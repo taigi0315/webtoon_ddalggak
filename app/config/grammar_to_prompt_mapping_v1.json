@@ -1,0 +1,11 @@
+{
+  "version": "v1",
+  "mapping": {
+    "establishing": "Wide establishing shot, environment clearly visible.",
+    "dialogue_medium": "Medium shot, two characters in frame, clear speech bubbles space.",
+    "emotion_closeup": "Close-up portrait, strong facial expression, emotional emphasis.",
+    "action": "Dynamic action pose, motion emphasis, dramatic lighting.",
+    "reaction": "Reaction shot, character responding, readable expression.",
+    "object_focus": "Close focus on an important object, detailed, centered composition."
+  }
+}

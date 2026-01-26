@@ -1,0 +1,11 @@
+{
+  "version": "v1",
+  "grammars": [
+    {"id": "establishing", "description": "Establish the setting and context."},
+    {"id": "dialogue_medium", "description": "Two characters speaking in a medium shot."},
+    {"id": "emotion_closeup", "description": "Close-up on a character's emotion."},
+    {"id": "action", "description": "Dynamic action moment."},
+    {"id": "reaction", "description": "Reaction shot to prior event."},
+    {"id": "object_focus", "description": "Focus on an important object."}
+  ]
+}

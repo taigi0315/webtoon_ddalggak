@@ -1,0 +1,16 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+pydantic-settings>=2.2
+sqlalchemy>=2.0
+alembic>=1.13
+psycopg[binary]>=3.1
+google-cloud-aiplatform>=1.71.0
+langgraph>=0.2.0
+
+[dev]
+pytest>=8.0
+httpx>=0.28.1
+ruff>=0.6
+black>=24.0
+mypy>=1.8

@@ -1,0 +1,22 @@
+{
+  "version": "v1",
+  "aspect_ratio": "9x16",
+  "templates": [
+    {
+      "template_id": "9x16_1",
+      "layout_text": "Single full-height panel",
+      "panels": [
+        {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
+      ]
+    },
+    {
+      "template_id": "9x16_3_vertical",
+      "layout_text": "Three stacked vertical panels",
+      "panels": [
+        {"x": 0.0, "y": 0.0, "w": 1.0, "h": 0.33},
+        {"x": 0.0, "y": 0.33, "w": 1.0, "h": 0.34},
+        {"x": 0.0, "y": 0.67, "w": 1.0, "h": 0.33}
+      ]
+    }
+  ]
+}

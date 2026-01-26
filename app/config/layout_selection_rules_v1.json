@@ -1,0 +1,8 @@
+{
+  "version": "v1",
+  "rules": [
+    {"panel_count": 1, "template_id": "9x16_1"},
+    {"panel_count": 3, "template_id": "9x16_3_vertical"}
+  ],
+  "default_template_id": "9x16_3_vertical"
+}
