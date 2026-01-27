@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   fetchImageStyles,
-  fetchProjects,
   fetchStories,
   fetchStoryStyles,
   setStoryStyleDefaults
@@ -32,11 +31,6 @@ export default function StyleSelectorPage() {
     setSelectedStoryStyle(storedStoryStyle);
     setSelectedImageStyle(storedImageStyle);
   }, [searchParams]);
-
-  const projectsQuery = useQuery({
-    queryKey: ["projects"],
-    queryFn: fetchProjects
-  });
 
   const storiesQuery = useQuery({
     queryKey: ["stories", projectId],
@@ -79,73 +73,10 @@ export default function StyleSelectorPage() {
   return (
     <section className="space-y-6">
       <div className="surface p-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="text-xs font-semibold text-slate-500">Project</label>
-            <select
-              className="input mt-2"
-              value={projectId}
-              onChange={(event) => {
-                setProjectId(event.target.value);
-                setStoryId("");
-              }}
-            >
-              <option value="">Select project</option>
-              {projectsQuery.data?.map((project) => (
-                <option key={project.project_id} value={project.project_id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-500">Story</label>
-            <select
-              className="input mt-2"
-              value={storyId}
-              onChange={(event) => setStoryId(event.target.value)}
-              disabled={!projectId || storiesQuery.isLoading}
-            >
-              <option value="">Select story (optional)</option>
-              {storiesQuery.data?.map((story) => (
-                <option key={story.story_id} value={story.story_id}>
-                  {story.title}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            className="btn-primary text-xs"
-            onClick={() => {
-              persistSelection(selectedStoryStyle, selectedImageStyle);
-              if (storyId) {
-                applyMutation.mutate({
-                  storyId,
-                  defaultStoryStyle: selectedStoryStyle,
-                  defaultImageStyle: selectedImageStyle
-                });
-              }
-            }}
-            disabled={!selectedStoryStyle || !selectedImageStyle}
-          >
-            Apply Styles
-          </button>
-          <button
-            className="btn-ghost text-xs"
-            onClick={() => {
-              persistSelection(selectedStoryStyle, selectedImageStyle);
-              const params = new URLSearchParams();
-              if (projectId) params.set("project_id", projectId);
-              if (storyId) params.set("story_id", storyId);
-              router.push(`/studio/story?${params.toString()}`);
-            }}
-          >
-            Continue to Story Editor
-          </button>
-          {statusMessage && <span className="text-xs text-slate-500">{statusMessage}</span>}
-        </div>
+        <h1 className="text-2xl font-semibold text-ink">Style Select</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Pick your story and image styles first. We’ll remember them for the Story Editor.
+        </p>
       </div>
 
       <div className="surface p-6">
@@ -205,6 +136,47 @@ export default function StyleSelectorPage() {
               </button>
             </div>
           ))}
+        </div>
+      </div>
+      <div className="surface p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">Ready to write?</p>
+            <p className="text-xs text-slate-500">
+              Continue to the Story Editor to create your story with these styles.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {storyId && (
+              <button
+                className="btn-ghost text-xs"
+                onClick={() => {
+                  persistSelection(selectedStoryStyle, selectedImageStyle);
+                  applyMutation.mutate({
+                    storyId,
+                    defaultStoryStyle: selectedStoryStyle,
+                    defaultImageStyle: selectedImageStyle
+                  });
+                }}
+                disabled={applyMutation.isPending}
+              >
+                Apply Styles to Story
+              </button>
+            )}
+            <button
+              className="btn-primary text-xs"
+              onClick={() => {
+                persistSelection(selectedStoryStyle, selectedImageStyle);
+                const params = new URLSearchParams();
+                if (projectId) params.set("project_id", projectId);
+                if (storyId) params.set("story_id", storyId);
+                router.push(`/studio/story?${params.toString()}`);
+              }}
+            >
+              Story Editor
+            </button>
+            {statusMessage && <span className="text-xs text-slate-500">{statusMessage}</span>}
+          </div>
         </div>
       </div>
     </section>

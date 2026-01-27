@@ -398,3 +398,548 @@ The separation above fixes all of these.
 ---
 
 If you want, paste me (or summarize) the **current node list / edges** from the messy implementation and I’ll rewrite it into the above structure with a concrete mapping: “old node X becomes S3”, “old node Y removed”, etc.
+
+
+Got it. Below are **production-grade prompts** for each LangGraph node, designed for **Gemini Flash 2.5** and your workflow:
+
+* **StoryBuildGraph** prompts (scene splitting, character extraction, visual plan, blind test)
+* **PerScenePlanningGraph** prompts (scene intent, panel plan, semantics)
+* **PromptCompiler** is rule/template driven (no LLM)
+* All prompts output **strict JSON** (so the graph doesn’t become “LLM poetry”)
+
+I’m writing these as **drop-in prompt templates** with variables like `{story_text}`. Your agent can implement them with a “system + user” message style.
+
+---
+
+# Prompt Standards (Apply to ALL nodes)
+
+## System message (same for all)
+
+Use this as the system prompt for all nodes:
+
+```text
+You are a strict JSON generator for a webtoon creation pipeline.
+Return ONLY valid JSON. No markdown. No commentary.
+Use double quotes for all keys and string values.
+Do not include trailing commas.
+If information is unknown, use null or an empty list.
+Follow the output schema exactly.
+```
+
+## Global constraints (append to user prompt)
+
+```text
+Constraints:
+- Do NOT invent named characters not present in the input unless the input clearly implies them (e.g., "her mom").
+- Keep outputs concise but complete.
+- Avoid repetition.
+- Respect the requested maximum counts.
+- If you are unsure, prefer conservative outputs.
+```
+
+---
+
+# StoryBuildGraph Prompts
+
+## S2 — SceneSplitter Prompt
+
+### Input variables
+
+* `{story_text}`
+* `{max_scenes}`
+* `{story_style}`
+
+### Output schema
+
+```json
+{
+  "scenes": [
+    {
+      "scene_index": 1,
+      "title": "string",
+      "summary": "string",
+      "source_text": "string",
+      "location_hint": "string|null",
+      "time_hint": "string|null",
+      "must_show": ["string"]
+    }
+  ]
+}
+```
+
+### Prompt
+
+```text
+Task: Split the story into a sequence of scenes for a vertical webtoon.
+Maximum number of scenes: {max_scenes}.
+Story style/genre: {story_style}.
+
+Rules:
+- Each scene must be a coherent beat with a clear purpose (setup, reveal, reaction, transition).
+- Prefer fewer scenes if the story is short; do not exceed max_scenes.
+- Each scene must include a short "must_show" list of 1-4 concrete visual elements (objects/actions) that are essential.
+
+Input story:
+{story_text}
+
+Return JSON with the schema exactly.
+```
+
+---
+
+## S3 — CharacterExtractor Prompt (this must fix “0 characters”)
+
+### Output schema
+
+```json
+{
+  "characters": [
+    {
+      "name": "string",
+      "role_guess": "main|secondary|background",
+      "evidence": ["string"],
+      "relationships": ["string"],
+      "notes": "string|null"
+    }
+  ]
+}
+```
+
+### Prompt
+
+```text
+Task: Extract ALL characters mentioned or implied in the story.
+Return at least the named characters. If the story includes two people interacting but only one name is given, include an implied character with name null and a descriptor (e.g., "unidentified woman").
+
+Rules:
+- Do not output zero characters unless the story truly has no people.
+- For each character, include evidence quotes (short phrases) from the input that justify their presence.
+- role_guess: main if central across scenes, secondary if appears in a scene but not core, background if minor.
+
+Input story:
+{story_text}
+
+Return JSON with the schema exactly.
+```
+
+> Implementation tip: if you still get empty output, run a second fallback extractor with “list every proper noun/person reference” as a rescue pass.
+
+---
+
+## S4 — CharacterProfileNormalizer Prompt
+
+This converts extracted characters into structured profiles you can prefill UI with.
+
+### Output schema
+
+```json
+{
+  "character_profiles": [
+    {
+      "character_key": "string",
+      "display_name": "string",
+      "role": "main|secondary|background",
+      "identity": {
+        "gender": "male|female|nonbinary|unknown",
+        "age_range": "teen|early_20s|late_20s|30s|40s|50s_plus|unknown",
+        "ethnicity": "string|null"
+      },
+      "appearance": {
+        "hair": "string",
+        "face": "string",
+        "build": "string"
+      },
+      "default_outfit": "string",
+      "baseline_mood": "string",
+      "identity_line": "string"
+    }
+  ]
+}
+```
+
+### Prompt
+
+```text
+Task: Create structured character profiles for webtoon consistency.
+You must fill reasonable defaults when details are missing:
+- gender: "unknown" if not inferable
+- age_range: "unknown" if not inferable
+- hair/face/build/outfit: provide generic but usable defaults
+
+Also create "identity_line": a compact visual descriptor used in prompts.
+Format: "<age_range> <ethnicity if known> <gender>, <hair>, <build>"
+
+Input story:
+{story_text}
+
+Extracted characters:
+{characters_json}
+
+Return JSON with the schema exactly.
+```
+
+---
+
+## S5 — StoryToVisualPlanCompiler Prompt
+
+### Output schema
+
+```json
+{
+  "scene_visual_plans": [
+    {
+      "scene_index": 1,
+      "beats": [
+        {
+          "beat_index": 1,
+          "what_happens": "string",
+          "characters_involved": ["string"],
+          "environment": "string",
+          "key_objects": ["string"],
+          "emotional_tone": "string",
+          "dialogue_draft": ["string"]
+        }
+      ]
+    }
+  ],
+  "global_environment_anchors": [
+    {
+      "anchor_key": "string",
+      "description": "string",
+      "importance": "high|medium|low"
+    }
+  ]
+}
+```
+
+### Prompt
+
+```text
+Task: Convert the story into a visual plan for a vertical webtoon.
+You already have scenes and character profiles. For each scene, produce 2-6 beats that can become panels later.
+
+Rules:
+- Beats should be visualizable (what we can see).
+- Dialogue_draft should be short and optional (0-2 lines per beat).
+- Use character display_name from the profiles.
+- Environment should be a concrete description (e.g., "apartment lobby with polished floors and potted plants").
+
+Story style: {story_style}
+
+Scenes:
+{scene_list_json}
+
+Character profiles:
+{character_profiles_json}
+
+Return JSON with the schema exactly.
+```
+
+---
+
+## S7 — BlindTestRunner (two prompts)
+
+### S7a Blind Reader Prompt
+
+Output schema:
+
+```json
+{
+  "reconstructed_story": "string",
+  "key_inferences": ["string"],
+  "uncertainties": ["string"]
+}
+```
+
+Prompt:
+
+```text
+Task: You are a blind reader. You only see a webtoon plan (visual beats + optional dialogue).
+Reconstruct the story as a short narrative using only what is visually shown.
+Do not add unrelated events.
+
+Visual plan:
+{scene_visual_plans_json}
+
+Return JSON with the schema exactly.
+```
+
+### S7b Comparator Prompt
+
+Output schema:
+
+```json
+{
+  "plot_recall": 0.0,
+  "emotional_alignment": 0.0,
+  "character_identifiability": 0.0,
+  "pacing_density": "too_slow|balanced|too_fast",
+  "visual_redundancy": "low|medium|high",
+  "failure_points": ["string"],
+  "repair_suggestions": [
+    {
+      "target": "scene_split|character_profiles|visual_plan",
+      "action": "string",
+      "reason": "string"
+    }
+  ]
+}
+```
+
+Prompt:
+
+```text
+Task: Compare original story vs reconstructed story.
+Score how well the visual plan conveys the original story.
+
+Original story:
+{story_text}
+
+Reconstructed story:
+{reconstructed_story}
+
+Return JSON with the schema exactly.
+
+Scoring rules:
+- Scores are 0.0 to 1.0
+- Be strict; only give high scores if clearly supported by the plan.
+```
+
+---
+
+# PerScenePlanningGraph Prompts
+
+## P1 — SceneIntentExtractor Prompt
+
+### Output schema
+
+```json
+{
+  "scene_intent": {
+    "scene_index": 1,
+    "logline": "string",
+    "pacing": "slow_burn|normal|fast|impact",
+    "core_reveal": "string|null",
+    "emotional_arc": ["string"],
+    "visual_motifs": ["string"]
+  }
+}
+```
+
+### Prompt
+
+```text
+Task: Create a concise directing intent for this scene for a vertical webtoon.
+
+Scene index: {scene_index}
+Scene source text:
+{scene_text}
+
+Story style: {story_style}
+
+Rules:
+- logline: one sentence describing the scene's purpose
+- pacing: choose one
+- emotional_arc: 2-5 steps (e.g., calm → unease → shock)
+- visual_motifs: 1-4 recurring visuals (objects, weather, lighting)
+
+Return JSON with the schema exactly.
+```
+
+---
+
+## P2 — PanelPlanGenerator Prompt (grammar-driven)
+
+### Output schema
+
+```json
+{
+  "panel_plan": {
+    "scene_index": 1,
+    "panel_count": 5,
+    "panels": [
+      {
+        "panel_id": 1,
+        "grammar_id": "establishing_environment|object_focus|character_action|reaction|emotion_closeup|dialogue_exchange|reveal|impact_silence",
+        "story_function": "string"
+      }
+    ]
+  }
+}
+```
+
+### Prompt
+
+```text
+Task: Create a panel plan (NOT prompts) for a single scene image.
+Target panel count: {panel_count}
+Allowed grammar_ids:
+- establishing_environment
+- object_focus
+- character_action
+- reaction
+- emotion_closeup
+- dialogue_exchange
+- reveal
+- impact_silence
+
+Scene intent:
+{scene_intent_json}
+
+Scene text:
+{scene_text}
+
+Character profiles (names + identity_line):
+{character_profiles_json}
+
+Hard rules:
+- No more than 2 emotion_closeup panels.
+- Do not repeat the same grammar_id 3 times in a row.
+- If there is a major reveal, include a reveal panel.
+- Ensure at least one panel shows environment unless the scene is purely internal monologue.
+
+Return JSON with the schema exactly.
+```
+
+---
+
+## P3 — PanelPlanNormalizer (rules-only)
+
+No LLM needed. Implement as deterministic code.
+
+Rules to enforce:
+
+* cap emotion_closeup
+* break triple repeats
+* if no environment panel → convert first panel to establishing_environment
+* if reveal described but missing reveal grammar → convert best-fit panel to reveal
+
+---
+
+## P4 — LayoutResolver (rules-only)
+
+No LLM needed. Implement as deterministic mapping:
+
+* panel_count + pacing + has_impact → template_id
+* templates include XYWH and reading_flow
+
+---
+
+## P5 — PanelSemanticFiller Prompt
+
+### Output schema
+
+```json
+{
+  "panel_semantics": {
+    "scene_index": 1,
+    "panels": [
+      {
+        "panel_id": 1,
+        "grammar_id": "string",
+        "camera": "string",
+        "focus": "string",
+        "environment": "string",
+        "characters": [
+          {
+            "name": "string",
+            "identity_line": "string",
+            "action": "string",
+            "emotion": "string",
+            "gaze": "string"
+          }
+        ],
+        "objects": ["string"],
+        "mood": "string",
+        "dialogue": ["string"]
+      }
+    ]
+  }
+}
+```
+
+### Prompt
+
+```text
+Task: Fill panel-level semantics for a single scene image.
+You MUST follow the grammar constraints per panel. Do NOT write an image prompt; write structured semantics.
+
+Scene text:
+{scene_text}
+
+Scene intent:
+{scene_intent_json}
+
+Panel plan:
+{panel_plan_json}
+
+Layout template (reading flow + panel boxes):
+{layout_template_json}
+
+Character profiles:
+{character_profiles_json}
+
+Grammar constraints:
+- establishing_environment: show environment; characters optional; no close-up faces.
+- object_focus: focus on a meaningful object; minimize faces.
+- character_action: show action clearly; medium or wide shot.
+- reaction: show reaction; can be medium shot; avoid camera-facing gaze.
+- emotion_closeup: close-up emotion; 1 character; avoid complex background.
+- dialogue_exchange: 2+ characters; readable staging; minimal action.
+- reveal: include the reveal subject (person/object) and context.
+- impact_silence: dramatic pause; minimal text; strong composition.
+
+Also:
+- For each character in a panel, include identity_line explicitly.
+- Gaze must be one of: "at_other", "at_object", "down", "away", "toward_path", "camera" (camera only for impact_silence if needed).
+
+Return JSON with the schema exactly.
+```
+
+---
+
+# SceneRenderGraph Prompting
+
+## R2 — PromptCompiler (NO LLM)
+
+This should be deterministic template code.
+
+Inputs:
+
+* image_style preset block
+* layout template description
+* panel semantics
+
+Output:
+
+* one big prompt string for Gemini
+
+If the agent insists on using LLM here, it will drift and degrade. Don’t.
+
+---
+
+# Bonus: “Progress messages” per node (UI requirement)
+
+Have each node set:
+
+* `progress.current_node`
+* `progress.message`
+* `progress.step`
+* `progress.total_steps`
+
+Example mapping:
+
+* S2: “Splitting story into scenes…”
+* S3: “Extracting characters…”
+* S5: “Compiling visual beats…”
+* S7: “Blind test: reconstructing story…” then “Blind test: comparing…”
+
+---
+
+# If you want, I can also provide:
+
+1. A **prompt library file** layout (`prompts/story_build/*.txt`, `prompts/scene_plan/*.txt`)
+2. A **fallback strategy** for when JSON parsing fails (self-repair prompts)
+3. Concrete **few-shot examples** for each node (very effective for Gemini)
+
+But the above is already enough to replace “shit prompts” with stable, structured outputs.

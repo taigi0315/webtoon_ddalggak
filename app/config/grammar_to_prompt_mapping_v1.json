@@ -6,6 +6,8 @@
     "emotion_closeup": "Close-up portrait, strong facial expression, emotional emphasis.",
     "action": "Dynamic action pose, motion emphasis, dramatic lighting.",
     "reaction": "Reaction shot, character responding, readable expression.",
-    "object_focus": "Close focus on an important object, detailed, centered composition."
+    "object_focus": "Close focus on an important object, detailed, centered composition.",
+    "reveal": "Dramatic reveal composition, subject entering frame or being unveiled, high contrast lighting.",
+    "impact_silence": "Stark dramatic pause, minimal elements, powerful negative space, frozen moment."
   }
 }

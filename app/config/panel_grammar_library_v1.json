@@ -6,6 +6,8 @@
     {"id": "emotion_closeup", "description": "Close-up on a character's emotion."},
     {"id": "action", "description": "Dynamic action moment."},
     {"id": "reaction", "description": "Reaction shot to prior event."},
-    {"id": "object_focus", "description": "Focus on an important object."}
+    {"id": "object_focus", "description": "Focus on an important object."},
+    {"id": "reveal", "description": "Dramatic reveal of character, object, or information."},
+    {"id": "impact_silence", "description": "Dramatic pause with minimal elements, strong composition."}
   ]
 }

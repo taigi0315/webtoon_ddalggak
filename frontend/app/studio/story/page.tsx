@@ -21,8 +21,19 @@ type Step = "setup" | "generating" | "review";
 const GENERATION_STEPS = [
   { id: "project", label: "Creating project..." },
   { id: "story", label: "Creating story..." },
-  { id: "blueprint", label: "Generating scenes, characters, panels, QC, and render specs..." },
+  { id: "blueprint", label: "Generating story blueprint..." },
   { id: "complete", label: "Generation complete!" }
+];
+
+const BLUEPRINT_MESSAGES = [
+  "Splitting story into scenes...",
+  "Extracting character profiles...",
+  "Normalizing character data...",
+  "Planning panel flow...",
+  "Resolving layouts...",
+  "Drafting panel semantics...",
+  "Running QC checks...",
+  "Preparing render specs..."
 ];
 
 export default function StoryEditorPage() {
@@ -31,6 +42,7 @@ export default function StoryEditorPage() {
   // Current step in the flow
   const [step, setStep] = useState<Step>("setup");
   const [generationStep, setGenerationStep] = useState(0);
+  const [blueprintMessageIndex, setBlueprintMessageIndex] = useState(0);
 
   // Setup form state
   const [projectId, setProjectId] = useState("");
@@ -115,6 +127,14 @@ export default function StoryEditorPage() {
       setGeneratedCharacters(charactersQuery.data);
     }
   }, [generatedCharacters.length, charactersQuery.data]);
+
+  useEffect(() => {
+    if (step !== "generating" || generationStep !== 2) return;
+    const interval = window.setInterval(() => {
+      setBlueprintMessageIndex((prev) => (prev + 1) % BLUEPRINT_MESSAGES.length);
+    }, 1800);
+    return () => window.clearInterval(interval);
+  }, [step, generationStep]);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -214,6 +234,11 @@ export default function StoryEditorPage() {
           <p className="mt-2 text-slate-500 text-center">
             Please wait while the AI processes your story...
           </p>
+          {generationStep === 2 && (
+            <p className="mt-3 text-xs text-indigo-600 text-center">
+              {BLUEPRINT_MESSAGES[blueprintMessageIndex]}
+            </p>
+          )}
 
           {/* Progress indicator */}
           <div className="mt-8 space-y-4">
@@ -281,7 +306,7 @@ export default function StoryEditorPage() {
         <div className="surface p-8">
           <h1 className="text-2xl font-bold text-ink">Create Your Webtoon</h1>
           <p className="mt-2 text-slate-500">
-            Styles are selected in the Style Defaults tab before story generation.
+            Styles are selected in the Style Select tab before story generation.
           </p>
           <div className="mt-6 rounded-xl border border-[rgba(17,24,39,0.12)] bg-white/70 p-4 text-sm text-slate-600">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Current Styles</p>

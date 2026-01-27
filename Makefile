@@ -57,7 +57,10 @@ dev:
 	@echo "  make dev-back   # backend only"
 	@echo "  make dev-front  # frontend only"
 
-dev-back: api
+dev-back:
+	docker compose up -d phoenix
+	@echo "Starting backend with Phoenix OTEL endpoint..."
+	PHOENIX_OTEL_ENDPOINT=http://localhost:6006/v1/traces uvicorn app.main:app --reload
 
 dev-front: ui
 

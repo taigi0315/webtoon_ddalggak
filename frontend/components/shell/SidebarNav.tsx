@@ -6,8 +6,8 @@ const items = [
 ];
 
 const studioItems = [
+  { label: "Style Select", href: "/studio/styles" },
   { label: "Story Editor", href: "/studio/story" },
-  { label: "Style Defaults", href: "/studio/styles" },
   { label: "Character Design", href: "/studio/characters" },
   { label: "Scene Design", href: "/studio/planner" },
   { label: "Dialogue Editor", href: "/studio/dialogue" }

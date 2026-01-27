@@ -1,4 +1,22 @@
+"use client";
+
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+
 export default function TopBar() {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries();
+      await queryClient.refetchQueries({ type: "active" });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
       <div>
@@ -9,6 +27,14 @@ export default function TopBar() {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <button
+          className="btn-ghost text-xs"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          title="Refresh cached data."
+        >
+          {isRefreshing ? "Refreshing..." : "Refresh"}
+        </button>
         <button className="btn-ghost text-xs" title="See the studio workflow guide.">
           Help
         </button>
