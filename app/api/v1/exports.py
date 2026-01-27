@@ -1,9 +1,12 @@
 import uuid
+import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 
 from app.api.deps import DbSessionDep
 from app.api.v1.schemas import ExportRead
+from app.core.settings import settings
 from app.db.models import Episode, EpisodeScene, ExportJob, Layer, Scene
 from app.graphs import nodes
 from app.services.artifacts import ArtifactService
@@ -152,3 +155,98 @@ def finalize_export(export_id: uuid.UUID, db=DbSessionDep):
     db.commit()
     db.refresh(job)
     return job
+
+
+def _generate_video_background(export_id: uuid.UUID, db_session_factory):
+    """Background task to generate video from export."""
+    from sqlalchemy.orm import Session
+    from app.services.video import generate_video_from_export_data
+
+    db: Session = db_session_factory()
+    try:
+        job = db.get(ExportJob, export_id)
+        if job is None:
+            return
+
+        try:
+            video_path = generate_video_from_export_data(
+                export_metadata=job.metadata_,
+                media_root=settings.media_root,
+                output_dir=os.path.join(settings.media_root, "videos"),
+            )
+
+            # Update job with video URL
+            video_url = f"/media/videos/{os.path.basename(video_path)}"
+            job.output_url = video_url
+            job.status = "succeeded"
+            job.metadata_["video_path"] = video_path
+            db.add(job)
+            db.commit()
+
+        except Exception as e:
+            job.status = "failed"
+            job.metadata_["error"] = str(e)
+            db.add(job)
+            db.commit()
+            raise
+
+    finally:
+        db.close()
+
+
+@router.post("/exports/{export_id}/generate-video", response_model=ExportRead)
+def generate_video_export(
+    export_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db=DbSessionDep,
+):
+    """Generate a video from an episode export.
+
+    The export must be finalized first. Video generation runs in the background.
+    Check the export status to see when it's complete.
+    """
+    job = db.get(ExportJob, export_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="export not found")
+
+    if job.status != "succeeded":
+        raise HTTPException(status_code=400, detail="export must be finalized first")
+
+    if not job.episode_id:
+        raise HTTPException(status_code=400, detail="video export only supported for episodes")
+
+    if not job.metadata_.get("scenes"):
+        raise HTTPException(status_code=400, detail="no scenes in export metadata")
+
+    # Mark as processing
+    job.status = "processing"
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    # Start background video generation
+    # Note: We need to pass the session factory, not the session itself
+    from app.db.session import SessionLocal
+    background_tasks.add_task(_generate_video_background, export_id, SessionLocal)
+
+    return job
+
+
+@router.get("/exports/{export_id}/video")
+def download_video_export(export_id: uuid.UUID, db=DbSessionDep):
+    """Download the generated video file."""
+    job = db.get(ExportJob, export_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="export not found")
+
+    video_path = job.metadata_.get("video_path")
+    if not video_path or not os.path.exists(video_path):
+        if job.status == "processing":
+            raise HTTPException(status_code=202, detail="video generation in progress")
+        raise HTTPException(status_code=404, detail="video not found")
+
+    return FileResponse(
+        video_path,
+        media_type="video/mp4",
+        filename=f"webtoon_export_{export_id}.mp4",
+    )

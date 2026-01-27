@@ -10,6 +10,108 @@ Assumptions (MVP-aligned):
 
 ---
 
+# **Testing Feedback — UI/Workflow Issues (Actionable)**
+
+This section captures testing feedback that should be treated as immediate UI/UX + workflow requirements.
+
+## **1) Story Editor missing “Max Number of Scenes”**
+
+**Problem**
+
+* Story Editor lacks a **Max Scenes** input.
+* This value must be passed into the LLM prompt to control scene count.
+
+**Expected**
+
+* Add **Max Scenes (integer)** in the story setup flow.
+* Pass it to backend during **Generate Story**.
+
+---
+
+## **2) Generate Story returns zero characters**
+
+**Problem**
+
+* Story generation produces scenes but **character list is empty**.
+* Character Design page shows no characters, blocking the flow.
+
+**Expected**
+
+* Generate Story must output:
+  * scenes (with readable summaries)
+  * **characters (profiles)** extracted/generated from the story
+* Characters must be auto-created in backend and visible immediately in Character tab.
+
+---
+
+## **3) Style selection must happen first**
+
+**Problem**
+
+* Style defaults UI is misplaced/duplicated.
+* Story style + image style should be chosen before story generation.
+
+**Expected**
+
+* First user step order:
+  1. choose **Story Style (genre)**
+  2. choose **Image Style**
+  3. enter story title + story text
+  4. set max scenes
+  5. click **Generate Story**
+* Do not repeat style selection later.
+
+---
+
+## **4) No progress visibility during long generation**
+
+**Problem**
+
+* Generate Story takes a long time with no feedback.
+
+**Expected**
+
+* Show **LangGraph progress/status**:
+  * node name (e.g., “Writing scenes…”, “Generating character profiles…”, “Generating panel descriptions…”, “Checking environments…”)
+  * step count/progress bar
+  * optional log stream
+
+---
+
+## **5) Scene Design/Render pages are too complex**
+
+**Problems**
+
+* Panel plan/layout controls are exposed to users.
+* Scene pages show **scene ID** (not useful).
+
+**Expected — Correct Scene Image flow**
+
+* A single **Scene Image** page:
+  * **Left column**: list of scenes with readable summary/text (no IDs)
+  * **Middle column**: image viewer
+  * **Buttons only**: Generate Image / Regenerate / Approve (Select as Reference)
+  * No panel plan UI, no scene ID input.
+
+---
+
+## **6) Caching/state persistence is broken**
+
+**Problems**
+
+* Navigating away and back causes data to disappear.
+
+**Expected**
+
+* Persist and reload:
+  * scenes from story generation
+  * generated characters + profiles
+  * character reference images
+  * scene renders (history)
+* Reset only on explicit regenerate or delete.
+
+---
+
 # **Implementation Plan — MVP (Backend \+ Graph)**
 
 ## **Milestone 0 — Repo & Foundations (Day 0–1)**

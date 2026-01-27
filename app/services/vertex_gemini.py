@@ -129,13 +129,41 @@ class GeminiClient:
 
         return self._extract_text_from_response(response)
 
-    def generate_image(self, prompt: str, model: str | None = None) -> tuple[bytes, str]:
+    def generate_image(
+        self,
+        prompt: str,
+        model: str | None = None,
+        reference_images: list[tuple[bytes, str]] | None = None,
+    ) -> tuple[bytes, str]:
+        """Generate an image with optional reference images for style/character consistency.
+
+        Args:
+            prompt: Text prompt for image generation
+            model: Optional model override
+            reference_images: Optional list of (image_bytes, mime_type) tuples for reference
+        """
         model_name = model or self._image_model
+
+        # Build contents with optional reference images
+        contents: list = []
+
+        if reference_images:
+            # Add reference images first as context
+            for img_bytes, mime_type in reference_images:
+                contents.append(
+                    types.Part.from_bytes(data=img_bytes, mime_type=mime_type)
+                )
+            # Add prompt with instruction to maintain character consistency
+            contents.append(
+                f"Using the reference images above for character appearance consistency:\n\n{prompt}"
+            )
+        else:
+            contents.append(prompt)
 
         response = self._retry(
             func=lambda: self._client.models.generate_content(
                 model=model_name,
-                contents=[prompt],
+                contents=contents,
                 config=types.GenerateContentConfig(
                     image_config=_DEFAULT_IMAGE_CONFIG,
                     safety_settings=_DEFAULT_SAFETY_SETTINGS,

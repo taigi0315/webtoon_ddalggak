@@ -31,6 +31,18 @@ export const projectsSchema = z.array(projectSchema);
 export const storiesSchema = z.array(storySchema);
 export const scenesSchema = z.array(sceneSchema);
 
+export const characterSchema = z.object({
+  character_id: z.string().uuid(),
+  story_id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  role: z.string(),
+  identity_line: z.string().nullable(),
+  approved: z.boolean()
+});
+
+export const charactersSchema = z.array(characterSchema);
+
 export const artifactIdSchema = z.object({
   artifact_id: z.string().uuid()
 });
@@ -54,10 +66,50 @@ export const styleItemSchema = z.object({
 
 export const styleItemsSchema = z.array(styleItemSchema);
 
+export const storyGenerateResponseSchema = z.object({
+  scenes: scenesSchema,
+  characters: charactersSchema
+});
+
+export const characterRefSchema = z.object({
+  reference_image_id: z.string().uuid(),
+  character_id: z.string().uuid(),
+  image_url: z.string(),
+  ref_type: z.string(),
+  approved: z.boolean(),
+  is_primary: z.boolean(),
+  metadata_: z.record(z.any())
+});
+
+export const characterRefsSchema = z.array(characterRefSchema);
+
+export const characterGenerateRefsResponseSchema = z.object({
+  character_id: z.string().uuid(),
+  generated_refs: characterRefsSchema
+});
+
+export const dialogueSuggestionSchema = z.object({
+  speaker: z.string(),
+  text: z.string(),
+  emotion: z.string(),
+  panel_hint: z.number().nullable()
+});
+
+export const dialogueSuggestionsSchema = z.object({
+  scene_id: z.string().uuid(),
+  suggestions: z.array(dialogueSuggestionSchema)
+});
+
 export type HealthStatus = z.infer<typeof healthSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type Story = z.infer<typeof storySchema>;
 export type Scene = z.infer<typeof sceneSchema>;
+export type Character = z.infer<typeof characterSchema>;
 export type ArtifactIdResponse = z.infer<typeof artifactIdSchema>;
 export type Artifact = z.infer<typeof artifactSchema>;
 export type StyleItem = z.infer<typeof styleItemSchema>;
+export type StoryGenerateResponse = z.infer<typeof storyGenerateResponseSchema>;
+export type CharacterRef = z.infer<typeof characterRefSchema>;
+export type CharacterGenerateRefsResponse = z.infer<typeof characterGenerateRefsResponseSchema>;
+export type DialogueSuggestion = z.infer<typeof dialogueSuggestionSchema>;
+export type DialogueSuggestions = z.infer<typeof dialogueSuggestionsSchema>;

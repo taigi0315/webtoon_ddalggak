@@ -5,7 +5,7 @@ export default function TopBar() {
         <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Studio</p>
         <h1 className="text-2xl font-semibold text-ink">Webtoon Production Workflow</h1>
         <div className="mt-2 text-xs text-slate-500">
-          Project &gt; Story &gt; Scenes &gt; Character Design &gt; Scene Design &gt; Render &gt; Dialogue &gt; Export
+          Project &gt; Story &gt; Scenes &gt; Character Design &gt; Scene Design &gt; Dialogue &gt; Export
         </div>
       </div>
       <div className="flex items-center gap-2">

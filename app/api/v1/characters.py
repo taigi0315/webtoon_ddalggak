@@ -10,9 +10,13 @@ from app.api.v1.schemas import (
     CharacterRead,
     CharacterRefCreate,
     CharacterRefRead,
+    CharacterUpdate,
     CharacterSetPrimaryRefRequest,
+    CharacterGenerateRefsRequest,
+    CharacterGenerateRefsResponse,
 )
 from app.db.models import Character, CharacterReferenceImage, Story
+from app.graphs import nodes
 
 
 router = APIRouter(tags=["characters"])
@@ -31,6 +35,27 @@ def create_character(story_id: uuid.UUID, payload: CharacterCreate, db=DbSession
         role=payload.role,
         identity_line=payload.identity_line,
     )
+    db.add(character)
+    db.commit()
+    db.refresh(character)
+    return character
+
+
+@router.patch("/characters/{character_id}", response_model=CharacterRead)
+def update_character(character_id: uuid.UUID, payload: CharacterUpdate, db=DbSessionDep):
+    character = db.get(Character, character_id)
+    if character is None:
+        raise HTTPException(status_code=404, detail="character not found")
+
+    if "name" in payload.model_fields_set and payload.name is not None:
+        character.name = payload.name
+    if "description" in payload.model_fields_set:
+        character.description = payload.description
+    if "role" in payload.model_fields_set and payload.role is not None:
+        character.role = payload.role
+    if "identity_line" in payload.model_fields_set:
+        character.identity_line = payload.identity_line
+
     db.add(character)
     db.commit()
     db.refresh(character)
@@ -139,3 +164,53 @@ def set_primary_character_ref(character_id: uuid.UUID, payload: CharacterSetPrim
     db.commit()
     db.refresh(ref)
     return ref
+
+
+@router.delete("/characters/{character_id}/refs/{reference_image_id}")
+def delete_character_ref(character_id: uuid.UUID, reference_image_id: uuid.UUID, db=DbSessionDep):
+    """Delete a character reference image."""
+    character = db.get(Character, character_id)
+    if character is None:
+        raise HTTPException(status_code=404, detail="character not found")
+
+    ref = db.get(CharacterReferenceImage, reference_image_id)
+    if ref is None or ref.character_id != character_id:
+        raise HTTPException(status_code=404, detail="reference image not found")
+
+    db.delete(ref)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.post("/characters/{character_id}/generate-refs", response_model=CharacterGenerateRefsResponse)
+def generate_character_refs(character_id: uuid.UUID, payload: CharacterGenerateRefsRequest, db=DbSessionDep):
+    """Generate AI character reference images based on character description."""
+    character = db.get(Character, character_id)
+    if character is None:
+        raise HTTPException(status_code=404, detail="character not found")
+
+    if not character.description and not character.identity_line:
+        raise HTTPException(
+            status_code=400,
+            detail="character needs description or identity_line to generate reference images"
+        )
+
+    story_style = None
+    if character.story:
+        story_style = character.story.default_story_style
+
+    generated_refs: list[CharacterReferenceImage] = []
+    for ref_type in payload.ref_types:
+        for _ in range(payload.count_per_type):
+            ref = nodes.generate_character_reference_image(
+                db=db,
+                character_id=character_id,
+                ref_type=ref_type,
+                story_style=story_style,
+            )
+            generated_refs.append(ref)
+
+    return CharacterGenerateRefsResponse(
+        character_id=character_id,
+        generated_refs=generated_refs,
+    )

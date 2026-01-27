@@ -1,4 +1,4 @@
-.PHONY: help install install-back install-front dev dev-install dev-back dev-front db-up db-migrate db-down api ui test lint clean test-data
+.PHONY: help install install-back install-front dev dev-install dev-back dev-front db-up db-migrate db-down api ui kill test lint clean test-data
 
 # Default target
 help:
@@ -60,6 +60,14 @@ dev:
 dev-back: api
 
 dev-front: ui
+
+kill:
+	@echo "Stopping backend (uvicorn) and frontend (next dev)..."
+	@pkill -f "uvicorn app.main:app" 2>/dev/null || true
+	@pkill -f "next dev" 2>/dev/null || true
+	@pkill -f "npm --prefix frontend run dev" 2>/dev/null || true
+	@pkill -f "node .*next" 2>/dev/null || true
+	@echo "Done."
 
 test:
 	pytest -q

@@ -132,8 +132,8 @@ export default function ProjectsPage() {
                   </button>
                   <Link
                     className="btn-ghost text-xs"
-                    href={`/studio/story?project_id=${project.project_id}`}
-                    title="Open this project in the story editor."
+                    href={`/studio/styles?project_id=${project.project_id}`}
+                    title="Open style selection for this project."
                   >
                     Open
                   </Link>

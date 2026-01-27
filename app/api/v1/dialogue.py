@@ -3,8 +3,15 @@ import uuid
 from fastapi import APIRouter, HTTPException
 
 from app.api.deps import DbSessionDep
-from app.api.v1.schemas import DialogueLayerCreate, DialogueLayerRead, DialogueLayerUpdate
+from app.api.v1.schemas import (
+    DialogueLayerCreate,
+    DialogueLayerRead,
+    DialogueLayerUpdate,
+    DialogueSuggestionsRead,
+)
 from app.db.models import DialogueLayer, Scene
+from app.services.artifacts import ArtifactService
+from app.graphs.nodes import ARTIFACT_DIALOGUE_SUGGESTIONS
 
 
 router = APIRouter(tags=["dialogue"])
@@ -50,3 +57,20 @@ def get_dialogue(scene_id: uuid.UUID, db=DbSessionDep):
     if layer is None:
         raise HTTPException(status_code=404, detail="dialogue not found")
     return layer
+
+
+@router.get("/scenes/{scene_id}/dialogue/suggestions", response_model=DialogueSuggestionsRead)
+def get_dialogue_suggestions(scene_id: uuid.UUID, db=DbSessionDep):
+    """Get pre-generated dialogue suggestions extracted from scene text."""
+    scene = db.get(Scene, scene_id)
+    if scene is None:
+        raise HTTPException(status_code=404, detail="scene not found")
+
+    artifact = ArtifactService(db).get_latest_artifact(scene_id, ARTIFACT_DIALOGUE_SUGGESTIONS)
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="dialogue suggestions not found; run story blueprint first")
+
+    return DialogueSuggestionsRead(
+        scene_id=scene_id,
+        suggestions=artifact.payload.get("suggestions", []),
+    )

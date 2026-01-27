@@ -9,7 +9,13 @@ import {
   storiesSchema,
   sceneSchema,
   storySchema,
-  styleItemsSchema
+  styleItemsSchema,
+  charactersSchema,
+  storyGenerateResponseSchema,
+  characterRefsSchema,
+  characterRefSchema,
+  characterGenerateRefsResponseSchema,
+  dialogueSuggestionsSchema
 } from "@/lib/api/types";
 
 export async function fetchHealth() {
@@ -54,6 +60,21 @@ export async function createStory(params: {
   return storySchema.parse(payload);
 }
 
+export async function setStoryStyleDefaults(params: {
+  storyId: string;
+  defaultStoryStyle: string;
+  defaultImageStyle: string;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/set-style-defaults`, {
+    method: "POST",
+    body: JSON.stringify({
+      default_story_style: params.defaultStoryStyle,
+      default_image_style: params.defaultImageStyle
+    })
+  });
+  return storySchema.parse(payload);
+}
+
 export async function fetchStory(storyId: string) {
   const payload = await fetchJson(`/v1/stories/${storyId}`);
   return storySchema.parse(payload);
@@ -62,6 +83,49 @@ export async function fetchStory(storyId: string) {
 export async function fetchStories(projectId: string) {
   const payload = await fetchJson(`/v1/projects/${projectId}/stories`);
   return storiesSchema.parse(payload);
+}
+
+export async function fetchCharacters(storyId: string) {
+  const payload = await fetchJson(`/v1/stories/${storyId}/characters`);
+  return charactersSchema.parse(payload);
+}
+
+export async function createCharacter(params: {
+  storyId: string;
+  name: string;
+  description?: string | null;
+  role?: string;
+  identityLine?: string | null;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/characters`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: params.name,
+      description: params.description ?? null,
+      role: params.role ?? "secondary",
+      identity_line: params.identityLine ?? null
+    })
+  });
+  return charactersSchema.element.parse(payload);
+}
+
+export async function updateCharacter(params: {
+  characterId: string;
+  name?: string | null;
+  description?: string | null;
+  role?: string | null;
+  identityLine?: string | null;
+}) {
+  const payload = await fetchJson(`/v1/characters/${params.characterId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: params.name ?? undefined,
+      description: params.description ?? undefined,
+      role: params.role ?? undefined,
+      identity_line: params.identityLine ?? undefined
+    })
+  });
+  return charactersSchema.element.parse(payload);
 }
 
 export async function createScene(params: {
@@ -139,6 +203,31 @@ export async function autoChunkScenes(params: {
   return scenesSchema.parse(payload);
 }
 
+export async function generateStoryBlueprint(params: {
+  storyId: string;
+  sourceText: string;
+  maxScenes?: number;
+  panelCount?: number;
+  styleId?: string;
+  maxCharacters?: number;
+  generateRenderSpec?: boolean;
+  allowAppend?: boolean;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/generate/blueprint`, {
+    method: "POST",
+    body: JSON.stringify({
+      source_text: params.sourceText,
+      max_scenes: params.maxScenes ?? 6,
+      panel_count: params.panelCount ?? 3,
+      style_id: params.styleId ?? null,
+      max_characters: params.maxCharacters ?? 6,
+      generate_render_spec: params.generateRenderSpec ?? true,
+      allow_append: params.allowAppend ?? false
+    })
+  });
+  return storyGenerateResponseSchema.parse(payload);
+}
+
 export async function generateSceneIntent(sceneId: string) {
   const payload = await fetchJson(`/v1/scenes/${sceneId}/generate/scene-intent`, {
     method: "POST"
@@ -180,4 +269,76 @@ export async function evaluateQc(sceneId: string) {
     method: "POST"
   });
   return artifactIdSchema.parse(payload);
+}
+
+// Character Reference Image APIs
+
+export async function fetchCharacterRefs(characterId: string) {
+  const payload = await fetchJson(`/v1/characters/${characterId}/refs`);
+  return characterRefsSchema.parse(payload);
+}
+
+export async function generateCharacterRefs(params: {
+  characterId: string;
+  refTypes?: string[];
+  countPerType?: number;
+}) {
+  const payload = await fetchJson(`/v1/characters/${params.characterId}/generate-refs`, {
+    method: "POST",
+    body: JSON.stringify({
+      ref_types: params.refTypes ?? ["face"],
+      count_per_type: params.countPerType ?? 2
+    })
+  });
+  return characterGenerateRefsResponseSchema.parse(payload);
+}
+
+export async function approveCharacterRef(params: {
+  characterId: string;
+  referenceImageId: string;
+}) {
+  const payload = await fetchJson(`/v1/characters/${params.characterId}/approve-ref`, {
+    method: "POST",
+    body: JSON.stringify({
+      reference_image_id: params.referenceImageId
+    })
+  });
+  return characterRefSchema.parse(payload);
+}
+
+export async function deleteCharacterRef(params: {
+  characterId: string;
+  referenceImageId: string;
+}) {
+  await fetchJson(`/v1/characters/${params.characterId}/refs/${params.referenceImageId}`, {
+    method: "DELETE"
+  });
+  return null;
+}
+
+export async function setPrimaryCharacterRef(params: {
+  characterId: string;
+  referenceImageId: string;
+}) {
+  const payload = await fetchJson(`/v1/characters/${params.characterId}/set-primary-ref`, {
+    method: "POST",
+    body: JSON.stringify({
+      reference_image_id: params.referenceImageId
+    })
+  });
+  return characterRefSchema.parse(payload);
+}
+
+export async function approveCharacter(characterId: string) {
+  const payload = await fetchJson(`/v1/characters/${characterId}/approve`, {
+    method: "POST"
+  });
+  return charactersSchema.element.parse(payload);
+}
+
+// Dialogue APIs
+
+export async function fetchDialogueSuggestions(sceneId: string) {
+  const payload = await fetchJson(`/v1/scenes/${sceneId}/dialogue/suggestions`);
+  return dialogueSuggestionsSchema.parse(payload);
 }

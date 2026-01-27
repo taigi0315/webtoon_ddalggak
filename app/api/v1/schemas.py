@@ -95,6 +95,28 @@ class CharacterRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CharacterUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    role: str | None = Field(default=None, min_length=1, max_length=32)
+    identity_line: str | None = None
+
+
+class StoryGenerateRequest(BaseModel):
+    source_text: str = Field(min_length=1)
+    max_scenes: int = Field(default=6, ge=1, le=20)
+    panel_count: int = Field(default=3, ge=1, le=12)
+    style_id: str | None = Field(default=None, min_length=1, max_length=64)
+    max_characters: int = Field(default=6, ge=1, le=20)
+    generate_render_spec: bool = True
+    allow_append: bool = False
+
+
+class StoryGenerateResponse(BaseModel):
+    scenes: list[SceneRead]
+    characters: list[CharacterRead]
+
+
 class CharacterRefCreate(BaseModel):
     image_url: str = Field(min_length=1)
     ref_type: str = Field(default="face", min_length=1, max_length=32)
@@ -118,6 +140,29 @@ class CharacterApproveRefRequest(BaseModel):
 
 class CharacterSetPrimaryRefRequest(BaseModel):
     reference_image_id: uuid.UUID
+
+
+class CharacterGenerateRefsRequest(BaseModel):
+    ref_types: list[str] = Field(default=["face"], min_length=1)
+    count_per_type: int = Field(default=2, ge=1, le=5)
+
+
+class CharacterGenerateRefsResponse(BaseModel):
+    character_id: uuid.UUID
+    generated_refs: list["CharacterRefRead"]
+
+
+class DialogueSuggestion(BaseModel):
+    """Pre-generated dialogue extracted from scene text for later positioning."""
+    speaker: str
+    text: str
+    emotion: str = "neutral"
+    panel_hint: int | None = None
+
+
+class DialogueSuggestionsRead(BaseModel):
+    scene_id: uuid.UUID
+    suggestions: list[DialogueSuggestion]
 
 
 class ArtifactRead(BaseModel):

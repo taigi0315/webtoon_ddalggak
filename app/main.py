@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.settings import settings
+from app.core.telemetry import setup_telemetry
 from app.db.base import Base
 from app.db.session import get_engine, init_engine
 
@@ -22,6 +23,8 @@ async def lifespan(app: FastAPI):
     logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
 
     init_engine(settings.database_url)
+
+    setup_telemetry(app, service_name="ssuljaengi")
 
     if settings.db_auto_create and settings.database_url.startswith("sqlite"):
         engine = get_engine()

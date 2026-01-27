@@ -10,7 +10,6 @@ const studioItems = [
   { label: "Style Defaults", href: "/studio/styles" },
   { label: "Character Design", href: "/studio/characters" },
   { label: "Scene Design", href: "/studio/planner" },
-  { label: "Scene Render", href: "/studio/render" },
   { label: "Dialogue Editor", href: "/studio/dialogue" }
 ];
 
