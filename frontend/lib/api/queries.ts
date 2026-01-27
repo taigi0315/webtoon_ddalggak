@@ -8,7 +8,8 @@ import {
   scenesSchema,
   storiesSchema,
   sceneSchema,
-  storySchema
+  storySchema,
+  styleItemsSchema
 } from "@/lib/api/types";
 
 export async function fetchHealth() {
@@ -27,6 +28,13 @@ export async function createProject(name: string) {
     body: JSON.stringify({ name })
   });
   return projectSchema.parse(payload);
+}
+
+export async function deleteProject(projectId: string) {
+  await fetchJson(`/v1/projects/${projectId}`, {
+    method: "DELETE"
+  });
+  return null;
 }
 
 export async function createStory(params: {
@@ -81,8 +89,53 @@ export async function fetchSceneArtifacts(sceneId: string) {
   return artifactsSchema.parse(payload);
 }
 
+export async function fetchSceneRenders(sceneId: string) {
+  const payload = await fetchJson(`/v1/scenes/${sceneId}/renders`);
+  return artifactsSchema.parse(payload);
+}
+
+export async function fetchStoryStyles() {
+  const payload = await fetchJson("/v1/styles/story");
+  return styleItemsSchema.parse(payload);
+}
+
+export async function fetchImageStyles() {
+  const payload = await fetchJson("/v1/styles/image");
+  return styleItemsSchema.parse(payload);
+}
+
+export async function generateRenderSpec(sceneId: string, styleId: string) {
+  const payload = await fetchJson(`/v1/scenes/${sceneId}/generate/render-spec`, {
+    method: "POST",
+    body: JSON.stringify({ style_id: styleId })
+  });
+  return artifactIdSchema.parse(payload);
+}
+
+export async function generateRender(sceneId: string) {
+  const payload = await fetchJson(`/v1/scenes/${sceneId}/generate/render`, {
+    method: "POST"
+  });
+  return artifactIdSchema.parse(payload);
+}
+
 export async function fetchScenes(storyId: string) {
   const payload = await fetchJson(`/v1/stories/${storyId}/scenes`);
+  return scenesSchema.parse(payload);
+}
+
+export async function autoChunkScenes(params: {
+  storyId: string;
+  sourceText: string;
+  maxScenes?: number;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/scenes/auto-chunk`, {
+    method: "POST",
+    body: JSON.stringify({
+      source_text: params.sourceText,
+      max_scenes: params.maxScenes ?? 6
+    })
+  });
   return scenesSchema.parse(payload);
 }
 
@@ -117,6 +170,13 @@ export async function generateLayout(sceneId: string) {
 
 export async function generatePanelSemantics(sceneId: string) {
   const payload = await fetchJson(`/v1/scenes/${sceneId}/generate/panel-semantics`, {
+    method: "POST"
+  });
+  return artifactIdSchema.parse(payload);
+}
+
+export async function evaluateQc(sceneId: string) {
+  const payload = await fetchJson(`/v1/scenes/${sceneId}/evaluate/qc`, {
     method: "POST"
   });
   return artifactIdSchema.parse(payload);

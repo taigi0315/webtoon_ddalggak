@@ -4,58 +4,49 @@ export default function CharacterStudioPage() {
       <div className="surface p-6">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-ink">Characters</h3>
-          <button className="btn-ghost text-xs">New</button>
+          <button className="btn-ghost text-xs" title="Create a new character profile.">
+            New
+          </button>
         </div>
-        <div className="mt-4 space-y-3">
-          {[
-            { name: "Ji-hoon", ready: true },
-            { name: "Min-ji", ready: false },
-            { name: "Tae-woo", ready: false }
-          ].map((character) => (
-            <div key={character.name} className="card flex items-center justify-between">
-              <span className="text-sm font-semibold text-ink">{character.name}</span>
-              <span className="pill text-[10px]">
-                {character.ready ? "Ready" : "Needs refs"}
-              </span>
-            </div>
-          ))}
+        <p className="mt-2 text-xs text-slate-500">
+          Build character references first to keep scene renders consistent.
+        </p>
+        <div className="mt-4 card text-sm text-slate-500">
+          No characters yet. Create one to begin reference generation.
         </div>
       </div>
       <div className="surface p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-ink">Character Profile</h2>
-          <button className="btn-primary text-xs">Save</button>
+          <button className="btn-primary text-xs" title="Save character details.">
+            Save
+          </button>
         </div>
         <div className="mt-4 grid gap-3">
-          <input className="input" placeholder="Name" defaultValue="Ji-hoon" />
+          <input className="input" placeholder="Name" />
           <div className="grid grid-cols-2 gap-3">
-            <input className="input" placeholder="Role" defaultValue="Main" />
-            <input className="input" placeholder="Age" defaultValue="26" />
+            <input className="input" placeholder="Role" />
+            <input className="input" placeholder="Age" />
           </div>
-          <input className="input" placeholder="Appearance" defaultValue="Short black hair, casual, reserved" />
-          <textarea
-            className="textarea"
-            defaultValue="Identity line: A soft-spoken architect with a guarded heart."
-          />
+          <input className="input" placeholder="Appearance" />
+          <textarea className="textarea" placeholder="Identity line" />
           <div className="flex flex-wrap gap-2">
-            <button className="btn-ghost text-xs">Generate Refs</button>
-            <button className="btn-ghost text-xs">Regenerate</button>
-            <button className="btn-primary text-xs">Approve Face</button>
+            <button className="btn-ghost text-xs" title="Generate character reference images.">
+              Generate Refs
+            </button>
+            <button className="btn-ghost text-xs" title="Regenerate the latest references.">
+              Regenerate
+            </button>
+            <button className="btn-primary text-xs" title="Approve the selected face reference.">
+              Approve Face
+            </button>
           </div>
         </div>
       </div>
       <div className="surface p-6">
         <h3 className="text-lg font-semibold text-ink">Reference Images</h3>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="card space-y-2">
-              <div className="h-24 rounded-lg bg-gradient-to-br from-slate-100 via-white to-slate-200" />
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>Face #{index + 1}</span>
-                <button className="btn-ghost text-[10px]">Set</button>
-              </div>
-            </div>
-          ))}
+        <div className="mt-4 card text-sm text-slate-500">
+          No reference images yet. Generate refs after creating a character.
         </div>
       </div>
     </section>

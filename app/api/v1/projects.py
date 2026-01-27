@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import select
 
 from app.api.deps import DbSessionDep
@@ -23,6 +23,14 @@ def create_project(payload: ProjectCreate, db=DbSessionDep):
 @router.get("/projects", response_model=list[ProjectRead])
 def list_projects(db=DbSessionDep):
     return list(db.execute(select(Project)).scalars().all())
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+def delete_project(project_id: uuid.UUID, db=DbSessionDep):
+    project = get_project_or_404(db, project_id)
+    db.delete(project)
+    db.commit()
+    return Response(status_code=204)
 
 
 def get_project_or_404(db, project_id: uuid.UUID) -> Project:

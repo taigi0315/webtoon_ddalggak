@@ -60,6 +60,11 @@ class SceneSetEnvironmentRequest(BaseModel):
     environment_id: uuid.UUID | None = None
 
 
+class SceneAutoChunkRequest(BaseModel):
+    source_text: str = Field(min_length=1)
+    max_scenes: int = Field(default=6, ge=1, le=20)
+
+
 class StorySetStyleDefaultsRequest(BaseModel):
     default_story_style: str = Field(min_length=1, max_length=64)
     default_image_style: str = Field(min_length=1, max_length=64)

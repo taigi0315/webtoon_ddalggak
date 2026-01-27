@@ -103,6 +103,13 @@ h1, h2, h3, h4 {
   background: rgba(255, 255, 255, 0.6);
 }
 
+.btn-primary:disabled,
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .pill {
   border: 1px solid var(--border);
   border-radius: 999px;

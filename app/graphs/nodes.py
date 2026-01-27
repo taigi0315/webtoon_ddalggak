@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 import logging
 
@@ -110,6 +111,53 @@ def compute_panel_plan_normalizer(panel_plan: dict) -> dict:
             last_two = last_two[-2:]
 
     return {"panels": normalized}
+
+
+def compute_scene_chunker(
+    source_text: str,
+    max_scenes: int = 6,
+    gemini: GeminiClient | None = None,
+) -> list[str]:
+    if not source_text or not source_text.strip():
+        raise ValueError("source_text is required for auto-chunking")
+
+    gemini = gemini or _build_gemini_client()
+    prompt = (
+        "Split the story into distinct scenes. Return ONLY a JSON list of scene strings.\n"
+        "Rules:\n"
+        "- Each scene should be 1-4 sentences.\n"
+        f"- Max scenes: {max_scenes}.\n"
+        "- Do not include numbering or extra keys.\n\n"
+        f"STORY_TEXT:\n{source_text}\n"
+    )
+
+    text = gemini.generate_text(prompt)
+    chunks: list[str] = []
+    try:
+        payload = json.loads(text)
+        if isinstance(payload, list):
+            chunks = [str(item).strip() for item in payload if str(item).strip()]
+    except Exception:
+        chunks = []
+
+    if len(chunks) <= 1:
+        chunks = []
+
+    if not chunks:
+        # Fallback: split by paragraphs, then by sentences.
+        paragraphs = [p.strip() for p in source_text.split("\n\n") if p.strip()]
+        if len(paragraphs) > 1:
+            chunks = paragraphs
+        else:
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", source_text.strip()) if s.strip()]
+            if sentences:
+                size = 2
+                chunks = [" ".join(sentences[i : i + size]) for i in range(0, len(sentences), size)]
+
+    if max_scenes and len(chunks) > max_scenes:
+        chunks = chunks[:max_scenes]
+
+    return chunks
 
 
 def compute_qc_report(panel_plan: dict, panel_semantics: dict) -> dict:
@@ -560,6 +608,34 @@ def run_image_renderer(
     gemini: GeminiClient | None = None,
     reason: str | None = None,
 ):
+    scene = db.get(Scene, scene_id)
+    if scene is None:
+        raise ValueError("scene not found")
+
+    chars = list(db.execute(select(Character).where(Character.story_id == scene.story_id)).scalars().all())
+    if not chars:
+        raise ValueError("no characters found; create characters and approve primary face refs before rendering")
+
+    primary_refs = list(
+        db.execute(
+            select(CharacterReferenceImage).where(
+                CharacterReferenceImage.character_id.in_([c.character_id for c in chars]),
+                CharacterReferenceImage.ref_type == "face",
+                CharacterReferenceImage.approved.is_(True),
+                CharacterReferenceImage.is_primary.is_(True),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    primary_by_character_id = {r.character_id for r in primary_refs}
+
+    main_chars = [c for c in chars if (c.role or "").lower() == "main"]
+    target_chars = main_chars if main_chars else chars
+    missing = [c.name for c in target_chars if c.character_id not in primary_by_character_id]
+    if missing:
+        raise ValueError(f"missing primary face refs for: {', '.join(missing)}")
+
     svc = ArtifactService(db)
     spec = svc.get_latest_artifact(scene_id, ARTIFACT_RENDER_SPEC)
     if spec is None:

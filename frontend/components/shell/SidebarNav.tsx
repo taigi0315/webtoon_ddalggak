@@ -7,10 +7,10 @@ const items = [
 
 const studioItems = [
   { label: "Story Editor", href: "/studio/story" },
-  { label: "Character Studio", href: "/studio/characters" },
-  { label: "Style Selector", href: "/studio/styles" },
-  { label: "Scene Planner", href: "/studio/planner" },
-  { label: "Scene Renderer", href: "/studio/render" },
+  { label: "Style Defaults", href: "/studio/styles" },
+  { label: "Character Design", href: "/studio/characters" },
+  { label: "Scene Design", href: "/studio/planner" },
+  { label: "Scene Render", href: "/studio/render" },
   { label: "Dialogue Editor", href: "/studio/dialogue" }
 ];
 

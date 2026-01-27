@@ -4,28 +4,12 @@ export default function EpisodesPage() {
       <div className="surface p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-ink">Episode Builder</h2>
-          <button className="btn-primary text-xs">New Episode</button>
+          <button className="btn-primary text-xs" title="Create a new episode from scenes.">
+            New Episode
+          </button>
         </div>
-        <div className="mt-4 space-y-3">
-          {[
-            "Episode 1 - Blue Couch Reunion",
-            "Episode 2 - Shadow Nights"
-          ].map((episode) => (
-            <div key={episode} className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-ink">{episode}</p>
-                  <p className="mt-1 text-xs text-slate-500">Scenes: 8 - Status: planning</p>
-                </div>
-                <button className="btn-ghost text-xs">Open</button>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className="panel-dash h-16" />
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="mt-4 card text-sm text-slate-500">
+          No episodes yet. Create one after finalizing scenes.
         </div>
       </div>
       <div className="surface p-6">
@@ -43,21 +27,13 @@ export default function EpisodesPage() {
           <label className="flex items-center gap-2 text-xs text-slate-600">
             <input type="checkbox" defaultChecked /> Include dialogue layers
           </label>
-          <button className="btn-primary text-xs">Start Export</button>
+          <button className="btn-primary text-xs" title="Generate export assets for this episode.">
+            Start Export
+          </button>
         </div>
         <div className="mt-6">
           <h4 className="text-sm font-semibold text-ink">Jobs</h4>
-          <div className="mt-3 space-y-2">
-            {[
-              "Episode 1 - queued",
-              "Episode 2 - done"
-            ].map((job) => (
-              <div key={job} className="card flex items-center justify-between text-xs text-slate-600">
-                <span>{job}</span>
-                <button className="btn-ghost text-xs">Download</button>
-              </div>
-            ))}
-          </div>
+          <div className="mt-3 card text-sm text-slate-500">No export jobs yet.</div>
         </div>
       </div>
     </section>

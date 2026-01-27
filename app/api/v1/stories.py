@@ -4,9 +4,10 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
 from app.api.deps import DbSessionDep
-from app.api.v1.schemas import StoryCreate, StoryRead, StorySetStyleDefaultsRequest
+from app.api.v1.schemas import SceneAutoChunkRequest, SceneRead, StoryCreate, StoryRead, StorySetStyleDefaultsRequest
 from app.config.loaders import has_image_style, has_story_style
-from app.db.models import Project, Story
+from app.db.models import Project, Scene, Story
+from app.graphs import nodes
 
 
 router = APIRouter(tags=["stories"])
@@ -51,6 +52,29 @@ def list_project_stories(project_id: uuid.UUID, db=DbSessionDep):
 
     stories = db.execute(select(Story).where(Story.project_id == project_id)).scalars().all()
     return list(stories)
+
+
+@router.post("/stories/{story_id}/scenes/auto-chunk", response_model=list[SceneRead])
+def auto_chunk_scenes(story_id: uuid.UUID, payload: SceneAutoChunkRequest, db=DbSessionDep):
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="story not found")
+
+    chunks = nodes.compute_scene_chunker(payload.source_text, max_scenes=payload.max_scenes)
+    if not chunks:
+        raise HTTPException(status_code=400, detail="auto-chunk produced no scenes")
+
+    scenes: list[Scene] = []
+    for chunk in chunks:
+        scene = Scene(story_id=story_id, source_text=chunk)
+        db.add(scene)
+        scenes.append(scene)
+
+    db.commit()
+    for scene in scenes:
+        db.refresh(scene)
+
+    return scenes
 
 
 @router.post("/stories/{story_id}/set-style-defaults", response_model=StoryRead)

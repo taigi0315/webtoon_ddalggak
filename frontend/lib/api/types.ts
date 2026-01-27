@@ -46,9 +46,18 @@ export const artifactSchema = z.object({
 
 export const artifactsSchema = z.array(artifactSchema);
 
+export const styleItemSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string()
+});
+
+export const styleItemsSchema = z.array(styleItemSchema);
+
 export type HealthStatus = z.infer<typeof healthSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type Story = z.infer<typeof storySchema>;
 export type Scene = z.infer<typeof sceneSchema>;
 export type ArtifactIdResponse = z.infer<typeof artifactIdSchema>;
 export type Artifact = z.infer<typeof artifactSchema>;
+export type StyleItem = z.infer<typeof styleItemSchema>;

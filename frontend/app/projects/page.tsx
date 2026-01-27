@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { createProject, fetchProjects } from "@/lib/api/queries";
+import { createProject, deleteProject, fetchProjects } from "@/lib/api/queries";
 
 export default function ProjectsPage() {
   const [newProjectName, setNewProjectName] = useState("");
@@ -23,6 +24,13 @@ export default function ProjectsPage() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteProject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    }
+  });
+
   const createStatus = useMemo(() => {
     if (createMutation.isPending) return "Creating project...";
     if (createMutation.isError) return "Project create failed.";
@@ -38,10 +46,17 @@ export default function ProjectsPage() {
             <h2 className="mt-2 text-2xl font-semibold text-ink">My Webtoon Projects</h2>
           </div>
           <div className="flex gap-2">
-            <button className="btn-ghost text-xs">New Story</button>
+            <Link
+              className="btn-ghost text-xs"
+              href="/studio/story"
+              title="Create a new story inside a selected project."
+            >
+              New Story
+            </Link>
             <button
               className="btn-primary text-xs"
               onClick={() => setShowCreate((prev) => !prev)}
+              title="Create a new project to organize stories and scenes."
             >
               New Project
             </button>
@@ -60,10 +75,15 @@ export default function ProjectsPage() {
                 className="btn-primary text-xs"
                 onClick={() => createMutation.mutate(newProjectName.trim())}
                 disabled={!newProjectName.trim()}
+                title="Save this new project and open it in the studio."
               >
                 Create
               </button>
-              <button className="btn-ghost text-xs" onClick={() => setShowCreate(false)}>
+              <button
+                className="btn-ghost text-xs"
+                onClick={() => setShowCreate(false)}
+                title="Close without creating a project."
+              >
                 Cancel
               </button>
             </div>
@@ -95,7 +115,29 @@ export default function ProjectsPage() {
               </div>
               <div className="flex items-center justify-between text-xs text-slate-500">
                 <span className="pill">Active</span>
-                <button className="btn-ghost text-xs">Open</button>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn-ghost text-xs text-rose-600"
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        `Delete "${project.name}" and all its stories/scenes?`
+                      );
+                      if (confirmed) {
+                        deleteMutation.mutate(project.project_id);
+                      }
+                    }}
+                    title="Delete this project and all child stories/scenes."
+                  >
+                    Delete
+                  </button>
+                  <Link
+                    className="btn-ghost text-xs"
+                    href={`/studio/story?project_id=${project.project_id}`}
+                    title="Open this project in the story editor."
+                  >
+                    Open
+                  </Link>
+                </div>
               </div>
             </div>
           ))}
@@ -103,32 +145,8 @@ export default function ProjectsPage() {
       </div>
       <div className="surface p-6">
         <h3 className="text-lg font-semibold text-ink">Recent activity</h3>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="card">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Latest renders</p>
-            <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li>Scene 05 render approved</li>
-              <li>Scene 04 QC failed - regen queued</li>
-              <li>Scene 02 blind test passed</li>
-            </ul>
-          </div>
-          <div className="card">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Pipeline status</p>
-            <div className="mt-3 space-y-3 text-sm text-slate-600">
-              <div className="flex items-center justify-between">
-                <span>Characters ready</span>
-                <span className="pill text-xs">5/6</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Scenes planned</span>
-                <span className="pill text-xs">8/10</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Exports delivered</span>
-                <span className="pill text-xs">2</span>
-              </div>
-            </div>
-          </div>
+        <div className="mt-3 text-sm text-slate-500">
+          No recent activity yet. Create a story to populate this feed.
         </div>
       </div>
     </section>
