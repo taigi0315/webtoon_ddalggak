@@ -1,0 +1,30 @@
+{
+  "version": "v1",
+  "styles": [
+    {
+      "id": "default",
+      "label": "Default",
+      "description": "Neutral webtoon rendering."
+    },
+    {
+      "id": "soft_webtoon",
+      "label": "Soft Webtoon",
+      "description": "Soft lineart, pastel palette, gentle lighting."
+    },
+    {
+      "id": "clean_lineart",
+      "label": "Clean Lineart",
+      "description": "Crisp lineart, minimal shading."
+    },
+    {
+      "id": "dramatic_lighting",
+      "label": "Dramatic Lighting",
+      "description": "High contrast, cinematic lighting."
+    },
+    {
+      "id": "flat_color",
+      "label": "Flat Color",
+      "description": "Flat colors, simple shading."
+    }
+  ]
+}

@@ -40,6 +40,7 @@ def _build_client() -> GeminiClient:
     return GeminiClient(
         project=settings.google_cloud_project,
         location=settings.google_cloud_location,
+        api_key=settings.gemini_api_key,
         text_model=settings.gemini_text_model,
         image_model=settings.gemini_image_model,
         timeout_seconds=settings.gemini_timeout_seconds,

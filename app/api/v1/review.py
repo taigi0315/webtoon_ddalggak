@@ -1,7 +1,9 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 from app.api.deps import DbSessionDep
 from app.db.models import Artifact, Scene
@@ -20,6 +22,10 @@ class ApproveRequest(BaseModel):
     artifact_id: uuid.UUID | None = None
 
 
+class RegenerateRequest(BaseModel):
+    reason: Literal["bad_faces", "bad_mood", "bad_composition"] | None = Field(default=None)
+
+
 def _scene_or_404(db, scene_id: uuid.UUID) -> Scene:
     scene = db.get(Scene, scene_id)
     if scene is None:
@@ -28,14 +34,19 @@ def _scene_or_404(db, scene_id: uuid.UUID) -> Scene:
 
 
 @router.post("/scenes/{scene_id}/review/regenerate", response_model=ArtifactIdResponse)
-def regenerate(scene_id: uuid.UUID, db=DbSessionDep):
+def regenerate(scene_id: uuid.UUID, payload: RegenerateRequest | None = None, db=DbSessionDep):
     _scene_or_404(db, scene_id)
 
     spec = ArtifactService(db).get_latest_artifact(scene_id, nodes.ARTIFACT_RENDER_SPEC)
     if spec is None:
         raise HTTPException(status_code=400, detail="render_spec artifact not found")
 
-    artifact = nodes.run_image_renderer(db=db, scene_id=scene_id)
+    qc = nodes.run_qc_checker(db=db, scene_id=scene_id)
+    if not (qc.payload or {}).get("passed"):
+        raise HTTPException(status_code=400, detail="qc failed; fix panel plan or semantics")
+
+    reason = payload.reason if payload else None
+    artifact = nodes.run_image_renderer(db=db, scene_id=scene_id, reason=reason)
     return ArtifactIdResponse(artifact_id=artifact.artifact_id)
 
 

@@ -1,0 +1,24 @@
+{
+  "version": "v1",
+  "closeup_ratio_max": 0.5,
+  "dialogue_ratio_max": 0.6,
+  "repeated_framing_run_length": 3,
+  "require_environment_on_establishing": true,
+  "environment_keywords": [
+    "room",
+    "street",
+    "cafe",
+    "school",
+    "office",
+    "park",
+    "house",
+    "kitchen",
+    "bedroom",
+    "hallway",
+    "city",
+    "forest",
+    "alley",
+    "rooftop",
+    "subway"
+  ]
+}

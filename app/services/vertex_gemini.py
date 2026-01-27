@@ -1,27 +1,41 @@
+
 import time
 import uuid
 import logging
-from typing import Any, Dict
+from typing import Callable
 
-import vertexai
-from vertexai.generative_models import GenerativeModel, Image, Part
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
+
+
+_DEFAULT_IMAGE_CONFIG = types.ImageConfig(aspect_ratio="9:16")
+_DEFAULT_SAFETY_SETTINGS = [
+    {"category": types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, "threshold": types.HarmBlockThreshold.BLOCK_NONE},
+    {"category": types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": types.HarmBlockThreshold.BLOCK_NONE},
+    {"category": types.HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": types.HarmBlockThreshold.BLOCK_NONE},
+    {"category": types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": types.HarmBlockThreshold.BLOCK_NONE},
+]
 
 
 class GeminiClient:
     def __init__(
         self,
         project: str | None,
-        location: str,
+        location: str | None,
+        api_key: str | None,
         text_model: str,
         image_model: str,
         timeout_seconds: float = 60.0,
         max_retries: int = 3,
         initial_backoff_seconds: float = 0.8,
     ):
-        self._project = project
-        self._location = location
+        if not api_key and (not project or not location):
+            raise RuntimeError(
+                "Either GEMINI_API_KEY or both GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION must be configured"
+            )
+
         self._text_model = text_model
         self._image_model = image_model
         self._timeout_seconds = timeout_seconds
@@ -32,98 +46,103 @@ class GeminiClient:
         self.last_model: str | None = None
         self.last_usage: dict | None = None
 
-        # Initialize Vertex AI
-        vertexai.init(project=project, location=location)
+        if project and location:
+            self._client = genai.Client(vertexai=True, project=project, location=location)
+        else:
+            self._client = genai.Client(api_key=api_key)
+
+    def _retry(
+        self,
+        func: Callable[[], types.GenerateContentResponse],
+        model_name: str,
+        request_type: str,
+    ) -> types.GenerateContentResponse:
+        last_exc: Exception | None = None
+        request_id = str(uuid.uuid4())
+        for attempt in range(self._max_retries):
+            try:
+                response = func()
+                self.last_request_id = response.response_id or request_id
+                self.last_model = model_name
+                if response.usage_metadata:
+                    self.last_usage = response.usage_metadata.model_dump()
+                else:
+                    self.last_usage = {"model": model_name}
+                return response
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                backoff = self._initial_backoff_seconds * (2**attempt)
+                logger.warning(
+                    "gemini.%s failed request_id=%s model=%s attempt=%s error=%s",
+                    request_type,
+                    request_id,
+                    model_name,
+                    attempt + 1,
+                    repr(exc),
+                )
+                if attempt + 1 >= self._max_retries:
+                    break
+                time.sleep(backoff)
+
+        raise RuntimeError(f"Gemini {request_type} failed after retries: {last_exc!r}")
+
+    def _extract_text_from_response(self, response: types.GenerateContentResponse) -> str:
+        candidate = (response.candidates or [None])[0]
+        if candidate is None or not candidate.content or not candidate.content.parts:
+            raise RuntimeError("Gemini returned empty content")
+
+        texts: list[str] = []
+        for part in candidate.content.parts:
+            text = part.text
+            if text:
+                texts.append(text)
+
+        if not texts:
+            raise RuntimeError("Gemini returned no textual content")
+
+        return "\n".join(texts).strip()
+
+    def _extract_image(self, response: types.GenerateContentResponse) -> tuple[bytes, str]:
+        candidate = (response.candidates or [None])[0]
+        if candidate is None or not candidate.content or not candidate.content.parts:
+            raise RuntimeError("Gemini returned empty content")
+
+        for part in candidate.content.parts:
+            inline_data = part.inline_data
+            if inline_data and inline_data.data:
+                mime_type = inline_data.mime_type or "image/png"
+                return inline_data.data, mime_type
+
+        raise RuntimeError("Gemini returned no image data")
 
     def generate_text(self, prompt: str, model: str | None = None) -> str:
         model_name = model or self._text_model
-        request_id = str(uuid.uuid4())
 
-        self.last_request_id = request_id
-        self.last_model = model_name
-        self.last_usage = None
+        response = self._retry(
+            func=lambda: self._client.models.generate_content(
+                model=model_name,
+                contents=[prompt],
+            ),
+            model_name=model_name,
+            request_type="generate_text",
+        )
 
-        last_exc: Exception | None = None
-        for attempt in range(self._max_retries):
-            try:
-                gemini_model = GenerativeModel(model_name)
-                resp = gemini_model.generate_content(prompt)
-                # Usage metadata is not directly exposed in Vertex AI SDK; we store a placeholder
-                self.last_usage = {"model": model_name}
-                if not resp.candidates:
-                    raise RuntimeError("Gemini returned no candidates")
-                candidate = resp.candidates[0]
-                if candidate.content is None or not candidate.content.parts:
-                    raise RuntimeError("Gemini returned empty content")
-                texts: list[str] = []
-                for part in candidate.content.parts:
-                    text = getattr(part, "text", None)
-                    if text:
-                        texts.append(text)
-                return "\n".join(texts).strip()
-            except Exception as e:
-                last_exc = e
-                backoff = self._initial_backoff_seconds * (2**attempt)
-                logger.warning(
-                    "gemini.generate_text failed request_id=%s model=%s attempt=%s error=%s",
-                    request_id,
-                    model_name,
-                    attempt + 1,
-                    repr(e),
-                )
-                if attempt + 1 >= self._max_retries:
-                    break
-                time.sleep(backoff)
-
-        raise RuntimeError(f"Gemini generate_text failed after retries: {last_exc!r}")
+        return self._extract_text_from_response(response)
 
     def generate_image(self, prompt: str, model: str | None = None) -> tuple[bytes, str]:
         model_name = model or self._image_model
-        request_id = str(uuid.uuid4())
 
-        self.last_request_id = request_id
-        self.last_model = model_name
-        self.last_usage = None
+        response = self._retry(
+            func=lambda: self._client.models.generate_content(
+                model=model_name,
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    image_config=_DEFAULT_IMAGE_CONFIG,
+                    safety_settings=_DEFAULT_SAFETY_SETTINGS,
+                ),
+            ),
+            model_name=model_name,
+            request_type="generate_image",
+        )
 
-        last_exc: Exception | None = None
-        for attempt in range(self._max_retries):
-            try:
-                gemini_model = GenerativeModel(model_name)
-                resp = gemini_model.generate_content(
-                    [prompt],
-                    generation_config={
-                        "temperature": 0.9,
-                        "top_p": 0.8,
-                        "top_k": 40,
-                        "candidate_count": 1,
-                        "max_output_tokens": 8192,
-                    },
-                )
-                self.last_usage = {"model": model_name}
-                if not resp.candidates:
-                    raise RuntimeError("Gemini returned no candidates")
-                candidate = resp.candidates[0]
-                if candidate.content is None or not candidate.content.parts:
-                    raise RuntimeError("Gemini returned empty content")
-                # Extract image bytes from response
-                for part in candidate.content.parts:
-                    if hasattr(part, "inline_data") and part.inline_data:
-                        img_bytes = part.inline_data.data
-                        mime_type = part.inline_data.mime_type or "image/png"
-                        return img_bytes, mime_type
-                raise RuntimeError("Gemini returned no image data")
-            except Exception as e:
-                last_exc = e
-                backoff = self._initial_backoff_seconds * (2**attempt)
-                logger.warning(
-                    "gemini.generate_image failed request_id=%s model=%s attempt=%s error=%s",
-                    request_id,
-                    model_name,
-                    attempt + 1,
-                    repr(e),
-                )
-                if attempt + 1 >= self._max_retries:
-                    break
-                time.sleep(backoff)
-
-        raise RuntimeError(f"Gemini generate_image failed after retries: {last_exc!r}")
+        return self._extract_image(response)

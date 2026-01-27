@@ -73,6 +73,7 @@ async def test_generate_full_pipeline_mocked(client, monkeypatch, tmp_path):
         "panel_plan_normalized_artifact_id",
         "layout_template_artifact_id",
         "panel_semantics_artifact_id",
+        "qc_report_artifact_id",
         "render_spec_artifact_id",
         "render_result_artifact_id",
         "blind_test_report_artifact_id",

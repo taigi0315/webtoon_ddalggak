@@ -7,9 +7,9 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config.loaders import load_grammar_to_prompt_mapping_v1, select_template
+from app.config.loaders import load_grammar_to_prompt_mapping_v1, load_qc_rules_v1, select_template
 from app.core.settings import settings
-from app.db.models import Character, Scene
+from app.db.models import Character, CharacterReferenceImage, Scene
 from app.services.artifacts import ArtifactService
 from app.services.vertex_gemini import GeminiClient
 from app.services.images import ImageService
@@ -27,12 +27,15 @@ ARTIFACT_PANEL_SEMANTICS = "panel_semantics"
 ARTIFACT_RENDER_SPEC = "render_spec"
 ARTIFACT_RENDER_RESULT = "render_result"
 ARTIFACT_BLIND_TEST_REPORT = "blind_test_report"
+ARTIFACT_QC_REPORT = "qc_report"
 
 
 def compute_prompt_compiler(
     panel_semantics: dict,
     layout_template: dict,
     style_id: str = "default",
+    story_style_id: str | None = None,
+    image_style_id: str | None = None,
 ) -> dict:
     mapping = load_grammar_to_prompt_mapping_v1().mapping
 
@@ -40,8 +43,14 @@ def compute_prompt_compiler(
     if not isinstance(panels, list) or not panels:
         raise ValueError("panel_semantics.panels must be a non-empty list")
 
+    image_style_id = image_style_id or style_id or "default"
+
     parts: list[str] = []
-    parts.append(f"STYLE: {style_id}")
+    parts.append(f"STYLE: {image_style_id}")
+    if story_style_id:
+        parts.append(f"STORY_STYLE: {story_style_id}")
+    if image_style_id:
+        parts.append(f"IMAGE_STYLE: {image_style_id}")
 
     template_id = layout_template.get("template_id")
     if template_id:
@@ -58,7 +67,12 @@ def compute_prompt_compiler(
         parts.append(line)
 
     prompt = "\n".join([p for p in parts if p])
-    return {"style_id": style_id, "prompt": prompt}
+    return {
+        "style_id": image_style_id,
+        "story_style_id": story_style_id,
+        "image_style_id": image_style_id,
+        "prompt": prompt,
+    }
 
 
 def compute_layout_template_resolver(panel_plan: dict | list, derived_features: dict | None = None) -> dict:
@@ -98,6 +112,92 @@ def compute_panel_plan_normalizer(panel_plan: dict) -> dict:
     return {"panels": normalized}
 
 
+def compute_qc_report(panel_plan: dict, panel_semantics: dict) -> dict:
+    rules = load_qc_rules_v1()
+    panels = panel_semantics.get("panels")
+    if not isinstance(panels, list) or not panels:
+        raise ValueError("panel_semantics.panels must be a non-empty list")
+
+    issues: list[dict] = []
+    total = len(panels)
+
+    closeup_count = 0
+    dialogue_count = 0
+    last_three: list[str | None] = []
+    has_establishing = False
+    establishing_missing_env = False
+
+    env_keywords = {kw.lower() for kw in rules.environment_keywords}
+
+    for panel in panels:
+        grammar_id = panel.get("grammar_id")
+        grammar_str = grammar_id if isinstance(grammar_id, str) else ""
+        text = panel.get("text") or ""
+
+        if "closeup" in grammar_str or "close_up" in grammar_str:
+            closeup_count += 1
+
+        if "dialogue" in grammar_str:
+            dialogue_count += 1
+
+        if grammar_str == "establishing":
+            has_establishing = True
+            if rules.require_environment_on_establishing:
+                text_lower = text.lower() if isinstance(text, str) else ""
+                if not any(keyword in text_lower for keyword in env_keywords):
+                    establishing_missing_env = True
+
+        last_three.append(grammar_str if grammar_str else None)
+        last_three = last_three[-rules.repeated_framing_run_length :]
+        if (
+            len(last_three) == rules.repeated_framing_run_length
+            and last_three[0]
+            and last_three[0] == last_three[1] == last_three[-1]
+        ):
+            issues.append(
+                {
+                    "code": "repeated_framing",
+                    "severity": "medium",
+                    "message": f"Same framing repeated {rules.repeated_framing_run_length} times in a row: {last_three[0]}",
+                    "suggested_reroute": "panel_plan",
+                }
+            )
+            last_three = []
+
+    if total >= 4 and closeup_count / total > rules.closeup_ratio_max:
+        issues.append(
+            {
+                "code": "too_many_closeups",
+                "severity": "high",
+                "message": "Closeup panels exceed allowed ratio.",
+                "suggested_reroute": "panel_plan",
+            }
+        )
+
+    if total >= 3 and dialogue_count / total > rules.dialogue_ratio_max:
+        issues.append(
+            {
+                "code": "over_dialogue_density",
+                "severity": "medium",
+                "message": "Dialogue-heavy panels exceed allowed ratio.",
+                "suggested_reroute": "panel_semantics",
+            }
+        )
+
+    if has_establishing and establishing_missing_env:
+        issues.append(
+            {
+                "code": "missing_environment",
+                "severity": "high",
+                "message": "Establishing panel lacks clear environment description.",
+                "suggested_reroute": "panel_semantics",
+            }
+        )
+
+    passed = len(issues) == 0
+    return {"passed": passed, "issues": issues, "panel_count": total}
+
+
 def _build_gemini_client() -> GeminiClient:
     if not settings.google_cloud_project:
         raise RuntimeError("GOOGLE_CLOUD_PROJECT is not configured")
@@ -105,6 +205,7 @@ def _build_gemini_client() -> GeminiClient:
     return GeminiClient(
         project=settings.google_cloud_project,
         location=settings.google_cloud_location,
+        api_key=settings.gemini_api_key,
         text_model=settings.gemini_text_model,
         image_model=settings.gemini_image_model,
         timeout_seconds=settings.gemini_timeout_seconds,
@@ -342,10 +443,33 @@ def run_panel_semantic_filler(db: Session, scene_id: uuid.UUID, gemini: GeminiCl
         raise ValueError("layout_template artifact not found")
 
     chars = list(db.execute(select(Character).where(Character.story_id == scene.story_id)).scalars().all())
-    characters = [
-        {"character_id": str(c.character_id), "name": c.name, "description": c.description}
-        for c in chars
-    ]
+    primary_refs = list(
+        db.execute(
+            select(CharacterReferenceImage).where(
+                CharacterReferenceImage.character_id.in_([c.character_id for c in chars]),
+                CharacterReferenceImage.ref_type == "face",
+                CharacterReferenceImage.approved.is_(True),
+                CharacterReferenceImage.is_primary.is_(True),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    primary_face_by_character_id = {r.character_id: r for r in primary_refs}
+
+    characters = []
+    for c in chars:
+        primary_face = primary_face_by_character_id.get(c.character_id)
+        characters.append(
+            {
+                "character_id": str(c.character_id),
+                "name": c.name,
+                "description": c.description,
+                "role": c.role,
+                "identity_line": c.identity_line,
+                "primary_face_ref_image_url": primary_face.image_url if primary_face else None,
+            }
+        )
 
     payload = compute_panel_semantic_filler(
         source_text=scene.source_text,
@@ -366,6 +490,10 @@ def run_panel_semantic_filler(db: Session, scene_id: uuid.UUID, gemini: GeminiCl
 
 
 def run_prompt_compiler(db: Session, scene_id: uuid.UUID, style_id: str = "default"):
+    scene = db.get(Scene, scene_id)
+    if scene is None:
+        raise ValueError("scene not found")
+
     svc = ArtifactService(db)
     semantics = svc.get_latest_artifact(scene_id, ARTIFACT_PANEL_SEMANTICS)
     if semantics is None:
@@ -375,10 +503,26 @@ def run_prompt_compiler(db: Session, scene_id: uuid.UUID, style_id: str = "defau
     if layout is None:
         raise ValueError("layout_template artifact not found")
 
+    story_style_id = "default"
+    image_style_id = "default"
+    if scene.story is not None:
+        story_style_id = scene.story.default_story_style or "default"
+        image_style_id = scene.story.default_image_style or "default"
+
+    if scene.story_style_override:
+        story_style_id = scene.story_style_override
+    if scene.image_style_override:
+        image_style_id = scene.image_style_override
+
+    if style_id:
+        image_style_id = style_id
+
     payload = compute_prompt_compiler(
         panel_semantics=semantics.payload,
         layout_template=layout.payload,
-        style_id=style_id,
+        style_id=image_style_id,
+        story_style_id=story_style_id,
+        image_style_id=image_style_id,
     )
     artifact = svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_SPEC, payload=payload)
     logger.info(
@@ -389,7 +533,33 @@ def run_prompt_compiler(db: Session, scene_id: uuid.UUID, style_id: str = "defau
     return artifact
 
 
-def run_image_renderer(db: Session, scene_id: uuid.UUID, gemini: GeminiClient | None = None):
+def run_qc_checker(db: Session, scene_id: uuid.UUID):
+    svc = ArtifactService(db)
+    plan = svc.get_latest_artifact(scene_id, ARTIFACT_PANEL_PLAN)
+    if plan is None:
+        raise ValueError("panel_plan artifact not found")
+
+    semantics = svc.get_latest_artifact(scene_id, ARTIFACT_PANEL_SEMANTICS)
+    if semantics is None:
+        raise ValueError("panel_semantics artifact not found")
+
+    payload = compute_qc_report(plan.payload, semantics.payload)
+    artifact = svc.create_artifact(scene_id=scene_id, type=ARTIFACT_QC_REPORT, payload=payload)
+    logger.info(
+        "node_complete node_name=QualityControl scene_id=%s artifact_id=%s passed=%s",
+        scene_id,
+        artifact.artifact_id,
+        payload.get("passed"),
+    )
+    return artifact
+
+
+def run_image_renderer(
+    db: Session,
+    scene_id: uuid.UUID,
+    gemini: GeminiClient | None = None,
+    reason: str | None = None,
+):
     svc = ArtifactService(db)
     spec = svc.get_latest_artifact(scene_id, ARTIFACT_RENDER_SPEC)
     if spec is None:
@@ -417,6 +587,8 @@ def run_image_renderer(db: Session, scene_id: uuid.UUID, gemini: GeminiClient | 
         "mime_type": mime_type,
         "_meta": {"model": getattr(gemini, "last_model", None), "usage": getattr(gemini, "last_usage", None)},
     }
+    if reason:
+        payload["regenerate_reason"] = reason
     artifact = svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_RESULT, payload=payload)
     logger.info(
         "node_complete node_name=ImageRenderer scene_id=%s artifact_id=%s model=%s",

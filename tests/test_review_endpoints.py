@@ -39,7 +39,30 @@ async def test_review_regenerate_and_approve(client, monkeypatch, tmp_path):
 
     SessionLocal = get_sessionmaker()
     with SessionLocal() as db:
-        ArtifactService(db).create_artifact(
+        svc = ArtifactService(db)
+        svc.create_artifact(
+            scene_id=scene_id,
+            type=nodes.ARTIFACT_PANEL_PLAN,
+            payload={
+                "panels": [
+                    {"grammar_id": "establishing", "story_function": "setup"},
+                    {"grammar_id": "reaction", "story_function": "beat"},
+                    {"grammar_id": "dialogue_medium", "story_function": "talk"},
+                ]
+            },
+        )
+        svc.create_artifact(
+            scene_id=scene_id,
+            type=nodes.ARTIFACT_PANEL_SEMANTICS,
+            payload={
+                "panels": [
+                    {"grammar_id": "establishing", "text": "wide street"},
+                    {"grammar_id": "reaction", "text": "shock"},
+                    {"grammar_id": "dialogue_medium", "text": "talking"},
+                ]
+            },
+        )
+        svc.create_artifact(
             scene_id=scene_id,
             type=nodes.ARTIFACT_RENDER_SPEC,
             payload={"prompt": "draw"},

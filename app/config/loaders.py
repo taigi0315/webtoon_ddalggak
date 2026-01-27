@@ -57,6 +57,26 @@ class ContinuityRulesV1(BaseModel):
     rules: list[dict]
 
 
+class QcRulesV1(BaseModel):
+    version: str
+    closeup_ratio_max: float = Field(ge=0.0, le=1.0)
+    dialogue_ratio_max: float = Field(ge=0.0, le=1.0)
+    repeated_framing_run_length: int = Field(ge=2)
+    require_environment_on_establishing: bool = True
+    environment_keywords: list[str] = Field(default_factory=list)
+
+
+class StyleItem(BaseModel):
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+
+
+class StyleLibraryV1(BaseModel):
+    version: str
+    styles: list[StyleItem]
+
+
 def _config_dir() -> Path:
     return Path(__file__).resolve().parent
 
@@ -96,6 +116,24 @@ def load_continuity_rules_v1() -> ContinuityRulesV1:
     return ContinuityRulesV1.model_validate(data)
 
 
+@lru_cache(maxsize=1)
+def load_qc_rules_v1() -> QcRulesV1:
+    data = _read_json(_config_dir() / "qc_rules_v1.json")
+    return QcRulesV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_story_styles_v1() -> StyleLibraryV1:
+    data = _read_json(_config_dir() / "story_styles.json")
+    return StyleLibraryV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_image_styles_v1() -> StyleLibraryV1:
+    data = _read_json(_config_dir() / "image_styles.json")
+    return StyleLibraryV1.model_validate(data)
+
+
 def get_grammar(grammar_id: str) -> GrammarItem:
     lib = load_grammar_library_v1()
     for g in lib.grammars:
@@ -110,6 +148,16 @@ def get_layout_template(template_id: str) -> LayoutTemplate:
         if t.template_id == template_id:
             return t
     raise KeyError(f"Unknown template_id: {template_id}")
+
+
+def has_story_style(style_id: str) -> bool:
+    lib = load_story_styles_v1()
+    return any(s.id == style_id for s in lib.styles)
+
+
+def has_image_style(style_id: str) -> bool:
+    lib = load_image_styles_v1()
+    return any(s.id == style_id for s in lib.styles)
 
 
 def _panel_plan_count(panel_plan) -> int:

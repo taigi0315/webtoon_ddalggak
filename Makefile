@@ -1,24 +1,40 @@
-.PHONY: help install dev db-up db-migrate db-down api test lint clean test-data
+.PHONY: help install install-back install-front dev dev-install dev-back dev-front db-up db-migrate db-down api ui test lint clean test-data
 
 # Default target
 help:
 	@echo "Available commands:"
-	@echo "  install    Install dependencies"
-	@echo "  dev        Install dev dependencies"
+	@echo "  install    Install backend + frontend dependencies"
+	@echo "  install-back Install backend dependencies"
+	@echo "  install-front Install frontend dependencies"
+	@echo "  dev        Show dev commands"
+	@echo "  dev-install Install dev dependencies"
+	@echo "  dev-back   Run backend only"
+	@echo "  dev-front  Run frontend only"
 	@echo "  db-up      Start Postgres via Docker Compose"
 	@echo "  db-down    Stop Postgres"
 	@echo "  db-migrate Run Alembic migrations (upgrade head)"
 	@echo "  api        Start Uvicorn server (reload)"
+	@echo "  ui         Start Next.js dev server"
 	@echo "  test       Run pytest"
 	@echo "  lint       Run ruff check and black --check"
 	@echo "  format     Run ruff check --fix and black"
 	@echo "  clean      Remove __pycache__ and .pytest_cache"
 	@echo "  test-data  Create test project/story/scene and export IDs"
 
-install:
+install: install-back install-front
+
+install-back:
 	pip install -e .
 
-dev:
+install-front:
+	@if [ ! -d frontend/node_modules ]; then \
+		echo "Installing frontend dependencies..."; \
+		npm --prefix frontend install; \
+	else \
+		echo "Frontend dependencies already installed."; \
+	fi
+
+dev-install:
 	pip install -e ".[dev]"
 
 db-up:
@@ -32,6 +48,18 @@ db-migrate:
 
 api:
 	uvicorn app.main:app --reload
+
+ui:
+	npm --prefix frontend run dev
+
+dev:
+	@echo "Use one of:"
+	@echo "  make dev-back   # backend only"
+	@echo "  make dev-front  # frontend only"
+
+dev-back: api
+
+dev-front: ui
 
 test:
 	pytest -q
