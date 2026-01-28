@@ -4,6 +4,8 @@ import hashlib
 import json
 import logging
 import math
+import mimetypes
+import os
 import re
 import uuid
 from typing import Iterable
@@ -14,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import loaders
 from app.core.telemetry import trace_span
 from app.core.settings import settings
-from app.db.models import Character, Scene, Story
+from app.db.models import Character, CharacterReferenceImage, Scene, Story
 from app.services.artifacts import ArtifactService
 from app.services.images import ImageService
 from app.services.storage import LocalMediaStore
@@ -222,6 +224,81 @@ def get_character_style_prompt(gender: str | None, age_range: str | None) -> str
         return ""
     key = (gender.lower(), age_range.lower())
     return CHARACTER_STYLE_MAP.get(key, "")
+
+
+def _build_gemini_client() -> GeminiClient:
+    if not settings.google_cloud_project and not settings.gemini_api_key:
+        raise RuntimeError("Gemini is not configured")
+
+    return GeminiClient(
+        project=settings.google_cloud_project,
+        location=settings.google_cloud_location,
+        api_key=settings.gemini_api_key,
+        text_model=settings.gemini_text_model,
+        image_model=settings.gemini_image_model,
+        timeout_seconds=settings.gemini_timeout_seconds,
+        max_retries=settings.gemini_max_retries,
+        initial_backoff_seconds=settings.gemini_initial_backoff_seconds,
+    )
+
+
+def generate_character_reference_image(
+    db: Session,
+    character_id: uuid.UUID,
+    ref_type: str = "face",
+    story_style: str | None = None,
+    gemini: GeminiClient | None = None,
+) -> CharacterReferenceImage:
+    character = db.get(Character, character_id)
+    if character is None:
+        raise ValueError("character not found")
+
+    if not character.description and not character.identity_line:
+        raise ValueError("character needs description or identity_line to generate reference images")
+
+    gemini = gemini or _build_gemini_client()
+
+    style_prompt = get_character_style_prompt(character.gender, character.age_range)
+    identity = character.identity_line or character.description or character.name
+    story_style_text = story_style or (character.story.default_story_style if character.story else None)
+
+    prompt_parts = [
+        "High-quality character reference image for a Korean webtoon.",
+        f"Character: {character.name}.",
+        f"Identity: {identity}.",
+        f"Ref type: {ref_type}.",
+    ]
+    if story_style_text:
+        prompt_parts.append(f"Story style: {story_style_text}.")
+    if style_prompt:
+        prompt_parts.append(style_prompt)
+    prompt_parts.append("Plain background, clean silhouette, full body if possible.")
+
+    prompt = " ".join([part for part in prompt_parts if part])
+
+    image_bytes, mime_type = gemini.generate_image(prompt=prompt)
+
+    store = LocalMediaStore(root_dir=settings.media_root, url_prefix=settings.media_url_prefix)
+    _, url = store.save_image_bytes(image_bytes=image_bytes, mime_type=mime_type)
+
+    ref = CharacterReferenceImage(
+        character_id=character_id,
+        image_url=url,
+        ref_type=ref_type,
+        approved=False,
+        is_primary=False,
+        metadata_={
+            "mime_type": mime_type,
+            "model": getattr(gemini, "last_model", None),
+            "request_id": getattr(gemini, "last_request_id", None),
+            "usage": getattr(gemini, "last_usage", None),
+            "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        },
+    )
+    db.add(ref)
+    db.commit()
+    db.refresh(ref)
+    return ref
 
 
 # ---------------------------------------------------------------------------
@@ -666,7 +743,12 @@ def run_qc_checker(db: Session, scene_id: uuid.UUID):
         return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_QC_REPORT, payload=report)
 
 
-def run_prompt_compiler(db: Session, scene_id: uuid.UUID, style_id: str):
+def run_prompt_compiler(
+    db: Session,
+    scene_id: uuid.UUID,
+    style_id: str,
+    prompt_override: str | None = None,
+):
     with trace_span("graph.prompt_compiler", scene_id=str(scene_id), style_id=style_id):
         svc = ArtifactService(db)
         panel_semantics = svc.get_latest_artifact(scene_id, ARTIFACT_PANEL_SEMANTICS)
@@ -678,13 +760,15 @@ def run_prompt_compiler(db: Session, scene_id: uuid.UUID, style_id: str):
         story = db.get(Story, scene.story_id)
         characters = _list_characters(db, scene.story_id)
 
-        prompt = _compile_prompt(
-            panel_semantics=panel_semantics.payload,
-            layout_template=layout.payload,
-            style_id=style_id,
-            characters=characters,
-            story_style=(story.default_story_style if story else None),
-        )
+        prompt = prompt_override
+        if not prompt:
+            prompt = _compile_prompt(
+                panel_semantics=panel_semantics.payload,
+                layout_template=layout.payload,
+                style_id=style_id,
+                characters=characters,
+                story_style=(story.default_story_style if story else None),
+            )
 
         payload = {
             "prompt": prompt,
@@ -712,7 +796,16 @@ def run_image_renderer(
         if not prompt:
             raise ValueError("render_spec is missing prompt")
 
-        image_bytes, mime_type, metadata = _render_image_from_prompt(prompt, gemini=gemini)
+        reference_images = None
+        if gemini is not None:
+            scene = _get_scene(db, scene_id)
+            reference_images = _load_character_reference_images(db, scene.story_id)
+
+        image_bytes, mime_type, metadata = _render_image_from_prompt(
+            prompt,
+            gemini=gemini,
+            reference_images=reference_images,
+        )
 
         store = LocalMediaStore(root_dir=settings.media_root, url_prefix=settings.media_url_prefix)
         _, url = store.save_image_bytes(image_bytes=image_bytes, mime_type=mime_type)
@@ -731,6 +824,7 @@ def run_image_renderer(
             "request_id": metadata.get("request_id"),
             "usage": metadata.get("usage"),
             "prompt_sha256": render_spec.payload.get("prompt_sha256"),
+            "prompt": prompt,
             "approved": False,
             "reason": reason,
         }
@@ -1339,12 +1433,15 @@ def _rough_similarity(text_a: str, text_b: str) -> float:
     return len(intersection) / max(1, len(union))
 
 
-def _render_image_from_prompt(prompt: str, gemini: GeminiClient | None = None) -> tuple[bytes, str, dict]:
+def _render_image_from_prompt(
+    prompt: str,
+    gemini: GeminiClient | None = None,
+    reference_images: list[tuple[bytes, str]] | None = None,
+) -> tuple[bytes, str, dict]:
     if gemini is None:
-        metadata = {"model": "placeholder", "request_id": None, "usage": None}
-        return _BLANK_PNG_BYTES, "image/png", metadata
+        raise RuntimeError("Gemini is not configured")
 
-    image_bytes, mime_type = gemini.generate_image(prompt=prompt)
+    image_bytes, mime_type = gemini.generate_image(prompt=prompt, reference_images=reference_images)
     metadata = {
         "model": getattr(gemini, "last_model", None),
         "request_id": getattr(gemini, "last_request_id", None),
@@ -1353,13 +1450,83 @@ def _render_image_from_prompt(prompt: str, gemini: GeminiClient | None = None) -
     return image_bytes, mime_type, metadata
 
 
+def _resolve_media_path(image_url: str) -> str:
+    prefix = settings.media_url_prefix.rstrip("/")
+    if image_url.startswith(f"{prefix}/"):
+        return os.path.join(settings.media_root, image_url[len(prefix) + 1 :])
+    if image_url.startswith("/media/"):
+        return os.path.join(settings.media_root, image_url[len("/media/") :])
+    if image_url.startswith("media/"):
+        return os.path.join(settings.media_root, image_url[len("media/") :])
+    if os.path.isabs(image_url):
+        return image_url
+    return os.path.join(settings.media_root, image_url)
+
+
+def _load_character_reference_images(
+    db: Session,
+    story_id: uuid.UUID,
+    max_images: int = 6,
+) -> list[tuple[bytes, str]]:
+    stmt = (
+        select(CharacterReferenceImage)
+        .join(Character, CharacterReferenceImage.character_id == Character.character_id)
+        .where(
+            Character.story_id == story_id,
+            CharacterReferenceImage.approved.is_(True),
+            CharacterReferenceImage.ref_type == "face",
+        )
+        .order_by(
+            CharacterReferenceImage.character_id.asc(),
+            CharacterReferenceImage.is_primary.desc(),
+            CharacterReferenceImage.created_at.desc(),
+        )
+    )
+
+    refs = list(db.execute(stmt).scalars().all())
+    picked: dict[uuid.UUID, CharacterReferenceImage] = {}
+    for ref in refs:
+        if ref.character_id in picked:
+            continue
+        picked[ref.character_id] = ref
+        if len(picked) >= max_images:
+            break
+
+    results: list[tuple[bytes, str]] = []
+    for ref in picked.values():
+        try:
+            path = _resolve_media_path(ref.image_url)
+            with open(path, "rb") as handle:
+                data = handle.read()
+            mime_type = mimetypes.guess_type(path)[0] or "image/png"
+            results.append((data, mime_type))
+        except OSError as exc:
+            logger.warning("reference image load failed ref_id=%s error=%s", ref.reference_image_id, exc)
+            continue
+
+    return results
+
+
 def _extract_dialogue_suggestions(text: str) -> list[dict]:
     suggestions: list[dict] = []
     for idx, line in enumerate(_extract_dialogue_lines(text)):
+        speaker = "unknown"
+        cleaned = line.strip()
+        if ":" in cleaned:
+            possible_speaker, remainder = cleaned.split(":", 1)
+            if 0 < len(possible_speaker) <= 24 and remainder.strip():
+                speaker = possible_speaker.strip().strip('"')
+                cleaned = remainder.strip().strip('"')
+        elif " - " in cleaned:
+            possible_speaker, remainder = cleaned.split(" - ", 1)
+            if 0 < len(possible_speaker) <= 24 and remainder.strip():
+                speaker = possible_speaker.strip().strip('"')
+                cleaned = remainder.strip().strip('"')
+
         suggestions.append(
             {
-                "speaker": "unknown",
-                "text": line,
+                "speaker": speaker,
+                "text": cleaned,
                 "emotion": "neutral",
                 "panel_hint": idx + 1,
             }
@@ -1734,7 +1901,19 @@ def _prompt_blind_reader(panel_semantics: dict) -> str:
         desc = f"Panel {p.get('panel_index')}: {p.get('description', '')}"
         dialogue = p.get("dialogue", [])
         if dialogue:
-            desc += f" Dialogue: {' '.join(dialogue)}"
+            dialogue_texts: list[str] = []
+            if isinstance(dialogue, list):
+                for item in dialogue:
+                    if isinstance(item, dict):
+                        text = item.get("text")
+                        if text:
+                            dialogue_texts.append(str(text))
+                    else:
+                        dialogue_texts.append(str(item))
+            else:
+                dialogue_texts.append(str(dialogue))
+            if dialogue_texts:
+                desc += f" Dialogue: {' '.join(dialogue_texts)}"
         chars = p.get("characters", [])
         if isinstance(chars, list) and chars:
             if isinstance(chars[0], dict):
@@ -1849,8 +2028,9 @@ def _prompt_character_extraction(source_text: str, max_characters: int) -> str:
     return f"""{SYSTEM_PROMPT_JSON}
 {GLOBAL_CONSTRAINTS}
 
-Extract characters from the following story text.
-Include BOTH explicitly named characters AND implied characters (e.g., "her mom", "the stranger", "his boss").
+Extract only the IMPORTANT characters from the following story text.
+Include explicitly named characters and implied characters ONLY if they are plot-relevant or recurring.
+Do NOT include incidental background roles (e.g., movers, clerks, passersby) unless they directly affect the plot.
 
 Rules:
 - Extract up to {max_characters} characters

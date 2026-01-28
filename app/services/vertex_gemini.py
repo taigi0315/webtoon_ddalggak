@@ -30,6 +30,7 @@ class GeminiClient:
         timeout_seconds: float = 60.0,
         max_retries: int = 3,
         initial_backoff_seconds: float = 0.8,
+        rate_limit_backoff_seconds: list[float] | None = None,
     ):
         if not api_key and (not project or not location):
             raise RuntimeError(
@@ -41,6 +42,7 @@ class GeminiClient:
         self._timeout_seconds = timeout_seconds
         self._max_retries = max_retries
         self._initial_backoff_seconds = initial_backoff_seconds
+        self._rate_limit_backoff_seconds = rate_limit_backoff_seconds or [10, 30, 180, 600]
 
         self.last_request_id: str | None = None
         self.last_model: str | None = None
@@ -59,7 +61,9 @@ class GeminiClient:
     ) -> types.GenerateContentResponse:
         last_exc: Exception | None = None
         request_id = str(uuid.uuid4())
-        for attempt in range(self._max_retries):
+        attempt = 0
+        max_attempts = self._max_retries
+        while attempt < max_attempts:
             try:
                 response = func()
                 self.last_request_id = response.response_id or request_id
@@ -71,7 +75,14 @@ class GeminiClient:
                 return response
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
-                backoff = self._initial_backoff_seconds * (2**attempt)
+                error_text = str(exc)
+                is_rate_limited = "RESOURCE_EXHAUSTED" in error_text or "429" in error_text
+                if is_rate_limited:
+                    max_attempts = max(max_attempts, len(self._rate_limit_backoff_seconds) + 1)
+                    idx = min(attempt, len(self._rate_limit_backoff_seconds) - 1)
+                    backoff = self._rate_limit_backoff_seconds[idx]
+                else:
+                    backoff = self._initial_backoff_seconds * (2**attempt)
                 logger.warning(
                     "gemini.%s failed request_id=%s model=%s attempt=%s error=%s",
                     request_type,
@@ -80,9 +91,12 @@ class GeminiClient:
                     attempt + 1,
                     repr(exc),
                 )
-                if attempt + 1 >= self._max_retries:
+                if attempt + 1 >= max_attempts:
                     break
                 time.sleep(backoff)
+                attempt += 1
+                continue
+            attempt += 1
 
         raise RuntimeError(f"Gemini {request_type} failed after retries: {last_exc!r}")
 

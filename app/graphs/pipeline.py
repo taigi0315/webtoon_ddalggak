@@ -31,6 +31,7 @@ class RenderState(TypedDict, total=False):
     db: Session
     scene_id: uuid.UUID
     style_id: str | None
+    prompt_override: str | None
     enforce_qc: bool
     gemini: GeminiClient | None
 
@@ -47,6 +48,7 @@ class PipelineState(TypedDict, total=False):
     panel_count: int
     style_id: str
     genre: str | None
+    prompt_override: str | None
     gemini: GeminiClient | None
 
     scene_intent_artifact_id: str
@@ -137,6 +139,7 @@ def _node_render_spec(state: RenderState) -> dict[str, Any]:
         db=state["db"],
         scene_id=state["scene_id"],
         style_id=state.get("style_id") or "default",
+        prompt_override=state.get("prompt_override"),
     )
     return {"render_spec_artifact_id": str(artifact.artifact_id)}
 
@@ -240,6 +243,7 @@ def run_scene_render(
     scene_id: uuid.UUID,
     style_id: str | None = None,
     enforce_qc: bool = True,
+    prompt_override: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> RenderState:
     with trace_span("graph.scene_render", scene_id=str(scene_id), style_id=style_id):
@@ -248,6 +252,7 @@ def run_scene_render(
             "db": db,
             "scene_id": scene_id,
             "style_id": style_id,
+            "prompt_override": prompt_override,
             "enforce_qc": enforce_qc,
             "gemini": gemini,
         }
@@ -260,6 +265,7 @@ def run_full_pipeline(
     panel_count: int = 3,
     style_id: str | None = None,
     genre: str | None = None,
+    prompt_override: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> PipelineState:
     with trace_span("graph.full_pipeline", scene_id=str(scene_id), style_id=style_id):
@@ -284,6 +290,7 @@ def run_full_pipeline(
             scene_id=scene_id,
             style_id=style_id,
             enforce_qc=True,
+            prompt_override=prompt_override,
             gemini=gemini,
         )
 

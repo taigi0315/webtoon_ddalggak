@@ -73,6 +73,29 @@ def create_episode(story_id: uuid.UUID, payload: EpisodeCreate, db=DbSessionDep)
     )
 
 
+@router.get("/stories/{story_id}/episodes", response_model=list[EpisodeRead])
+def list_story_episodes(story_id: uuid.UUID, db=DbSessionDep):
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="story not found")
+
+    episodes = list(db.execute(select(Episode).where(Episode.story_id == story_id)).scalars().all())
+    result: list[EpisodeRead] = []
+    for episode in episodes:
+        result.append(
+            EpisodeRead(
+                episode_id=episode.episode_id,
+                story_id=episode.story_id,
+                title=episode.title,
+                default_story_style=episode.default_story_style,
+                default_image_style=episode.default_image_style,
+                status=episode.status,
+                scene_ids_ordered=_scene_ids_ordered(db, episode.episode_id),
+            )
+        )
+    return result
+
+
 @router.get("/episodes/{episode_id}", response_model=EpisodeRead)
 def get_episode(episode_id: uuid.UUID, db=DbSessionDep):
     episode = _episode_or_404(db, episode_id)

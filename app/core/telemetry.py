@@ -44,12 +44,13 @@ def setup_telemetry(app=None, service_name: str = "ssuljaengi") -> None:
 def trace_span(name: str, **attributes):
     try:
         from opentelemetry import trace
-
-        tracer = trace.get_tracer("ssuljaengi")
-        with tracer.start_as_current_span(name) as span:
-            for key, value in attributes.items():
-                if value is not None:
-                    span.set_attribute(key, value)
-            yield span
     except Exception:
         yield None
+        return
+
+    tracer = trace.get_tracer("ssuljaengi")
+    with tracer.start_as_current_span(name) as span:
+        for key, value in attributes.items():
+            if value is not None:
+                span.set_attribute(key, value)
+        yield span

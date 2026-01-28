@@ -25,6 +25,7 @@ class StoryBuildState(TypedDict, total=False):
     allow_append: bool
     story_style: str | None
     image_style: str | None
+    planning_mode: str
     gemini: GeminiClient | None
 
     scenes: list[dict]
@@ -249,26 +250,31 @@ def _summarize_text(text: str, max_words: int = 32) -> str:
     return " ".join(words[:max_words])
 
 
-def build_story_build_graph():
+def build_story_build_graph(planning_mode: str = "full"):
     graph = StateGraph(StoryBuildState)
     graph.add_node("validate_inputs", _node_validate_inputs)
     graph.add_node("scene_splitter", _node_scene_splitter)
     graph.add_node("character_extractor", _node_character_extractor)
     graph.add_node("character_normalizer", _node_character_normalizer)
     graph.add_node("persist_story_bundle", _node_persist_story_bundle)
-    graph.add_node("visual_plan_compiler", _node_visual_plan_compiler)
-    graph.add_node("per_scene_planning", _node_per_scene_planning_loop)
-    graph.add_node("blind_test_runner", _node_blind_test_runner)
 
     graph.set_entry_point("validate_inputs")
     graph.add_edge("validate_inputs", "scene_splitter")
     graph.add_edge("scene_splitter", "character_extractor")
     graph.add_edge("character_extractor", "character_normalizer")
     graph.add_edge("character_normalizer", "persist_story_bundle")
-    graph.add_edge("persist_story_bundle", "visual_plan_compiler")
-    graph.add_edge("visual_plan_compiler", "per_scene_planning")
-    graph.add_edge("per_scene_planning", "blind_test_runner")
-    graph.add_edge("blind_test_runner", END)
+
+    if planning_mode == "full":
+        graph.add_node("visual_plan_compiler", _node_visual_plan_compiler)
+        graph.add_node("per_scene_planning", _node_per_scene_planning_loop)
+        graph.add_node("blind_test_runner", _node_blind_test_runner)
+        graph.add_edge("persist_story_bundle", "visual_plan_compiler")
+        graph.add_edge("visual_plan_compiler", "per_scene_planning")
+        graph.add_edge("per_scene_planning", "blind_test_runner")
+        graph.add_edge("blind_test_runner", END)
+    else:
+        graph.add_edge("persist_story_bundle", END)
+
     return graph.compile()
 
 
@@ -283,11 +289,14 @@ def run_story_build_graph(
     story_style: str | None = None,
     image_style: str | None = None,
     gemini: GeminiClient | None = None,
+    planning_mode: str = "full",
 ) -> StoryBuildState:
     if gemini is None:
         raise ValueError("Gemini client is required for story generation")
+    if planning_mode not in {"full", "characters_only"}:
+        raise ValueError("planning_mode must be 'full' or 'characters_only'")
     with trace_span("graph.story_build", story_id=str(story_id)):
-        app = build_story_build_graph()
+        app = build_story_build_graph(planning_mode=planning_mode)
         state: StoryBuildState = {
             "db": db,
             "story_id": story_id,
@@ -298,6 +307,7 @@ def run_story_build_graph(
             "allow_append": allow_append,
             "story_style": story_style,
             "image_style": image_style,
+            "planning_mode": planning_mode,
             "gemini": gemini,
         }
         return app.invoke(state)

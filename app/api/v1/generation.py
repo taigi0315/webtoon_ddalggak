@@ -5,9 +5,11 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import DbSessionDep
 from app.config.loaders import has_image_style
+from app.core.settings import settings
 from app.db.models import Scene
 from app.graphs import nodes
 from app.graphs.pipeline import run_full_pipeline
+from app.services.vertex_gemini import GeminiClient
 
 
 router = APIRouter(tags=["generation"])
@@ -29,6 +31,7 @@ class GenerateFullRequest(BaseModel):
     panel_count: int = Field(default=3, ge=1, le=12)
     style_id: str = Field(min_length=1)
     genre: str | None = None
+    prompt_override: str | None = None
 
 
 class GenerateFullResponse(BaseModel):
@@ -41,6 +44,22 @@ class GenerateFullResponse(BaseModel):
     render_spec_artifact_id: uuid.UUID
     render_result_artifact_id: uuid.UUID
     blind_test_report_artifact_id: uuid.UUID
+
+
+def _build_gemini_client() -> GeminiClient:
+    if not settings.google_cloud_project and not settings.gemini_api_key:
+        raise HTTPException(status_code=500, detail="Gemini is not configured")
+
+    return GeminiClient(
+        project=settings.google_cloud_project,
+        location=settings.google_cloud_location,
+        api_key=settings.gemini_api_key,
+        text_model=settings.gemini_text_model,
+        image_model=settings.gemini_image_model,
+        timeout_seconds=settings.gemini_timeout_seconds,
+        max_retries=settings.gemini_max_retries,
+        initial_backoff_seconds=settings.gemini_initial_backoff_seconds,
+    )
 
 
 def _scene_or_404(db, scene_id: uuid.UUID) -> Scene:
@@ -100,7 +119,8 @@ def generate_render(scene_id: uuid.UUID, db=DbSessionDep):
     qc = nodes.run_qc_checker(db=db, scene_id=scene_id)
     if not (qc.payload or {}).get("passed"):
         raise HTTPException(status_code=400, detail="qc failed; fix panel plan or semantics")
-    artifact = nodes.run_image_renderer(db=db, scene_id=scene_id)
+    gemini = _build_gemini_client()
+    artifact = nodes.run_image_renderer(db=db, scene_id=scene_id, gemini=gemini)
     return ArtifactIdResponse(artifact_id=artifact.artifact_id)
 
 
@@ -124,13 +144,16 @@ def generate_full(scene_id: uuid.UUID, payload: GenerateFullRequest, db=DbSessio
     if not has_image_style(payload.style_id):
         raise HTTPException(status_code=400, detail="unknown style_id")
 
+    gemini = _build_gemini_client()
+
     out = run_full_pipeline(
         db=db,
         scene_id=scene_id,
         panel_count=payload.panel_count,
         style_id=payload.style_id,
         genre=payload.genre,
-        gemini=None,
+        prompt_override=payload.prompt_override,
+        gemini=gemini,
     )
 
     return GenerateFullResponse(

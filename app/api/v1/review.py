@@ -6,9 +6,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.api.deps import DbSessionDep
+from app.core.settings import settings
 from app.db.models import Artifact, Scene
 from app.graphs import nodes
 from app.services.artifacts import ArtifactService
+from app.services.vertex_gemini import GeminiClient
 
 
 router = APIRouter(tags=["review"])
@@ -33,6 +35,22 @@ def _scene_or_404(db, scene_id: uuid.UUID) -> Scene:
     return scene
 
 
+def _build_gemini_client() -> GeminiClient:
+    if not settings.google_cloud_project and not settings.gemini_api_key:
+        raise HTTPException(status_code=500, detail="Gemini is not configured")
+
+    return GeminiClient(
+        project=settings.google_cloud_project,
+        location=settings.google_cloud_location,
+        api_key=settings.gemini_api_key,
+        text_model=settings.gemini_text_model,
+        image_model=settings.gemini_image_model,
+        timeout_seconds=settings.gemini_timeout_seconds,
+        max_retries=settings.gemini_max_retries,
+        initial_backoff_seconds=settings.gemini_initial_backoff_seconds,
+    )
+
+
 @router.post("/scenes/{scene_id}/review/regenerate", response_model=ArtifactIdResponse)
 def regenerate(scene_id: uuid.UUID, payload: RegenerateRequest | None = None, db=DbSessionDep):
     _scene_or_404(db, scene_id)
@@ -46,7 +64,8 @@ def regenerate(scene_id: uuid.UUID, payload: RegenerateRequest | None = None, db
         raise HTTPException(status_code=400, detail="qc failed; fix panel plan or semantics")
 
     reason = payload.reason if payload else None
-    artifact = nodes.run_image_renderer(db=db, scene_id=scene_id, reason=reason)
+    gemini = _build_gemini_client()
+    artifact = nodes.run_image_renderer(db=db, scene_id=scene_id, reason=reason, gemini=gemini)
     return ArtifactIdResponse(artifact_id=artifact.artifact_id)
 
 

@@ -12,6 +12,7 @@ import {
   styleItemsSchema,
   charactersSchema,
   storyGenerateResponseSchema,
+  sceneGenerateFullSchema,
   characterRefsSchema,
   characterRefSchema,
   characterGenerateRefsResponseSchema,
@@ -183,6 +184,25 @@ export async function generateRender(sceneId: string) {
   return artifactIdSchema.parse(payload);
 }
 
+export async function generateSceneFull(params: {
+  sceneId: string;
+  panelCount?: number;
+  styleId: string;
+  genre?: string | null;
+  promptOverride?: string | null;
+}) {
+  const payload = await fetchJson(`/v1/scenes/${params.sceneId}/generate/full`, {
+    method: "POST",
+    body: JSON.stringify({
+      panel_count: params.panelCount ?? 4,
+      style_id: params.styleId,
+      genre: params.genre ?? null,
+      prompt_override: params.promptOverride ?? null
+    })
+  });
+  return sceneGenerateFullSchema.parse(payload);
+}
+
 export async function fetchScenes(storyId: string) {
   const payload = await fetchJson(`/v1/stories/${storyId}/scenes`);
   return scenesSchema.parse(payload);
@@ -341,4 +361,101 @@ export async function approveCharacter(characterId: string) {
 export async function fetchDialogueSuggestions(sceneId: string) {
   const payload = await fetchJson(`/v1/scenes/${sceneId}/dialogue/suggestions`);
   return dialogueSuggestionsSchema.parse(payload);
+}
+
+export async function fetchEpisodes(storyId: string) {
+  const payload = await fetchJson(`/v1/stories/${storyId}/episodes`);
+  return payload;
+}
+
+export async function createEpisode(params: {
+  storyId: string;
+  title: string;
+  defaultStoryStyle: string;
+  defaultImageStyle: string;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/episodes`, {
+    method: "POST",
+    body: JSON.stringify({
+      title: params.title,
+      default_story_style: params.defaultStoryStyle,
+      default_image_style: params.defaultImageStyle
+    })
+  });
+  return payload;
+}
+
+export async function createEpisodeExport(episodeId: string) {
+  const payload = await fetchJson(`/v1/episodes/${episodeId}/export`, {
+    method: "POST"
+  });
+  return payload;
+}
+
+export async function finalizeExport(exportId: string) {
+  const payload = await fetchJson(`/v1/exports/${exportId}/finalize`, {
+    method: "POST"
+  });
+  return payload;
+}
+
+export async function generateVideoExport(exportId: string) {
+  const payload = await fetchJson(`/v1/exports/${exportId}/generate-video`, {
+    method: "POST"
+  });
+  return payload;
+}
+
+export async function fetchExport(exportId: string) {
+  const payload = await fetchJson(`/v1/exports/${exportId}`);
+  return payload;
+}
+
+export async function fetchDialogueLayer(sceneId: string) {
+  try {
+    const payload = await fetchJson(`/v1/scenes/${sceneId}/dialogue`);
+    return payload;
+  } catch (error) {
+    if (error instanceof Error && "status" in error) {
+      const status = (error as { status?: number }).status;
+      if (status === 404) return null;
+    }
+    throw error;
+  }
+}
+
+export async function createDialogueLayer(params: {
+  sceneId: string;
+  bubbles: Array<{
+    bubble_id: string;
+    panel_id: number;
+    text: string;
+    position: { x: number; y: number };
+    size: { w: number; h: number };
+    tail?: { x: number; y: number } | null;
+  }>;
+}) {
+  const payload = await fetchJson(`/v1/scenes/${params.sceneId}/dialogue`, {
+    method: "POST",
+    body: JSON.stringify({ bubbles: params.bubbles })
+  });
+  return payload;
+}
+
+export async function updateDialogueLayer(params: {
+  dialogueId: string;
+  bubbles: Array<{
+    bubble_id: string;
+    panel_id: number;
+    text: string;
+    position: { x: number; y: number };
+    size: { w: number; h: number };
+    tail?: { x: number; y: number } | null;
+  }>;
+}) {
+  const payload = await fetchJson(`/v1/dialogue/${params.dialogueId}`, {
+    method: "PUT",
+    body: JSON.stringify({ bubbles: params.bubbles })
+  });
+  return payload;
 }

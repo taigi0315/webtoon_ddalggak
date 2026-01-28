@@ -71,6 +71,18 @@ export const storyGenerateResponseSchema = z.object({
   characters: charactersSchema
 });
 
+export const sceneGenerateFullSchema = z.object({
+  scene_intent_artifact_id: z.string().uuid(),
+  panel_plan_artifact_id: z.string().uuid(),
+  panel_plan_normalized_artifact_id: z.string().uuid(),
+  layout_template_artifact_id: z.string().uuid(),
+  panel_semantics_artifact_id: z.string().uuid(),
+  qc_report_artifact_id: z.string().uuid(),
+  render_spec_artifact_id: z.string().uuid(),
+  render_result_artifact_id: z.string().uuid(),
+  blind_test_report_artifact_id: z.string().uuid()
+});
+
 export const characterRefSchema = z.object({
   reference_image_id: z.string().uuid(),
   character_id: z.string().uuid(),

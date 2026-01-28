@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 
 import {
   generateStoryBlueprint,
@@ -38,6 +39,7 @@ const BLUEPRINT_MESSAGES = [
 
 export default function StoryEditorPage() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
 
   // Current step in the flow
   const [step, setStep] = useState<Step>("setup");
@@ -51,6 +53,7 @@ export default function StoryEditorPage() {
   const [storyStyle, setStoryStyle] = useState("default");
   const [imageStyle, setImageStyle] = useState("default");
   const [storyText, setStoryText] = useState("");
+  const [storyTextTouched, setStoryTextTouched] = useState(false);
   const [storyId, setStoryId] = useState("");
   const [maxScenes, setMaxScenes] = useState(6);
 
@@ -138,13 +141,18 @@ export default function StoryEditorPage() {
 
   // Load from localStorage on mount
   useEffect(() => {
+    const paramProjectId = searchParams.get("project_id") ?? "";
+    const paramStoryId = searchParams.get("story_id") ?? "";
+    if (paramProjectId) setProjectId(paramProjectId);
+    if (paramStoryId) setStoryId(paramStoryId);
+
     const storedProjectId = window.localStorage.getItem("lastProjectId") ?? "";
-    if (storedProjectId) setProjectId(storedProjectId);
+    if (!paramProjectId && storedProjectId) setProjectId(storedProjectId);
     const storedStoryStyle = window.localStorage.getItem("selectedStoryStyle") ?? "default";
     const storedImageStyle = window.localStorage.getItem("selectedImageStyle") ?? "default";
     setStoryStyle(storedStoryStyle);
     setImageStyle(storedImageStyle);
-  }, []);
+  }, [searchParams]);
 
   // Save projectId to localStorage
   useEffect(() => {
@@ -159,6 +167,20 @@ export default function StoryEditorPage() {
       window.localStorage.setItem("lastStoryId", storyId);
     }
   }, [storyId]);
+
+  useEffect(() => {
+    setStoryTextTouched(false);
+  }, [storyId]);
+
+  useEffect(() => {
+    if (!storyId || storyTextTouched) return;
+    if (!scenesQuery.data || scenesQuery.data.length === 0) return;
+    const combined = scenesQuery.data
+      .map((scene) => scene.source_text?.trim())
+      .filter(Boolean)
+      .join("\n\n");
+    if (combined) setStoryText(combined);
+  }, [scenesQuery.data, storyId, storyTextTouched]);
 
   // Handle Generate Story - creates project/story if needed, then generates
   const handleGenerateStory = async () => {
@@ -439,10 +461,13 @@ export default function StoryEditorPage() {
               className="textarea w-full min-h-[300px]"
               placeholder="Paste or write your story here. The AI will convert it into webtoon scenes with panels, characters, and dialogue..."
               value={storyText}
-              onChange={(e) => setStoryText(e.target.value)}
+              onChange={(e) => {
+                setStoryTextTouched(true);
+                setStoryText(e.target.value);
+              }}
             />
             <p className="text-xs text-slate-500">
-              Write naturally. The AI will extract scenes, identify characters, and plan the visual panels.
+              Characters & scenes are created now; panel planning happens when rendering.
             </p>
           </div>
 

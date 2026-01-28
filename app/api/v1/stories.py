@@ -122,6 +122,8 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
 
     gemini = _build_gemini_client()
 
+    planning_mode = "characters_only"
+
     try:
         run_story_build_graph(
             db=db,
@@ -134,13 +136,14 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
             story_style=story.default_story_style,
             image_style=payload.style_id or story.default_image_style,
             gemini=gemini,
+            planning_mode=planning_mode,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     scenes = list(db.execute(select(Scene).where(Scene.story_id == story_id)).scalars().all())
 
-    if payload.generate_render_spec:
+    if payload.generate_render_spec and planning_mode == "full":
         style_id = payload.style_id or story.default_image_style or "default"
         for scene in scenes:
             nodes.run_prompt_compiler(db=db, scene_id=scene.scene_id, style_id=style_id)
