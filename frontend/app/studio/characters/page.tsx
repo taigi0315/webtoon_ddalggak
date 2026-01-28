@@ -178,11 +178,18 @@ export default function CharacterStudioPage() {
                     <p className="text-sm font-semibold text-ink">{character.name}</p>
                     <p className="text-xs text-slate-500 capitalize">{character.role}</p>
                   </div>
-                  {character.approved && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                      Ready
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {character.approved && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                        Ready
+                      </span>
+                    )}
+                    {character.appearance?.project_reused && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                        Reused
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="mt-2 text-xs text-slate-500 line-clamp-3">
                   {character.description || character.identity_line || "No description yet."}
@@ -231,6 +238,7 @@ function CharacterDetail({ character }: { character: Character }) {
   const queryClient = useQueryClient();
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [identityDraft, setIdentityDraft] = useState("");
+  const [zoom, setZoom] = useState(1);
 
   // Fetch refs for this character
   const refsQuery = useQuery({
@@ -325,6 +333,7 @@ function CharacterDetail({ character }: { character: Character }) {
   useEffect(() => {
     setDescriptionDraft(character.description ?? "");
     setIdentityDraft(character.identity_line ?? "");
+    setZoom(1);
   }, [character.character_id, character.description, character.identity_line]);
 
   return (
@@ -357,13 +366,35 @@ function CharacterDetail({ character }: { character: Character }) {
             Add a description or identity line before generating images.
           </p>
         )}
-        <div className="mt-6 flex items-center justify-center rounded-2xl bg-white/80 p-4 shadow-soft">
+        <div className="mt-6 rounded-2xl bg-white/80 p-4 shadow-soft">
+          <div className="mb-3 flex items-center justify-end gap-2">
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => setZoom((prev) => Math.max(0.6, Number((prev - 0.1).toFixed(2))))}
+              disabled={zoom <= 0.6}
+            >
+              −
+            </button>
+            <span className="text-xs text-slate-500 w-12 text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => setZoom((prev) => Math.min(2, Number((prev + 0.1).toFixed(2))))}
+              disabled={zoom >= 2}
+            >
+              +
+            </button>
+          </div>
           {previewRef ? (
-            <img
-              src={getImageUrl(previewRef)}
-              alt={character.name}
-              className="max-h-[420px] w-full rounded-xl object-contain"
-            />
+            <div className="relative h-[520px] w-full overflow-auto rounded-xl bg-slate-100">
+              <img
+                src={getImageUrl(previewRef)}
+                alt={character.name}
+                className="mx-auto rounded-xl object-contain"
+                style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+              />
+            </div>
           ) : (
             <div className="flex h-[360px] w-full items-center justify-center rounded-xl bg-slate-100 text-slate-400">
               No image yet.

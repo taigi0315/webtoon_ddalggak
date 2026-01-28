@@ -34,7 +34,7 @@ const BLUEPRINT_MESSAGES = [
   "Resolving layouts...",
   "Drafting panel semantics...",
   "Running QC checks...",
-  "Preparing render specs..."
+  "Finalizing planning..."
 ];
 
 export default function StoryEditorPage() {
@@ -230,7 +230,7 @@ export default function StoryEditorPage() {
         maxScenes: maxScenes,
         panelCount: 4,
         maxCharacters: 4,
-        generateRenderSpec: true,
+        generateRenderSpec: false,
         allowAppend: false
       });
     } catch (error) {

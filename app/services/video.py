@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
+import subprocess
 import tempfile
 import uuid
 from dataclasses import dataclass
@@ -14,6 +16,14 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
+
+VIDEO_DIALOGUE_CONFIG = {
+    "font_path": "/System/Library/Fonts/Helvetica.ttc",
+    "font_size": 16,
+    "font_scale": 1.8,
+    "padding": 10,
+    "line_height": 20,
+}
 
 
 @dataclass
@@ -56,17 +66,16 @@ def render_dialogue_bubble(
     h = int(bubble.height * image_height)
 
     # Draw bubble background (rounded rectangle)
-    padding = 10
+    padding = VIDEO_DIALOGUE_CONFIG["padding"]
     bubble_rect = [x, y, x + w, y + h]
     draw.rounded_rectangle(bubble_rect, radius=15, fill="white", outline="black", width=2)
 
-    # Draw text
-    text_x = x + padding
-    text_y = y + padding
-
     if font is None:
         try:
-            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 16)
+            font = ImageFont.truetype(
+                VIDEO_DIALOGUE_CONFIG["font_path"],
+                int(VIDEO_DIALOGUE_CONFIG["font_size"] * VIDEO_DIALOGUE_CONFIG["font_scale"]),
+            )
         except Exception:
             font = ImageFont.load_default()
 
@@ -89,8 +98,15 @@ def render_dialogue_bubble(
     if current_line:
         lines.append(" ".join(current_line))
 
-    # Draw each line
-    line_height = 20
+    # Center text horizontally and vertically
+    line_height = int(VIDEO_DIALOGUE_CONFIG["line_height"] * VIDEO_DIALOGUE_CONFIG["font_scale"])
+    total_text_height = line_height * len(lines)
+    text_block_width = max(
+        (draw.textbbox((0, 0), line, font=font)[2] for line in lines), default=0
+    )
+    text_x = x + max(padding, (w - text_block_width) // 2)
+    text_y = y + max(padding, (h - total_text_height) // 2)
+
     for i, line in enumerate(lines):
         draw.text((text_x, text_y + i * line_height), line, fill="black", font=font)
 
@@ -137,19 +153,18 @@ def generate_webtoon_video(
     Returns:
         Path to the generated video file
     """
-    try:
-        from moviepy.editor import ImageClip, concatenate_videoclips, CompositeVideoClip
-    except ImportError:
-        logger.error("moviepy not installed - video export not available")
-        raise RuntimeError("Video export requires moviepy. Install with: pip install moviepy")
+    if shutil.which("ffmpeg") is None:
+        logger.error("ffmpeg not installed - video export not available")
+        raise RuntimeError("Video export requires ffmpeg. Install ffmpeg and ensure it is on PATH.")
 
     if not scenes:
         raise ValueError("No scenes provided for video generation")
 
-    clips = []
     temp_dir = tempfile.mkdtemp()
+    concat_path = os.path.join(temp_dir, "concat.txt")
 
     try:
+        concat_lines: list[str] = []
         for i, scene in enumerate(scenes):
             # Check if image exists
             if not os.path.exists(scene.image_path):
@@ -168,41 +183,72 @@ def generate_webtoon_video(
             duration = scene.duration_seconds
             for dialogue in scene.dialogues:
                 duration += calculate_text_duration(dialogue.text)
+            abs_path = os.path.abspath(img_path)
+            concat_lines.append(f"file '{abs_path}'")
+            concat_lines.append(f"duration {duration:.3f}")
 
-            # Create image clip
-            clip = ImageClip(img_path, duration=duration)
-
-            # Resize to target width while maintaining aspect ratio
-            if clip.w != target_width:
-                clip = clip.resize(width=target_width)
-
-            clips.append(clip)
-
-        if not clips:
+        if not concat_lines:
             raise ValueError("No valid scenes could be processed")
 
-        # Concatenate all clips
-        final_clip = concatenate_videoclips(clips, method="compose")
+        # Repeat last file so the final duration is honored by concat demuxer
+        last_file = concat_lines[-2].replace("file ", "")
+        concat_lines.append(f"file {last_file}")
 
-        # Write video file
-        final_clip.write_videofile(
-            output_path,
-            fps=fps,
-            codec="libx264",
-            audio=False,
-            logger=None,  # Suppress moviepy output
+        with open(concat_path, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(concat_lines))
+
+        target_height = int(target_width * 16 / 9)
+        scale_pad = (
+            f"scale={target_width}:-2:force_original_aspect_ratio=decrease,"
+            f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2"
         )
 
-        # Cleanup
-        final_clip.close()
-        for clip in clips:
-            clip.close()
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            concat_path,
+            "-vf",
+            scale_pad,
+            "-r",
+            str(fps),
+            "-pix_fmt",
+            "yuv420p",
+            "-c:v",
+            "libx264",
+            "-movflags",
+            "+faststart",
+            output_path,
+        ]
+        logger.info("ffmpeg_start output_path=%s frames=%s", output_path, len(concat_lines) // 2)
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                timeout=300,
+            )
+            logger.info("ffmpeg_done output_path=%s", output_path)
+        except subprocess.TimeoutExpired as exc:
+            logger.error("ffmpeg timed out: %s", exc)
+            raise RuntimeError("Video export timed out. Try again with fewer scenes.") from exc
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr.decode("utf-8", errors="ignore") if exc.stderr else "ffmpeg failed"
+            logger.error("ffmpeg failed: %s", stderr)
+            raise RuntimeError(f"Video export failed: {stderr[:500]}") from exc
 
         return output_path
 
     finally:
         # Cleanup temp files
-        import shutil
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -239,8 +285,10 @@ def generate_video_from_export_data(
             image_path = os.path.join(media_root, image_url[6:])
         else:
             image_path = image_url
+        if not os.path.isabs(image_path):
+            image_path = os.path.abspath(image_path)
 
-        # Extract dialogue from layers
+        # Extract dialogue from layers or dialogue export
         dialogues: list[DialogueBubbleData] = []
         layers = scene_info.get("layers", [])
         for layer in layers:
@@ -256,11 +304,28 @@ def generate_video_from_export_data(
                         height=geometry.get("h", 0.15),
                     ))
 
+        if not dialogues:
+            for obj in scene_info.get("dialogue_bubbles", []) or []:
+                geometry = obj.get("geometry", {})
+                dialogues.append(DialogueBubbleData(
+                    text=obj.get("text", ""),
+                    speaker=obj.get("speaker", ""),
+                    x=geometry.get("x", 0.1),
+                    y=geometry.get("y", 0.1),
+                    width=geometry.get("w", 0.3),
+                    height=geometry.get("h", 0.15),
+                ))
+
         frames.append(SceneFrameData(
             image_path=image_path,
             dialogues=dialogues,
             duration_seconds=3.0,  # Base duration
         ))
+
+    logger.info("video_build_frames scenes=%s frames=%s", len(scenes_data), len(frames))
+
+    if not frames:
+        raise ValueError("No valid scenes could be processed")
 
     # Generate output filename
     video_filename = f"webtoon_{uuid.uuid4().hex[:8]}.mp4"

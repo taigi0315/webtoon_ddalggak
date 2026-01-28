@@ -385,6 +385,14 @@ export async function createEpisode(params: {
   return payload;
 }
 
+export async function setEpisodeScenes(params: { episodeId: string; sceneIds: string[] }) {
+  const payload = await fetchJson(`/v1/episodes/${params.episodeId}/scenes`, {
+    method: "POST",
+    body: JSON.stringify({ scene_ids_ordered: params.sceneIds })
+  });
+  return payload;
+}
+
 export async function createEpisodeExport(episodeId: string) {
   const payload = await fetchJson(`/v1/episodes/${episodeId}/export`, {
     method: "POST"

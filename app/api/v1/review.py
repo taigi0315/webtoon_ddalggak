@@ -59,9 +59,7 @@ def regenerate(scene_id: uuid.UUID, payload: RegenerateRequest | None = None, db
     if spec is None:
         raise HTTPException(status_code=400, detail="render_spec artifact not found")
 
-    qc = nodes.run_qc_checker(db=db, scene_id=scene_id)
-    if not (qc.payload or {}).get("passed"):
-        raise HTTPException(status_code=400, detail="qc failed; fix panel plan or semantics")
+    nodes.run_qc_checker(db=db, scene_id=scene_id)
 
     reason = payload.reason if payload else None
     gemini = _build_gemini_client()

@@ -1195,15 +1195,30 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
     panels = list(panel_plan.get("panels") or [])
     total = len(panels)
     if total == 0:
-        return {"passed": False, "issues": ["no_panels"], "metrics": {"panel_count": 0}}
+        return {
+            "passed": False,
+            "issues": ["no_panels"],
+            "issue_details": [
+                {
+                    "code": "no_panels",
+                    "message": "No panels found in the panel plan.",
+                    "hint": "Regenerate the panel plan or reduce strict constraints.",
+                }
+            ],
+            "metrics": {"panel_count": 0},
+            "summary": "QC failed: no panels detected.",
+        }
 
     closeups = [p for p in panels if p.get("grammar_id") == "emotion_closeup"]
-    closeup_ratio = len(closeups) / total
+    closeup_count = len(closeups)
+    closeup_ratio = closeup_count / total
 
     dialogue_ratio = 0.0
+    dialogue_count = 0
     if panel_semantics and isinstance(panel_semantics.get("panels"), list):
         dialogue_panels = [p for p in panel_semantics["panels"] if p.get("dialogue")]
-        dialogue_ratio = len(dialogue_panels) / total
+        dialogue_count = len(dialogue_panels)
+        dialogue_ratio = dialogue_count / total
 
     run_len = 1
     max_run = 1
@@ -1229,15 +1244,65 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
             if not any(word in desc for word in rules.environment_keywords):
                 issues.append("missing_environment_on_establishing")
 
+    issue_details: list[dict[str, str]] = []
+    for code in issues:
+        if code == "too_many_closeups":
+            allowed = max(1, int(total * rules.closeup_ratio_max))
+            issue_details.append(
+                {
+                    "code": code,
+                    "message": f"Too many close-up panels ({closeup_count}/{total}). Max {allowed}.",
+                    "hint": "Reduce close-ups or mix in wider shots to balance framing.",
+                }
+            )
+        elif code == "too_much_dialogue":
+            allowed = max(1, int(total * rules.dialogue_ratio_max))
+            issue_details.append(
+                {
+                    "code": code,
+                    "message": f"Too many dialogue panels ({dialogue_count}/{total}). Max {allowed}.",
+                    "hint": "Move some dialogue to narration or spread it across fewer panels.",
+                }
+            )
+        elif code == "repeated_framing":
+            issue_details.append(
+                {
+                    "code": code,
+                    "message": f"Repeated framing detected ({max_run} panels in a row).",
+                    "hint": "Vary camera distance or angle between adjacent panels.",
+                }
+            )
+        elif code == "missing_environment_on_establishing":
+            examples = ", ".join(rules.environment_keywords[:6])
+            issue_details.append(
+                {
+                    "code": code,
+                    "message": "Establishing panel lacks clear environment cues.",
+                    "hint": f"Add location details (e.g., {examples}).",
+                }
+            )
+        else:
+            issue_details.append(
+                {
+                    "code": code,
+                    "message": "QC rule failed.",
+                    "hint": "Regenerate the panel plan or adjust scene semantics.",
+                }
+            )
+
     return {
         "passed": not issues,
         "issues": issues,
+        "issue_details": issue_details,
         "metrics": {
             "panel_count": total,
+            "closeup_count": closeup_count,
             "closeup_ratio": closeup_ratio,
+            "dialogue_count": dialogue_count,
             "dialogue_ratio": dialogue_ratio,
             "max_repeated_framing": max_run,
         },
+        "summary": "QC passed." if not issues else f"QC failed: {len(issues)} issue(s).",
     }
 
 
@@ -1252,41 +1317,28 @@ def _compile_prompt(
     style_desc = _style_description(style_id)
     story_desc = _story_style_description(story_style)
     layout_text = layout_template.get("layout_text", "")
+    panels = panel_semantics.get("panels", []) or []
+    panel_count = len(panels)
 
-    # Build character identity lines with FULL age-based style prompts
+    # Build concise character lines (reference images provide detailed appearance)
     identity_lines = []
     for c in characters:
-        # Get age-based style prompt using gender and age_range from the Character model
-        char_style = ""
-        gender = getattr(c, "gender", None)
-        age_range = getattr(c, "age_range", None)
         appearance = getattr(c, "appearance", None)
-
-        if gender and age_range:
-            char_style = get_character_style_prompt(gender, age_range)
-
-        # Build comprehensive character visual reference
-        char_lines = [f"  **{c.name}** ({c.role or 'character'}):"]
-
-        # Include identity line if available
+        char_lines = [f"  - {c.name} ({c.role or 'character'})"]
         if c.identity_line:
             char_lines.append(f"    Identity: {c.identity_line}")
-
-        # Include full age-based style prompt (critical for consistent rendering)
-        if char_style:
-            char_lines.append(f"    Base style: {char_style}")
-
-        # Include appearance details if available
         if isinstance(appearance, dict):
+            brief = []
             if appearance.get("hair"):
-                char_lines.append(f"    Hair: {appearance['hair']}")
+                brief.append(f"Hair: {appearance['hair']}")
             if appearance.get("face"):
-                char_lines.append(f"    Face: {appearance['face']}")
+                brief.append(f"Face: {appearance['face']}")
             if appearance.get("build"):
-                char_lines.append(f"    Build: {appearance['build']}")
+                brief.append(f"Build: {appearance['build']}")
+            if brief:
+                char_lines.append(f"    Appearance: {'; '.join(brief)}")
         elif c.description:
-            char_lines.append(f"    Description: {c.description}")
-
+            char_lines.append(f"    Appearance: {c.description}")
         identity_lines.extend(char_lines)
 
     # Get genre-specific visual guidelines
@@ -1301,22 +1353,29 @@ def _compile_prompt(
         "",
         f"**VISUAL STYLE:** {style_desc}",
         f"**STORY GENRE:** {story_desc}",
-        f"**LAYOUT:** {layout_text}",
+        f"**LAYOUT:** {layout_text or f'{panel_count} panels, vertical flow'}",
+        f"**PANEL COUNT:** {panel_count} (do not add or remove panels)",
         "",
         f"**GENRE VISUAL GUIDELINES ({genre_key}):**",
         f"- Lighting: {genre_guide.get('lighting', 'natural ambient')}",
         f"- Atmosphere: {genre_guide.get('atmosphere', 'appropriate to mood')}",
         f"- Color palette: {genre_guide.get('color_palette', 'natural tones')}",
         "",
+        "**PANEL COMPOSITION GUIDELINES:**",
+        "- Panels do NOT need equal sizes or grid alignment.",
+        "- You may use one dominant panel with smaller inset panels.",
+        "- Panels can vary in size and position if reading order is clear (top to bottom).",
+        "- If there is a reveal/impact/emotional peak, make that panel dominant.",
+        "",
     ]
 
     if identity_lines:
-        lines.append("**CHARACTER VISUAL REFERENCES:**")
+        lines.append("**CHARACTERS (reference images provided; keep appearance consistent):**")
         lines.extend(identity_lines)
         lines.append("")
 
-    lines.append("**PANELS:**")
-    for panel in panel_semantics.get("panels", []):
+    lines.append("**PANELS (no text in image; dialogue is context only):**")
+    for panel in panels:
         grammar_id = panel.get("grammar_id")
         grammar_hint = mapping.get(grammar_id, "")
         desc = panel.get("description", "")
@@ -1327,7 +1386,7 @@ def _compile_prompt(
         atmosphere = panel.get("atmosphere_keywords", [])
 
         # Build detailed panel description
-        panel_lines = [f"Panel {panel.get('panel_index')}: {grammar_hint}"]
+        panel_lines = [f"Panel {panel.get('panel_index')}: {grammar_hint}".strip()]
 
         if desc:
             panel_lines.append(f"  Visual: {desc}")
@@ -1367,7 +1426,7 @@ def _compile_prompt(
                     dialogue_text = " | ".join([f"\"{d}\"" for d in dialogue[:3]])
             else:
                 dialogue_text = str(dialogue)
-            panel_lines.append(f"  Dialogue context: {dialogue_text}")
+            panel_lines.append(f"  Dialogue context (do NOT render text): {dialogue_text}")
 
         lines.extend(panel_lines)
         lines.append("")
@@ -1377,13 +1436,12 @@ def _compile_prompt(
         "- CRITICAL: Vertical 9:16 aspect ratio (height significantly greater than width)",
         "- Korean webtoon/manhwa art style (Naver webtoon quality)",
         "- Optimized for vertical scrolling webtoon format",
-        "- Full body front view showing head to toe where applicable",
+        "- Show full body only when the scene composition requires it",
         "- Masterpiece best quality professional illustration",
         "- No text, speech bubbles, or watermarks in image",
         "- Leave clear space for dialogue bubbles to be added later",
         "- Consistent character appearance across panels",
-        "- Follow CHARACTER VISUAL REFERENCES exactly for body type, height, and build",
-        "- Do not add conflicting physical attributes",
+        "- Follow reference images; avoid contradicting character traits",
         "",
         "**NEGATIVE:** text, watermark, signature, logo, speech bubbles, conflicting descriptions, "
         "square image, 1:1 ratio, horizontal image, landscape orientation, "

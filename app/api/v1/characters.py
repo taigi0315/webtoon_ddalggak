@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.api.deps import DbSessionDep
 from app.api.v1.schemas import (
@@ -36,6 +36,58 @@ def create_character(story_id: uuid.UUID, payload: CharacterCreate, db=DbSession
         identity_line=payload.identity_line,
     )
     db.add(character)
+    db.flush()
+
+    # Reuse project-level character references by name
+    existing = (
+        db.execute(
+            select(Character)
+            .join(Story, Character.story_id == Story.story_id)
+            .where(
+                Story.project_id == story.project_id,
+                func.lower(Character.name) == func.lower(payload.name),
+                Character.character_id != character.character_id,
+            )
+            .order_by(Character.created_at.desc())
+            .limit(1)
+        )
+        .scalars()
+        .one_or_none()
+    )
+
+    if existing is not None:
+        if character.description is None:
+            character.description = existing.description
+        if character.identity_line is None:
+            character.identity_line = existing.identity_line
+        if not character.role:
+            character.role = existing.role
+
+        refs = (
+            db.execute(
+                select(CharacterReferenceImage)
+                .where(CharacterReferenceImage.character_id == existing.character_id)
+            )
+            .scalars()
+            .all()
+        )
+        for ref in refs:
+            db.add(
+                CharacterReferenceImage(
+                    character_id=character.character_id,
+                    image_url=ref.image_url,
+                    ref_type=ref.ref_type,
+                    approved=ref.approved,
+                    is_primary=ref.is_primary,
+                    metadata_=ref.metadata_ or {},
+                )
+            )
+        if existing.approved:
+            character.approved = True
+        if character.approved or refs:
+            character.appearance = dict(character.appearance or {})
+            character.appearance["project_reused"] = True
+
     db.commit()
     db.refresh(character)
     return character

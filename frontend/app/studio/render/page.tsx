@@ -3,5 +3,5 @@
 import { redirect } from "next/navigation";
 
 export default function SceneRenderRedirectPage() {
-  redirect("/studio/planner");
+  redirect("/studio/scenes");
 }

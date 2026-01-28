@@ -42,6 +42,14 @@ h1, h2, h3, h4 {
   min-height: 100vh;
 }
 
+.app-grid.sidebar-collapsed {
+  grid-template-columns: 1fr;
+}
+
+.app-grid.sidebar-collapsed .shell-panel {
+  display: none;
+}
+
 @media (max-width: 960px) {
   .app-grid {
     grid-template-columns: 1fr;

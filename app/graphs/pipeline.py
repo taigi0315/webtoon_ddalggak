@@ -289,7 +289,7 @@ def run_full_pipeline(
             db=db,
             scene_id=scene_id,
             style_id=style_id,
-            enforce_qc=True,
+            enforce_qc=False,
             prompt_override=prompt_override,
             gemini=gemini,
         )

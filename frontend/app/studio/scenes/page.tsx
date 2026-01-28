@@ -289,6 +289,18 @@ function SceneDetail({
   const hasSemantics = artifactsQuery.data
     ? !!getLatestArtifact(artifactsQuery.data, "panel_semantics")
     : false;
+  const qcReport = artifactsQuery.data
+    ? getLatestArtifact(artifactsQuery.data, "qc_report")
+    : null;
+  const qcPayload =
+    qcReport && qcReport.payload && typeof qcReport.payload === "object"
+      ? (qcReport.payload as Record<string, any>)
+      : null;
+  const qcFailed = qcPayload?.passed === false;
+  const qcIssueDetails = Array.isArray(qcPayload?.issue_details)
+    ? qcPayload.issue_details
+    : [];
+  const qcIssues = Array.isArray(qcPayload?.issues) ? qcPayload.issues : [];
 
   const handleGenerate = async () => {
     setError("");
@@ -401,7 +413,7 @@ function SceneDetail({
             </button>
           </div>
           {imageUrl && !imageLoadError ? (
-            <div className="relative h-[620px] w-full overflow-auto rounded-xl bg-slate-100">
+            <div className="relative h-[760px] w-full overflow-auto rounded-xl bg-slate-100">
               <img
                 src={imageUrl}
                 alt="Scene render"
@@ -424,6 +436,35 @@ function SceneDetail({
           )}
         </div>
       </div>
+
+      {qcFailed && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          <div className="text-sm font-semibold">Quality Warning</div>
+          <p className="mt-1 text-xs text-amber-800">
+            This render did not pass QC. You can keep it, but consider re-generating
+            after adjusting the scene plan or prompt.
+          </p>
+          {qcPayload?.summary && (
+            <p className="mt-1 text-xs text-amber-700">{qcPayload.summary}</p>
+          )}
+          {(qcIssueDetails.length > 0 || qcIssues.length > 0) && (
+            <ul className="mt-2 list-disc pl-4 text-xs text-amber-900">
+              {qcIssueDetails.length > 0
+                ? qcIssueDetails.map((detail: any, idx: number) => (
+                    <li key={`${detail.code || "qc"}-${idx}`}>
+                      <span className="font-medium">{detail.message || detail.code}</span>
+                      {detail.hint ? (
+                        <span className="text-amber-800"> {detail.hint}</span>
+                      ) : null}
+                    </li>
+                  ))
+                : qcIssues.map((issue: string) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {latestRender && !imageUrl && !imageLoadError && (
         <p className="mt-2 text-xs text-slate-400">

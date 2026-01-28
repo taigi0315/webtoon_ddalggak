@@ -15,6 +15,7 @@ import {
   fetchStory,
   fetchEpisodes,
   createEpisode,
+  setEpisodeScenes,
   createEpisodeExport,
   finalizeExport,
   generateVideoExport,
@@ -51,6 +52,13 @@ export default function DialogueEditorPage() {
   const [videoStatus, setVideoStatus] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [lastExportId, setLastExportId] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [autoOpened, setAutoOpened] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [pollSeconds, setPollSeconds] = useState(0);
+  const scenesRowRef = useRef<HTMLDivElement | null>(null);
+  const sceneCardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [scenesOverflow, setScenesOverflow] = useState(false);
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -90,7 +98,11 @@ export default function DialogueEditorPage() {
   const saveLayerMutation = useMutation({
     mutationFn: async () => {
       if (!selectedSceneId) return null;
-      const payloadBubbles = bubbles.map((bubble) => ({
+      const validBubbles = bubbles.filter((bubble) => bubble.text.trim().length > 0);
+      if (validBubbles.length === 0) {
+        throw new Error("Add at least one dialogue bubble before saving.");
+      }
+      const payloadBubbles = validBubbles.map((bubble) => ({
         bubble_id: bubble.id,
         panel_id: bubble.panelId,
         text: bubble.text,
@@ -109,6 +121,10 @@ export default function DialogueEditorPage() {
     onSuccess: () => {
       if (!selectedSceneId) return;
       queryClient.invalidateQueries({ queryKey: ["dialogue-layer", selectedSceneId] });
+      setSaveError(null);
+    },
+    onError: (err) => {
+      setSaveError(err instanceof Error ? err.message : "Unable to save dialogue layer.");
     }
   });
 
@@ -130,6 +146,20 @@ export default function DialogueEditorPage() {
   const generateVideoMutation = useMutation({
     mutationFn: async () => {
       if (!selectedEpisodeId) throw new Error("Select an episode");
+      if (!scenesQuery.data || scenesQuery.data.length === 0) {
+        throw new Error("No scenes found for this story");
+      }
+      const selectedEpisode = episodesQuery.data?.find(
+        (episode: any) => episode.episode_id === selectedEpisodeId
+      );
+      const sceneIds =
+        selectedEpisode?.scene_ids_ordered?.length > 0
+          ? selectedEpisode.scene_ids_ordered
+          : scenesQuery.data.map((scene) => scene.scene_id);
+      if (!selectedEpisode?.scene_ids_ordered?.length) {
+        await setEpisodeScenes({ episodeId: selectedEpisodeId, sceneIds });
+        await queryClient.invalidateQueries({ queryKey: ["episodes", storyId] });
+      }
       const exportJob = await createEpisodeExport(selectedEpisodeId);
       const finalized = await finalizeExport(exportJob.export_id);
       const videoJob = await generateVideoExport(finalized.export_id);
@@ -138,6 +168,9 @@ export default function DialogueEditorPage() {
     },
     onSuccess: () => {
       setVideoStatus("processing");
+      setVideoError(null);
+      setAutoOpened(false);
+      setPollSeconds(0);
     },
     onError: (err) => {
       setVideoStatus(err instanceof Error ? err.message : "Video generation failed");
@@ -166,6 +199,33 @@ export default function DialogueEditorPage() {
     }
   }, [scenesQuery.data, selectedSceneId]);
 
+  useEffect(() => {
+    const row = scenesRowRef.current;
+    if (!row || !selectedSceneId) return;
+    const card = sceneCardRefs.current[selectedSceneId];
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [selectedSceneId]);
+
+  useEffect(() => {
+    const row = scenesRowRef.current;
+    if (!row) return;
+    const updateOverflow = () => {
+      setScenesOverflow(row.scrollWidth > row.clientWidth + 4);
+    };
+    updateOverflow();
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(updateOverflow);
+      observer.observe(row);
+    }
+    window.addEventListener("resize", updateOverflow);
+    return () => {
+      window.removeEventListener("resize", updateOverflow);
+      if (observer) observer.disconnect();
+    };
+  }, [scenesQuery.data?.length]);
+
   const selectedScene = useMemo(
     () => scenesQuery.data?.find((scene) => scene.scene_id === selectedSceneId),
     [scenesQuery.data, selectedSceneId]
@@ -192,18 +252,26 @@ export default function DialogueEditorPage() {
   useEffect(() => {
     if (!lastExportId) return;
     let active = true;
+    setPollSeconds(0);
     const interval = setInterval(async () => {
       try {
         const job = await fetchExport(lastExportId);
         if (!active) return;
         setVideoStatus(job.status);
+        const errorMessage =
+          typeof job?.metadata_?.error === "string" ? job.metadata_.error : null;
+        setVideoError(errorMessage);
         if (job.status === "succeeded" && job.output_url) {
           setVideoUrl(`http://localhost:8000${job.output_url}`);
+          if (!autoOpened) {
+            setAutoOpened(true);
+          }
           clearInterval(interval);
         }
         if (job.status === "failed") {
           clearInterval(interval);
         }
+        setPollSeconds((prev) => prev + 2);
       } catch {
         clearInterval(interval);
       }
@@ -265,8 +333,8 @@ export default function DialogueEditorPage() {
   }
 
   return (
-    <section className="space-y-6">
-      <div className="surface p-5">
+    <section className="mx-auto w-full max-w-6xl space-y-4 px-4 sm:px-6">
+      <div className="surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold text-ink">Dialogue Editor</h2>
@@ -308,12 +376,41 @@ export default function DialogueEditorPage() {
         </div>
       </div>
 
-      <div className="surface p-4">
-        <div className="flex items-center justify-between">
+      <div className="surface px-4 py-2">
+        <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-ink">Scenes</h3>
-          {scenesQuery.isLoading && <p className="text-xs text-slate-400">Loading…</p>}
+          <div className="flex items-center gap-2">
+            {scenesQuery.isLoading && <p className="text-xs text-slate-400">Loading…</p>}
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => scenesRowRef.current?.scrollBy({ left: -280, behavior: "smooth" })}
+              disabled={!scenesOverflow}
+              aria-label="Scroll scenes left"
+            >
+              ◀
+            </button>
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => scenesRowRef.current?.scrollBy({ left: 280, behavior: "smooth" })}
+              disabled={!scenesOverflow}
+              aria-label="Scroll scenes right"
+            >
+              ▶
+            </button>
+          </div>
         </div>
-        <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
+        <div
+          ref={scenesRowRef}
+          className="mt-2 flex gap-3 overflow-x-auto pb-2 flex-nowrap"
+          onWheel={(event) => {
+            const row = scenesRowRef.current;
+            if (!row || !scenesOverflow) return;
+            if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+              event.preventDefault();
+              row.scrollLeft += event.deltaY;
+            }
+          }}
+        >
           {scenesQuery.data?.length === 0 && (
             <div className="text-sm text-slate-500">
               No scenes found. Generate scenes first in Scene Editor.
@@ -327,6 +424,9 @@ export default function DialogueEditorPage() {
                   ? "border-indigo-400 bg-indigo-50"
                   : "border-slate-200 bg-white/70 hover:border-indigo-200"
               }`}
+              ref={(node) => {
+                sceneCardRefs.current[scene.scene_id] = node;
+              }}
               onClick={() => setSelectedSceneId(scene.scene_id)}
             >
               <p className="text-sm font-semibold text-ink">Scene {index + 1}</p>
@@ -338,15 +438,15 @@ export default function DialogueEditorPage() {
         </div>
       </div>
 
-      <section className="grid gap-6 xl:grid-cols-[0.75fr_1.8fr_0.9fr]">
-        <div className="surface p-6 space-y-5">
+      <section className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)_360px] xl:grid-cols-[280px_minmax(0,1fr)_400px] items-stretch min-h-[calc(100vh-340px)]">
+        <div className="surface p-5 h-full flex flex-col gap-5 min-w-0">
           <div>
             <h3 className="text-lg font-semibold text-ink">Tools</h3>
             <p className="mt-1 text-xs text-slate-500">
-              Drag dialogue lines from the right panel onto the canvas.
+              Drag dialogue lines from this panel onto the canvas.
             </p>
           </div>
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
             {([
               { id: "select", label: "Select" },
               { id: "speech", label: "Speech Bubble" },
@@ -355,7 +455,7 @@ export default function DialogueEditorPage() {
             ] as const).map((tool) => (
               <button
                 key={tool.id}
-                className={`btn-ghost w-full text-xs ${
+                className={`btn-ghost text-xs ${
                   activeTool === tool.id ? "border border-indigo-300 text-indigo-600" : ""
                 }`}
                 title={`Use the ${tool.label} tool on the canvas.`}
@@ -365,7 +465,6 @@ export default function DialogueEditorPage() {
               </button>
             ))}
           </div>
-          <div className="divider" />
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Inspector</p>
             <div className="mt-3 space-y-2">
@@ -418,17 +517,26 @@ export default function DialogueEditorPage() {
               />
             </div>
           </div>
+          <div className="flex-1" />
           <button
             className="btn-primary text-xs"
             title="Save dialogue bubbles for this scene."
-            onClick={() => saveLayerMutation.mutate()}
+            onClick={() => {
+              setSaveError(null);
+              saveLayerMutation.mutate();
+            }}
             disabled={!selectedSceneId || saveLayerMutation.isPending}
           >
             {saveLayerMutation.isPending ? "Saving..." : "Save Layer"}
           </button>
+          {saveLayerMutation.isError && (
+            <p className="text-xs text-rose-500">
+              {saveError || "Unable to save dialogue layer."}
+            </p>
+          )}
         </div>
 
-        <div className="surface p-6 flex flex-col gap-4">
+        <div className="surface p-5 flex flex-col gap-4 min-h-[calc(100vh-340px)] min-w-0">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-ink">Dialogue Canvas</h2>
             <div className="flex items-center gap-2">
@@ -449,9 +557,12 @@ export default function DialogueEditorPage() {
               >
                 +
               </button>
+              <button className="btn-ghost text-xs" onClick={() => setZoom(1)}>
+                Fit
+              </button>
             </div>
           </div>
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center min-h-[520px]">
             {selectedScene ? (
               <SceneCanvas
                 scene={selectedScene}
@@ -483,21 +594,31 @@ export default function DialogueEditorPage() {
           </div>
         </div>
 
-        <div className="surface p-6">
-          <h3 className="text-lg font-semibold text-ink">Dialogue List</h3>
-          <div className="mt-4 space-y-4">
-            {selectedScene ? (
-              <SceneDialogueList sceneId={selectedScene.scene_id} />
-            ) : (
-              <div className="card text-sm text-slate-500">Select a scene to view dialogue.</div>
-            )}
+        <div className="surface p-5 h-full flex flex-col gap-5 min-w-0">
+          <div>
+            <h4 className="text-sm font-semibold text-ink">Dialogue Lines</h4>
+            <div className="mt-3 space-y-4 flex-1 overflow-auto">
+              {selectedScene ? (
+                <SceneDialogueList sceneId={selectedScene.scene_id} />
+              ) : (
+                <div className="card text-sm text-slate-500">
+                  Select a scene to view dialogue.
+                </div>
+              )}
+            </div>
           </div>
-          <div className="divider my-5" />
-          <h4 className="text-sm font-semibold text-ink">Generate Video</h4>
-          <p className="mt-1 text-xs text-slate-500">
-            Create an episode export and generate a vertical video.
-          </p>
-          <div className="mt-3 space-y-2">
+        </div>
+      </section>
+
+      <div className="surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h4 className="text-sm font-semibold text-ink">Generate Video</h4>
+            <p className="mt-1 text-xs text-slate-500">
+              Create an episode export and generate a vertical video.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <select
               className="input text-xs"
               value={selectedEpisodeId}
@@ -513,7 +634,7 @@ export default function DialogueEditorPage() {
             </select>
             {episodesQuery.data?.length === 0 && storyQuery.data && (
               <button
-                className="btn-ghost text-xs w-full"
+                className="btn-ghost text-xs"
                 onClick={() => createEpisodeMutation.mutate()}
                 disabled={createEpisodeMutation.isPending}
               >
@@ -521,32 +642,55 @@ export default function DialogueEditorPage() {
               </button>
             )}
             <button
-              className="btn-primary text-xs w-full"
+              className="btn-primary text-xs"
               onClick={() => {
                 setVideoStatus(null);
                 setVideoUrl(null);
+                setVideoError(null);
+                setPollSeconds(0);
                 generateVideoMutation.mutate();
               }}
               disabled={!selectedEpisodeId || generateVideoMutation.isPending}
             >
               {generateVideoMutation.isPending ? "Generating..." : "Generate Video"}
             </button>
-            {videoStatus && (
-              <p className="text-xs text-slate-500">Status: {videoStatus}</p>
-            )}
-            {videoUrl && (
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+          {videoStatus && (
+            <div className="flex items-center gap-2">
+              {videoStatus === "processing" && (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
+              )}
+              <span>Status: {videoStatus}</span>
+              {videoStatus === "processing" && <span>({pollSeconds}s)</span>}
+            </div>
+          )}
+          {lastExportId && (
+            <p className="text-[11px] text-slate-400">Export ID: {lastExportId.slice(0, 8)}…</p>
+          )}
+          {videoError && <p className="text-xs text-rose-500">Error: {videoError}</p>}
+          {videoUrl && (
+            <div className="flex items-center gap-2">
               <a
                 className="text-xs text-indigo-500 hover:text-indigo-600"
                 href={videoUrl}
                 target="_blank"
                 rel="noreferrer"
+                download
               >
                 Download video
               </a>
-            )}
-          </div>
+              <button
+                className="btn-ghost text-[11px]"
+                onClick={() => window.open(videoUrl, "_blank", "noopener")}
+              >
+                Open
+              </button>
+            </div>
+          )}
         </div>
-      </section>
+      </div>
     </section>
   );
 }
@@ -563,16 +707,16 @@ type DialogueBubble = {
 
 function estimateBubbleHeight(text: string, widthRatio: number) {
   const normalized = text.trim();
-  if (!normalized) return 0.1;
-  const charsPerLine = Math.max(10, Math.floor(widthRatio * 60));
+  if (!normalized) return 0.08;
+  const charsPerLine = Math.max(12, Math.floor(widthRatio * 70));
   const rawLines = normalized.split("\n");
   const lines = rawLines.reduce((count, line) => {
     const len = Math.max(1, line.length);
     return count + Math.ceil(len / charsPerLine);
   }, 0);
-  const base = 0.08;
-  const perLine = 0.04;
-  return Math.min(0.6, Math.max(base + lines * perLine, 0.1));
+  const base = 0.05;
+  const perLine = 0.03;
+  return Math.min(0.55, Math.max(base + lines * perLine, 0.08));
 }
 
 function SceneCanvas({
@@ -595,6 +739,7 @@ function SceneCanvas({
   zoom: number;
 }) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const [dragGhost, setDragGhost] = useState<{ x: number; y: number } | null>(null);
   const [draggingBubbleId, setDraggingBubbleId] = useState<string | null>(null);
   const [resizingBubbleId, setResizingBubbleId] = useState<string | null>(null);
@@ -673,161 +818,170 @@ function SceneCanvas({
     ? getImageUrl(String(latestRender.payload.image_url))
     : null;
 
+  useEffect(() => {
+    if (viewportRef.current) {
+      viewportRef.current.scrollTop = 0;
+    }
+  }, [scene.scene_id]);
+
   return (
-    <div className="relative h-[720px] w-full max-w-md overflow-auto rounded-2xl bg-slate-100 shadow-soft">
+    <div
+      ref={viewportRef}
+      className="relative h-full w-full max-w-none overflow-auto rounded-2xl bg-slate-100 shadow-soft"
+    >
       <div
         ref={canvasRef}
-        className="relative aspect-[9/16] w-full rounded-2xl bg-gradient-to-b from-slate-200 via-white to-amber-100 shadow-soft overflow-hidden"
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        const raw = event.dataTransfer.getData("application/x-dialogue");
-        if (!raw || !canvasRef.current) return;
-        const data = JSON.parse(raw) as { text: string; speaker?: string };
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / rect.width;
-        const y = (event.clientY - rect.top) / rect.height;
-        const clampedX = Math.max(0.02, Math.min(0.92, x));
-        const clampedY = Math.max(0.02, Math.min(0.92, y));
-        onBubbleAdd({
-          id: crypto.randomUUID(),
-          panelId: 1,
-          text: data.text,
-          speaker: data.speaker,
-          position: { x: clampedX, y: clampedY },
-          size: { w: 0.28, h: estimateBubbleHeight(data.text, 0.28) }
-        });
-        setDragGhost(null);
-      }}
-      onDragEnter={(event) => {
-        if (!canvasRef.current) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / rect.width;
-        const y = (event.clientY - rect.top) / rect.height;
-        setDragGhost({ x, y });
-      }}
-      onDragLeave={() => setDragGhost(null)}
-      onDragOverCapture={(event) => {
-        if (!canvasRef.current) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / rect.width;
-        const y = (event.clientY - rect.top) / rect.height;
-        setDragGhost({ x, y });
-      }}
-      onClick={(event) => {
-        if (activeTool !== "speech") return;
-        if (!canvasRef.current) return;
-        const target = event.target as HTMLElement;
-        if (target.closest("[data-bubble='true']")) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / rect.width;
-        const y = (event.clientY - rect.top) / rect.height;
-        const clampedX = Math.max(0.02, Math.min(0.92, x));
-        const clampedY = Math.max(0.02, Math.min(0.92, y));
-        onBubbleAdd({
-          id: crypto.randomUUID(),
-          panelId: 1,
-          text: "New dialogue",
-          position: { x: clampedX, y: clampedY },
-          size: { w: 0.28, h: estimateBubbleHeight("New dialogue", 0.28) }
-        });
-      }}
+        className="relative aspect-[9/16] w-full max-w-[680px] rounded-2xl bg-gradient-to-b from-slate-200 via-white to-amber-100 shadow-soft overflow-hidden"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          const raw = event.dataTransfer.getData("application/x-dialogue");
+          if (!raw || !canvasRef.current) return;
+          const data = JSON.parse(raw) as { text: string; speaker?: string };
+          const rect = canvasRef.current.getBoundingClientRect();
+          const x = (event.clientX - rect.left) / rect.width;
+          const y = (event.clientY - rect.top) / rect.height;
+          const clampedX = Math.max(0.02, Math.min(0.92, x));
+          const clampedY = Math.max(0.02, Math.min(0.92, y));
+          onBubbleAdd({
+            id: crypto.randomUUID(),
+            panelId: 1,
+            text: data.text,
+            speaker: data.speaker,
+            position: { x: clampedX, y: clampedY },
+            size: { w: 0.28, h: estimateBubbleHeight(data.text, 0.28) }
+          });
+          setDragGhost(null);
+        }}
+        onDragEnter={(event) => {
+          if (!canvasRef.current) return;
+          const rect = canvasRef.current.getBoundingClientRect();
+          const x = (event.clientX - rect.left) / rect.width;
+          const y = (event.clientY - rect.top) / rect.height;
+          setDragGhost({ x, y });
+        }}
+        onDragLeave={() => setDragGhost(null)}
+        onDragOverCapture={(event) => {
+          if (!canvasRef.current) return;
+          const rect = canvasRef.current.getBoundingClientRect();
+          const x = (event.clientX - rect.left) / rect.width;
+          const y = (event.clientY - rect.top) / rect.height;
+          setDragGhost({ x, y });
+        }}
+        onClick={(event) => {
+          if (activeTool !== "speech") return;
+          if (!canvasRef.current) return;
+          const target = event.target as HTMLElement;
+          if (target.closest("[data-bubble='true']")) return;
+          const rect = canvasRef.current.getBoundingClientRect();
+          const x = (event.clientX - rect.left) / rect.width;
+          const y = (event.clientY - rect.top) / rect.height;
+          const clampedX = Math.max(0.02, Math.min(0.92, x));
+          const clampedY = Math.max(0.02, Math.min(0.92, y));
+          onBubbleAdd({
+            id: crypto.randomUUID(),
+            panelId: 1,
+            text: "New dialogue",
+            position: { x: clampedX, y: clampedY },
+            size: { w: 0.28, h: estimateBubbleHeight("New dialogue", 0.28) }
+          });
+        }}
         style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
       >
-      {imageUrl ? (
-        <img src={imageUrl} alt="Scene render" className="h-full w-full object-contain" />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
-          {rendersQuery.isLoading ? "Loading render..." : "No render found for this scene."}
-        </div>
-      )}
-      {bubbles.map((bubble) => (
-        <div key={bubble.id}>
-          <button
-            type="button"
-            className="absolute rounded-xl bg-white/90 text-[11px] text-slate-700 shadow-soft px-2 py-1 border border-slate-200 hover:border-indigo-300"
+        {imageUrl ? (
+          <img src={imageUrl} alt="Scene render" className="h-full w-full object-contain" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
+            {rendersQuery.isLoading ? "Loading render..." : "No render found for this scene."}
+          </div>
+        )}
+        {bubbles.map((bubble) => (
+          <div key={bubble.id}>
+            <button
+              type="button"
+              className="absolute rounded-xl bg-white/90 text-[11px] text-slate-700 shadow-soft px-2 py-0.5 border border-slate-200 hover:border-indigo-300"
+              style={{
+                left: `${bubble.position.x * 100}%`,
+                top: `${bubble.position.y * 100}%`,
+                width: `${bubble.size.w * 100}%`,
+                height: `${bubble.size.h * 100}%`,
+                minWidth: "80px",
+                transform: "translate(-50%, -50%)"
+              }}
+              onClick={() => {
+                if (activeTool === "delete") {
+                  onBubbleDelete(bubble.id);
+                  return;
+                }
+                onBubbleSelect(bubble.id);
+              }}
+              onPointerDown={(event) => {
+                if (activeTool !== "select") return;
+                if (!canvasRef.current) return;
+                const rect = canvasRef.current.getBoundingClientRect();
+                const bubbleX = bubble.position.x * rect.width;
+                const bubbleY = bubble.position.y * rect.height;
+                dragOffsetRef.current = {
+                  x: event.clientX - rect.left - bubbleX,
+                  y: event.clientY - rect.top - bubbleY
+                };
+                setDraggingBubbleId(bubble.id);
+              }}
+              data-bubble="true"
+            >
+              <span className="block whitespace-pre-wrap break-words leading-snug">
+                {bubble.text}
+              </span>
+            </button>
+            {activeTool === "select" && (
+              <button
+                type="button"
+                className="absolute h-3 w-3 rounded-full border border-indigo-300 bg-white shadow"
+                style={{
+                  left: `${(bubble.position.x + bubble.size.w / 2) * 100}%`,
+                  top: `${(bubble.position.y + bubble.size.h / 2) * 100}%`,
+                  transform: "translate(-50%, -50%)"
+                }}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  setResizingBubbleId(bubble.id);
+                }}
+                data-bubble="true"
+              />
+            )}
+            {activeTool === "tail" && (
+              <button
+                type="button"
+                className="absolute h-3 w-3 rounded-full border border-indigo-300 bg-indigo-100 shadow"
+                style={{
+                  left: `${(bubble.tail?.x ?? bubble.position.x) * 100}%`,
+                  top: `${(bubble.tail?.y ?? bubble.position.y + bubble.size.h / 2) * 100}%`,
+                  transform: "translate(-50%, -50%)"
+                }}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  onBubbleSelect(bubble.id);
+                  setTailDraggingId(bubble.id);
+                }}
+                data-bubble="true"
+              />
+            )}
+          </div>
+        ))}
+        {dragGhost && (
+          <div
+            className="absolute rounded-xl border border-dashed border-indigo-300 bg-white/60 text-[11px] text-indigo-400 px-2 py-1 pointer-events-none"
             style={{
-              left: `${bubble.position.x * 100}%`,
-              top: `${bubble.position.y * 100}%`,
-              width: `${bubble.size.w * 100}%`,
-              height: `${bubble.size.h * 100}%`,
+              left: `${Math.max(0.02, Math.min(0.92, dragGhost.x)) * 100}%`,
+              top: `${Math.max(0.02, Math.min(0.92, dragGhost.y)) * 100}%`,
+              width: "28%",
               minWidth: "80px",
               transform: "translate(-50%, -50%)"
             }}
-            onClick={() => {
-              if (activeTool === "delete") {
-                onBubbleDelete(bubble.id);
-                return;
-              }
-              onBubbleSelect(bubble.id);
-            }}
-            onPointerDown={(event) => {
-              if (activeTool !== "select") return;
-              if (!canvasRef.current) return;
-              const rect = canvasRef.current.getBoundingClientRect();
-              const bubbleX = bubble.position.x * rect.width;
-              const bubbleY = bubble.position.y * rect.height;
-              dragOffsetRef.current = {
-                x: event.clientX - rect.left - bubbleX,
-                y: event.clientY - rect.top - bubbleY
-              };
-              setDraggingBubbleId(bubble.id);
-            }}
-            data-bubble="true"
           >
-            <span className="block whitespace-pre-wrap break-words leading-snug">
-              {bubble.text}
-            </span>
-          </button>
-          {activeTool === "select" && (
-            <button
-              type="button"
-              className="absolute h-3 w-3 rounded-full border border-indigo-300 bg-white shadow"
-              style={{
-                left: `${(bubble.position.x + bubble.size.w / 2) * 100}%`,
-                top: `${(bubble.position.y + bubble.size.h / 2) * 100}%`,
-                transform: "translate(-50%, -50%)"
-              }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                setResizingBubbleId(bubble.id);
-              }}
-              data-bubble="true"
-            />
-          )}
-          {activeTool === "tail" && (
-            <button
-              type="button"
-              className="absolute h-3 w-3 rounded-full border border-indigo-300 bg-indigo-100 shadow"
-              style={{
-                left: `${(bubble.tail?.x ?? bubble.position.x) * 100}%`,
-                top: `${(bubble.tail?.y ?? bubble.position.y + bubble.size.h / 2) * 100}%`,
-                transform: "translate(-50%, -50%)"
-              }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                onBubbleSelect(bubble.id);
-                setTailDraggingId(bubble.id);
-              }}
-              data-bubble="true"
-            />
-          )}
-        </div>
-      ))}
-      {dragGhost && (
-        <div
-          className="absolute rounded-xl border border-dashed border-indigo-300 bg-white/60 text-[11px] text-indigo-400 px-2 py-1 pointer-events-none"
-          style={{
-            left: `${Math.max(0.02, Math.min(0.92, dragGhost.x)) * 100}%`,
-            top: `${Math.max(0.02, Math.min(0.92, dragGhost.y)) * 100}%`,
-            width: "28%",
-            minWidth: "80px",
-            transform: "translate(-50%, -50%)"
-          }}
-        >
-          Drop here
-        </div>
-      )}
+            Drop here
+          </div>
+        )}
       </div>
     </div>
   );

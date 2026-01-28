@@ -15,7 +15,6 @@ dependencies = [
   "google-genai>=0.3.0",
   "langgraph>=0.2.0",
   "pillow>=10.0",
-  "moviepy>=1.0.3",
 ]
 
 [project.optional-dependencies]

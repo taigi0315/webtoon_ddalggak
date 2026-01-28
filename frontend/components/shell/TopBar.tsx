@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-export default function TopBar() {
+type TopBarProps = {
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
+};
+
+export default function TopBar({ isSidebarOpen, onToggleSidebar }: TopBarProps) {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -27,6 +32,15 @@ export default function TopBar() {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {onToggleSidebar && (
+          <button
+            className="btn-ghost text-xs"
+            onClick={onToggleSidebar}
+            title={isSidebarOpen ? "Hide navigation" : "Show navigation"}
+          >
+            {isSidebarOpen ? "Hide Menu" : "Show Menu"}
+          </button>
+        )}
         <button
           className="btn-ghost text-xs"
           onClick={handleRefresh}

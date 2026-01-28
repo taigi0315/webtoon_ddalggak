@@ -116,9 +116,7 @@ def generate_render_spec(scene_id: uuid.UUID, payload: GenerateRenderSpecRequest
 @router.post("/scenes/{scene_id}/generate/render", response_model=ArtifactIdResponse)
 def generate_render(scene_id: uuid.UUID, db=DbSessionDep):
     _scene_or_404(db, scene_id)
-    qc = nodes.run_qc_checker(db=db, scene_id=scene_id)
-    if not (qc.payload or {}).get("passed"):
-        raise HTTPException(status_code=400, detail="qc failed; fix panel plan or semantics")
+    nodes.run_qc_checker(db=db, scene_id=scene_id)
     gemini = _build_gemini_client()
     artifact = nodes.run_image_renderer(db=db, scene_id=scene_id, gemini=gemini)
     return ArtifactIdResponse(artifact_id=artifact.artifact_id)

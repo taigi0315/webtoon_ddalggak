@@ -1,5 +1,7 @@
 import uuid
 import os
+import time
+import logging
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
@@ -7,12 +9,13 @@ from fastapi.responses import FileResponse
 from app.api.deps import DbSessionDep
 from app.api.v1.schemas import ExportRead
 from app.core.settings import settings
-from app.db.models import Episode, EpisodeScene, ExportJob, Layer, Scene
+from app.db.models import Episode, EpisodeScene, ExportJob, Layer, Scene, DialogueLayer
 from app.graphs import nodes
 from app.services.artifacts import ArtifactService
 
 
 router = APIRouter(tags=["exports"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/scenes/{scene_id}/export", response_model=ExportRead)
@@ -85,6 +88,17 @@ def get_export(export_id: uuid.UUID, db=DbSessionDep):
     job = db.get(ExportJob, export_id)
     if job is None:
         raise HTTPException(status_code=404, detail="export not found")
+    # Fail stuck processing jobs after 10 minutes
+    if job.status == "processing":
+        started_at = None
+        if isinstance(job.metadata_, dict):
+            started_at = job.metadata_.get("started_at")
+        if isinstance(started_at, (int, float)) and time.time() - float(started_at) > 600:
+            job.status = "failed"
+            job.metadata_["error"] = "Video export timed out."
+            db.add(job)
+            db.commit()
+            db.refresh(job)
     return job
 
 
@@ -117,12 +131,31 @@ def finalize_export(export_id: uuid.UUID, db=DbSessionDep):
             {"layer_id": str(layer.layer_id), "layer_type": layer.layer_type, "objects": layer.objects}
             for layer in layer_rows
         ]
+        dialogue_layer = (
+            db.query(DialogueLayer).filter(DialogueLayer.scene_id == job.scene_id).one_or_none()
+        )
+        dialogue_bubbles = []
+        if dialogue_layer is not None:
+            for bubble in dialogue_layer.bubbles:
+                dialogue_bubbles.append(
+                    {
+                        "text": bubble.get("text", ""),
+                        "speaker": bubble.get("speaker", ""),
+                        "geometry": {
+                            "x": bubble.get("position", {}).get("x", 0.1),
+                            "y": bubble.get("position", {}).get("y", 0.1),
+                            "w": bubble.get("size", {}).get("w", 0.3),
+                            "h": bubble.get("size", {}).get("h", 0.15),
+                        },
+                    }
+                )
         job.output_url = latest.payload.get("image_url")
         job.status = "succeeded"
         job.metadata_ = {
             "source": "render_result",
             "artifact_id": str(latest.artifact_id),
             "layers": layers,
+            "dialogue_bubbles": dialogue_bubbles,
         }
     elif job.episode_id:
         scene_ids = (
@@ -143,8 +176,31 @@ def finalize_export(export_id: uuid.UUID, db=DbSessionDep):
                 {"layer_id": str(layer.layer_id), "layer_type": layer.layer_type, "objects": layer.objects}
                 for layer in layer_rows
             ]
+            dialogue_layer = (
+                db.query(DialogueLayer).filter(DialogueLayer.scene_id == scene_id).one_or_none()
+            )
+            dialogue_bubbles = []
+            if dialogue_layer is not None:
+                for bubble in dialogue_layer.bubbles:
+                    dialogue_bubbles.append(
+                        {
+                            "text": bubble.get("text", ""),
+                            "speaker": bubble.get("speaker", ""),
+                            "geometry": {
+                                "x": bubble.get("position", {}).get("x", 0.1),
+                                "y": bubble.get("position", {}).get("y", 0.1),
+                                "w": bubble.get("size", {}).get("w", 0.3),
+                                "h": bubble.get("size", {}).get("h", 0.15),
+                            },
+                        }
+                    )
             images.append(
-                {"scene_id": str(scene_id), "image_url": latest.payload.get("image_url"), "layers": layers}
+                {
+                    "scene_id": str(scene_id),
+                    "image_url": latest.payload.get("image_url"),
+                    "layers": layers,
+                    "dialogue_bubbles": dialogue_bubbles,
+                }
             )
         job.status = "succeeded"
         job.metadata_ = {"scenes": images}
@@ -184,11 +240,14 @@ def _generate_video_background(export_id: uuid.UUID, db_session_factory):
             db.commit()
 
         except Exception as e:
+            logger.exception("video_generation_failed export_id=%s error=%s", export_id, e)
             job.status = "failed"
+            if job.metadata_ is None:
+                job.metadata_ = {}
             job.metadata_["error"] = str(e)
             db.add(job)
             db.commit()
-            raise
+            return
 
     finally:
         db.close()
@@ -220,14 +279,17 @@ def generate_video_export(
 
     # Mark as processing
     job.status = "processing"
+    if job.metadata_ is None:
+        job.metadata_ = {}
+    job.metadata_["started_at"] = time.time()
     db.add(job)
     db.commit()
     db.refresh(job)
 
     # Start background video generation
     # Note: We need to pass the session factory, not the session itself
-    from app.db.session import SessionLocal
-    background_tasks.add_task(_generate_video_background, export_id, SessionLocal)
+    from app.db.session import get_sessionmaker
+    background_tasks.add_task(_generate_video_background, export_id, get_sessionmaker())
 
     return job
 
