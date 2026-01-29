@@ -119,7 +119,17 @@ export default function StyleSelectorPage() {
           )}
           {imageStylesQuery.data?.map((style) => (
             <div key={style.id} className="card space-y-3">
-              <div className="h-32 rounded-xl bg-gradient-to-br from-amber-100 via-white to-slate-200" />
+              <div className="h-32 rounded-xl overflow-hidden bg-slate-100">
+                {style.image_url ? (
+                  <img
+                    src={style.image_url}
+                    alt={style.label}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-gradient-to-br from-amber-100 via-white to-slate-200" />
+                )}
+              </div>
               <div>
                 <p className="text-sm font-semibold text-ink">{style.label}</p>
                 <p className="text-xs text-slate-500">{style.description}</p>

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.telemetry import trace_span
-from app.db.models import Character, Scene, Story
+from app.db.models import Character, Scene, Story, StoryCharacter
 from app.graphs import nodes
 from app.services.artifacts import ArtifactService
 from app.services.vertex_gemini import GeminiClient
@@ -153,9 +153,21 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
     if existing_scenes and not allow_append:
         raise ValueError("story already has scenes; set allow_append to true to append more")
 
-    existing_chars = list(db.execute(select(Character).where(Character.story_id == story_id)).scalars().all())
+    story = db.get(Story, story_id)
+    if story is None:
+        raise ValueError("story not found")
+
+    existing_chars = list(
+        db.execute(select(Character).where(Character.project_id == story.project_id)).scalars().all()
+    )
     existing_by_name = {c.name.strip().lower(): c for c in existing_chars if c.name}
     existing_codes = {c.canonical_code for c in existing_chars if c.canonical_code}
+    existing_story_links = {
+        row[0]
+        for row in db.execute(
+            select(StoryCharacter.character_id).where(StoryCharacter.story_id == story_id)
+        ).all()
+    }
 
     def _code_from_index(index: int) -> str:
         alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -204,10 +216,13 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
                 existing_char.hair_description = hair_description
             if base_outfit and not existing_char.base_outfit:
                 existing_char.base_outfit = base_outfit
+            if existing_char.character_id not in existing_story_links:
+                db.add(StoryCharacter(story_id=story_id, character_id=existing_char.character_id))
+                existing_story_links.add(existing_char.character_id)
             character_ids.append(str(existing_char.character_id))
             continue
         character = Character(
-            story_id=story_id,
+            project_id=story.project_id,
             canonical_code=_next_character_code(),
             name=name,
             description=profile.get("description"),
@@ -221,6 +236,8 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
         )
         db.add(character)
         db.flush()
+        db.add(StoryCharacter(story_id=story_id, character_id=character.character_id))
+        existing_story_links.add(character.character_id)
         character_ids.append(str(character.character_id))
 
     scene_ids: list[str] = []

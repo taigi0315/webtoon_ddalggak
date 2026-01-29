@@ -36,7 +36,7 @@ export const scenesSchema = z.array(sceneSchema);
 
 export const characterSchema = z.object({
   character_id: z.string().uuid(),
-  story_id: z.string().uuid(),
+  project_id: z.string().uuid(),
   canonical_code: z.string().nullable(),
   name: z.string(),
   description: z.string().nullable(),
@@ -70,7 +70,8 @@ export const artifactsSchema = z.array(artifactSchema);
 export const styleItemSchema = z.object({
   id: z.string(),
   label: z.string(),
-  description: z.string()
+  description: z.string(),
+  image_url: z.string().nullable().optional()
 });
 
 export const styleItemsSchema = z.array(styleItemSchema);
@@ -112,21 +113,39 @@ export const characterRefSchema = z.object({
 
 export const characterRefsSchema = z.array(characterRefSchema);
 
+export const characterVariantSchema = z.object({
+  variant_id: z.string().uuid(),
+  character_id: z.string().uuid(),
+  story_id: z.string().uuid(),
+  variant_type: z.string(),
+  override_attributes: z.record(z.any()),
+  reference_image_id: z.string().uuid().nullable(),
+  is_active_for_story: z.boolean(),
+  created_at: z.string().nullable().optional()
+});
+
+export const characterVariantsSchema = z.array(characterVariantSchema);
+
 export const characterGenerateRefsResponseSchema = z.object({
   character_id: z.string().uuid(),
   generated_refs: characterRefsSchema
 });
 
-export const dialogueSuggestionSchema = z.object({
+export const dialogueLineSchema = z.object({
   speaker: z.string(),
-  text: z.string(),
-  emotion: z.string(),
-  panel_hint: z.number().nullable()
+  type: z.string(),
+  text: z.string()
+});
+
+export const dialoguePanelSchema = z.object({
+  panel_id: z.number(),
+  lines: z.array(dialogueLineSchema),
+  notes: z.string().nullable().optional()
 });
 
 export const dialogueSuggestionsSchema = z.object({
   scene_id: z.string().uuid(),
-  suggestions: z.array(dialogueSuggestionSchema)
+  dialogue_by_panel: z.array(dialoguePanelSchema)
 });
 
 export type HealthStatus = z.infer<typeof healthSchema>;
@@ -139,6 +158,21 @@ export type Artifact = z.infer<typeof artifactSchema>;
 export type StyleItem = z.infer<typeof styleItemSchema>;
 export type StoryGenerateResponse = z.infer<typeof storyGenerateResponseSchema>;
 export type CharacterRef = z.infer<typeof characterRefSchema>;
+export type CharacterVariant = z.infer<typeof characterVariantSchema>;
 export type CharacterGenerateRefsResponse = z.infer<typeof characterGenerateRefsResponseSchema>;
-export type DialogueSuggestion = z.infer<typeof dialogueSuggestionSchema>;
+export type DialogueLine = z.infer<typeof dialogueLineSchema>;
+export type DialoguePanel = z.infer<typeof dialoguePanelSchema>;
 export type DialogueSuggestions = z.infer<typeof dialogueSuggestionsSchema>;
+
+export const characterVariantSuggestionSchema = z.object({
+  suggestion_id: z.string().uuid(),
+  story_id: z.string().uuid(),
+  character_id: z.string().uuid(),
+  variant_type: z.string(),
+  override_attributes: z.record(z.any()),
+  created_at: z.string().nullable().optional()
+});
+
+export const characterVariantSuggestionsSchema = z.array(characterVariantSuggestionSchema);
+
+export type CharacterVariantSuggestion = z.infer<typeof characterVariantSuggestionSchema>;

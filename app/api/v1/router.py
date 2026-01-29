@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     artifacts,
+    character_variants,
     characters,
     dialogue,
     environments,
@@ -25,6 +26,7 @@ api_router.include_router(projects.router)
 api_router.include_router(stories.router)
 api_router.include_router(scenes.router)
 api_router.include_router(characters.router)
+api_router.include_router(character_variants.router)
 api_router.include_router(artifacts.router)
 api_router.include_router(gemini.router)
 api_router.include_router(generation.router)

@@ -37,8 +37,16 @@ class Story(Base):
 
     project: Mapped[Project] = relationship(back_populates="stories")
     scenes: Mapped[list["Scene"]] = relationship(back_populates="story", cascade="all, delete-orphan")
-    characters: Mapped[list["Character"]] = relationship(
+    character_links: Mapped[list["StoryCharacter"]] = relationship(
         back_populates="story", cascade="all, delete-orphan"
+    )
+    character_variants: Mapped[list["CharacterVariant"]] = relationship(
+        back_populates="story", cascade="all, delete-orphan"
+    )
+    characters: Mapped[list["Character"]] = relationship(
+        secondary="story_characters",
+        back_populates="stories",
+        viewonly=True,
     )
 
 
@@ -67,8 +75,8 @@ class Character(Base):
     __tablename__ = "characters"
 
     character_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    story_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("stories.story_id", ondelete="CASCADE"), nullable=False
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False
     )
     canonical_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -83,10 +91,36 @@ class Character(Base):
     approved: Mapped[bool] = mapped_column(nullable=False, default=False)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    story: Mapped[Story] = relationship(back_populates="characters")
+    project: Mapped[Project] = relationship()
+    story_links: Mapped[list["StoryCharacter"]] = relationship(
+        back_populates="character", cascade="all, delete-orphan"
+    )
+    stories: Mapped[list[Story]] = relationship(
+        secondary="story_characters",
+        back_populates="characters",
+        viewonly=True,
+    )
+    variants: Mapped[list["CharacterVariant"]] = relationship(
+        back_populates="character", cascade="all, delete-orphan"
+    )
     reference_images: Mapped[list["CharacterReferenceImage"]] = relationship(
         back_populates="character", cascade="all, delete-orphan"
     )
+
+
+class StoryCharacter(Base):
+    __tablename__ = "story_characters"
+
+    story_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("stories.story_id", ondelete="CASCADE"), primary_key=True
+    )
+    character_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("characters.character_id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    story: Mapped[Story] = relationship(back_populates="character_links")
+    character: Mapped[Character] = relationship(back_populates="story_links")
 
 
 class CharacterReferenceImage(Base):
@@ -106,6 +140,47 @@ class CharacterReferenceImage(Base):
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     character: Mapped[Character] = relationship(back_populates="reference_images")
+
+
+class CharacterVariant(Base):
+    __tablename__ = "character_variants"
+
+    variant_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    character_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("characters.character_id", ondelete="CASCADE"), nullable=False
+    )
+    story_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("stories.story_id", ondelete="CASCADE"), nullable=False
+    )
+    variant_type: Mapped[str] = mapped_column(String(32), nullable=False, default="outfit_change")
+    override_attributes: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    reference_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("character_reference_images.reference_image_id", ondelete="SET NULL"), nullable=True
+    )
+    is_active_for_story: Mapped[bool] = mapped_column(nullable=False, default=False)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    character: Mapped[Character] = relationship(back_populates="variants")
+    story: Mapped[Story] = relationship(back_populates="character_variants")
+    reference_image: Mapped[CharacterReferenceImage | None] = relationship()
+
+
+class CharacterVariantSuggestion(Base):
+    __tablename__ = "character_variant_suggestions"
+
+    suggestion_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    story_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("stories.story_id", ondelete="CASCADE"), nullable=False
+    )
+    character_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("characters.character_id", ondelete="CASCADE"), nullable=False
+    )
+    variant_type: Mapped[str] = mapped_column(String(32), nullable=False, default="outfit_change")
+    override_attributes: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    character: Mapped[Character] = relationship()
+    story: Mapped[Story] = relationship()
 
 
 class Artifact(Base):

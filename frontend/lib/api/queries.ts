@@ -17,7 +17,10 @@ import {
   characterRefsSchema,
   characterRefSchema,
   characterGenerateRefsResponseSchema,
-  dialogueSuggestionsSchema
+  dialogueSuggestionsSchema,
+  characterVariantsSchema,
+  characterVariantSchema,
+  characterVariantSuggestionsSchema
 } from "@/lib/api/types";
 
 export async function fetchHealth() {
@@ -327,6 +330,66 @@ export async function evaluateQc(sceneId: string) {
 export async function fetchCharacterRefs(characterId: string) {
   const payload = await fetchJson(`/v1/characters/${characterId}/refs`);
   return characterRefsSchema.parse(payload);
+}
+
+export async function fetchCharacterVariants(params: { storyId: string; characterId: string }) {
+  const payload = await fetchJson(
+    `/v1/stories/${params.storyId}/characters/${params.characterId}/variants`
+  );
+  return characterVariantsSchema.parse(payload);
+}
+
+export async function fetchCharacterVariantSuggestions(storyId: string) {
+  const payload = await fetchJson(`/v1/stories/${storyId}/character-variant-suggestions`);
+  return characterVariantSuggestionsSchema.parse(payload);
+}
+
+export async function refreshCharacterVariantSuggestions(storyId: string) {
+  const payload = await fetchJson(`/v1/stories/${storyId}/character-variant-suggestions/refresh`, {
+    method: "POST"
+  });
+  return characterVariantSuggestionsSchema.parse(payload);
+}
+
+export async function createCharacterVariant(params: {
+  storyId: string;
+  characterId: string;
+  variantType: string;
+  overrideAttributes?: Record<string, unknown>;
+  referenceImageId?: string | null;
+  isActiveForStory?: boolean;
+}) {
+  const payload = await fetchJson(
+    `/v1/stories/${params.storyId}/characters/${params.characterId}/variants`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        variant_type: params.variantType,
+        override_attributes: params.overrideAttributes ?? {},
+        reference_image_id: params.referenceImageId ?? null,
+        is_active_for_story: params.isActiveForStory ?? true
+      })
+    }
+  );
+  return characterVariantSchema.parse(payload);
+}
+
+export async function activateCharacterVariant(params: {
+  storyId: string;
+  characterId: string;
+  variantId: string;
+  isActiveForStory?: boolean;
+}) {
+  const payload = await fetchJson(
+    `/v1/stories/${params.storyId}/characters/${params.characterId}/variants/${params.variantId}/activate`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        is_active_for_story: params.isActiveForStory ?? true
+      })
+    }
+  );
+  return characterVariantSchema.parse(payload);
 }
 
 export async function generateCharacterRefs(params: {

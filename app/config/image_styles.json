@@ -4,27 +4,80 @@
     {
       "id": "default",
       "label": "Default",
-      "description": "Neutral webtoon rendering."
+      "description": "Neutral baseline rendering without stylistic bias.",
+      "image_url": "/image_styles/NO_STYLE.png"
     },
     {
-      "id": "soft_webtoon",
-      "label": "Soft Webtoon",
-      "description": "Soft lineart, pastel palette, gentle lighting."
+      "id": "NO_STYLE",
+      "label": "No Style",
+      "description": "Neutral baseline rendering without stylistic bias.",
+      "image_url": "/image_styles/NO_STYLE.png"
     },
     {
-      "id": "clean_lineart",
-      "label": "Clean Lineart",
-      "description": "Crisp lineart, minimal shading."
+      "id": "SOFT_ROMANTIC_WEBTOON",
+      "label": "Soft Romantic",
+      "description": "Pastel warmth, soft cel-shading, dreamy romantic lighting.",
+      "image_url": "/image_styles/SOFT_ROMANTIC_WEBTOON.png"
     },
     {
-      "id": "dramatic_lighting",
-      "label": "Dramatic Lighting",
-      "description": "High contrast, cinematic lighting."
+      "id": "VIBRANT_FANTASY_WEBTOON",
+      "label": "Vibrant Fantasy",
+      "description": "Magical glow, clean lineart, airy fantasy palette.",
+      "image_url": "/image_styles/VIBRANT_FANTASY_WEBTOON.png"
     },
     {
-      "id": "flat_color",
-      "label": "Flat Color",
-      "description": "Flat colors, simple shading."
+      "id": "DRAMATIC_HISTORICAL_WEBTOON",
+      "label": "Dramatic Historical",
+      "description": "Cinematic candlelight, rich shadows, historical depth.",
+      "image_url": "/image_styles/DRAMATIC_HISTORICAL_WEBTOON.png"
+    },
+    {
+      "id": "BRIGHT_YOUTHFUL_WEBTOON",
+      "label": "Bright Youthful",
+      "description": "Clean friendly lineart, cheerful daylight palette.",
+      "image_url": "/image_styles/BRIGHT_YOUTHFUL_WEBTOON.png"
+    },
+    {
+      "id": "DREAMY_ISEKAI_WEBTOON",
+      "label": "Dreamy Isekai",
+      "description": "Ethereal glow, jewel accents, fantasy romance polish.",
+      "image_url": "/image_styles/DREAMY_ISEKAI_WEBTOON.png"
+    },
+    {
+      "id": "DARK_SENSUAL_WEBTOON",
+      "label": "Dark Sensual",
+      "description": "Moody contrast, intimate lighting, rich sensual palette.",
+      "image_url": "/image_styles/DARK_SENSUAL_WEBTOON.png"
+    },
+    {
+      "id": "CLEAN_MODERN_WEBTOON",
+      "label": "Clean Modern",
+      "description": "Crisp lineart, balanced lighting, modern webtoon clarity.",
+      "image_url": "/image_styles/CLEAN_MODERN_WEBTOON.png"
+    },
+    {
+      "id": "PAINTERLY_ARTISTIC_WEBTOON",
+      "label": "Painterly Artistic",
+      "description": "Brush texture, artistic lighting, fine-art rendering.",
+      "image_url": "/image_styles/PAINTERLY_ARTISTIC_WEBTOON.png"
+    },
+    {
+      "id": "EMOTIVE_LUXURY_WEBTOON",
+      "label": "Emotive Luxury",
+      "description": "Premium romance finish, glossy highlights, emotional focus.",
+      "image_url": "/image_styles/EMOTIVE_LUXURY_WEBTOON.png"
+    },
+    {
+      "id": "OPERATION_TRUE_LOVE",
+      "label": "Operation True Love",
+      "description": "Cinematic modern romance, warm muted palette, editorial polish.",
+      "image_url": "/image_styles/OPERATION_TRUE_LOVE.png"
+    },
+    {
+      "id": "CINEMATIC_MODERN_MANHWA",
+      "label": "Cinematic Modern Manhwa",
+      "description": "Semi-realistic modern manhwa, cinematic tone.",
+      "image_url": "/image_styles/CINEMATIC_MODERN_MANHWA.png"
     }
   ]
 }
