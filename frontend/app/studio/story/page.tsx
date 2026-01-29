@@ -6,24 +6,28 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import {
-  generateStoryBlueprint,
+  generateStoryBlueprintAsync,
   createProject,
   createStory,
   fetchCharacters,
   fetchProjects,
   fetchScenes,
-  fetchStories
+  fetchStories,
+  fetchStoryProgress
 } from "@/lib/api/queries";
 import type { Character, Scene } from "@/lib/api/types";
 
 type Step = "setup" | "generating" | "review";
 
-// Progress steps for generation
-const GENERATION_STEPS = [
-  { id: "project", label: "Creating project..." },
-  { id: "story", label: "Creating story..." },
-  { id: "blueprint", label: "Generating story blueprint..." },
-  { id: "complete", label: "Generation complete!" }
+const PIPELINE_STEPS = [
+  { id: 1, label: "Validate inputs" },
+  { id: 2, label: "Split scenes" },
+  { id: 3, label: "Extract characters" },
+  { id: 4, label: "Normalize characters" },
+  { id: 5, label: "Persist bundle" },
+  { id: 6, label: "Compile visual plan" },
+  { id: 7, label: "Plan scenes" },
+  { id: 8, label: "Blind test" }
 ];
 
 const BLUEPRINT_MESSAGES = [
@@ -45,6 +49,7 @@ export default function StoryEditorPage() {
   const [step, setStep] = useState<Step>("setup");
   const [generationStep, setGenerationStep] = useState(0);
   const [blueprintMessageIndex, setBlueprintMessageIndex] = useState(0);
+  const [localStatusMessage, setLocalStatusMessage] = useState<string | null>(null);
 
   // Setup form state
   const [projectId, setProjectId] = useState("");
@@ -86,6 +91,13 @@ export default function StoryEditorPage() {
     enabled: storyId.length > 0
   });
 
+  const progressQuery = useQuery({
+    queryKey: ["story-progress", storyId],
+    queryFn: () => fetchStoryProgress(storyId),
+    enabled: step === "generating" && storyId.length > 0,
+    refetchInterval: step === "generating" ? 1500 : false
+  });
+
   // Mutations
   const createProjectMutation = useMutation({
     mutationFn: createProject,
@@ -104,15 +116,7 @@ export default function StoryEditorPage() {
   });
 
   const generateStoryMutation = useMutation({
-    mutationFn: generateStoryBlueprint,
-    onSuccess: (result) => {
-      setGeneratedScenes(result.scenes);
-      setGeneratedCharacters(result.characters);
-      setGenerationStep(3); // Complete
-      setTimeout(() => setStep("review"), 500);
-      queryClient.invalidateQueries({ queryKey: ["scenes", storyId] });
-      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
-    },
+    mutationFn: generateStoryBlueprintAsync,
     onError: (error) => {
       setGenerationError(error instanceof Error ? error.message : "Generation failed");
       setStep("setup");
@@ -132,12 +136,40 @@ export default function StoryEditorPage() {
   }, [generatedCharacters.length, charactersQuery.data]);
 
   useEffect(() => {
-    if (step !== "generating" || generationStep !== 2) return;
+    if (step !== "generating" || generationStep !== 2 || progressQuery.data?.progress?.message) return;
     const interval = window.setInterval(() => {
       setBlueprintMessageIndex((prev) => (prev + 1) % BLUEPRINT_MESSAGES.length);
     }, 1800);
     return () => window.clearInterval(interval);
-  }, [step, generationStep]);
+  }, [generationStep, progressQuery.data?.progress?.message, step]);
+
+  useEffect(() => {
+    if (step !== "generating") return;
+    const status = progressQuery.data?.status;
+    const progress = progressQuery.data?.progress;
+    if (progress?.message) {
+      setLocalStatusMessage(progress.message);
+    }
+    if (typeof progress?.step === "number") {
+      const totalSteps = progress?.total_steps ?? PIPELINE_STEPS.length;
+      const maxIndex = Math.max(0, Math.min(totalSteps, PIPELINE_STEPS.length)) - 1;
+      const nextStep = Math.max(0, Math.min(progress.step - 1, maxIndex));
+      setGenerationStep(nextStep);
+    }
+    if (status === "succeeded") {
+      const totalSteps = progress?.total_steps ?? PIPELINE_STEPS.length;
+      const normalizedTotal = Math.max(1, Math.min(totalSteps, PIPELINE_STEPS.length));
+      setGenerationStep(normalizedTotal);
+      setLocalStatusMessage("Generation complete.");
+      queryClient.invalidateQueries({ queryKey: ["scenes", storyId] });
+      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
+      setStep("review");
+    }
+    if (status === "failed") {
+      setGenerationError(progressQuery.data?.error ?? "Generation failed");
+      setStep("setup");
+    }
+  }, [progressQuery.data, queryClient, step, storyId]);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -169,6 +201,15 @@ export default function StoryEditorPage() {
   }, [storyId]);
 
   useEffect(() => {
+    if (!storyId) return;
+    const draftKey = `storyDraft:${storyId}`;
+    const storedDraft = window.localStorage.getItem(draftKey);
+    if (storedDraft && !storyTextTouched) {
+      setStoryText(storedDraft);
+    }
+  }, [storyId, storyTextTouched]);
+
+  useEffect(() => {
     setStoryTextTouched(false);
   }, [storyId]);
 
@@ -182,13 +223,23 @@ export default function StoryEditorPage() {
     if (combined) setStoryText(combined);
   }, [scenesQuery.data, storyId, storyTextTouched]);
 
+  useEffect(() => {
+    if (!storyId) return;
+    const draftKey = `storyDraft:${storyId}`;
+    if (storyTextTouched) {
+      window.localStorage.setItem(draftKey, storyText);
+    }
+  }, [storyId, storyText, storyTextTouched]);
+
   // Handle Generate Story - creates project/story if needed, then generates
   const handleGenerateStory = async () => {
     setGenerationError("");
     setStep("generating");
+    setBlueprintMessageIndex(0);
     let currentProjectId = projectId;
     let currentStoryId = storyId;
     setGenerationStep(currentProjectId ? 1 : 0);
+    setLocalStatusMessage("Creating project...");
 
     try {
       // Step 1: Create project if needed
@@ -203,6 +254,7 @@ export default function StoryEditorPage() {
         throw new Error("Project is required");
       }
       setGenerationStep(1);
+      setLocalStatusMessage("Creating story...");
 
       // Step 2: Create story if needed
       if (!currentStoryId && storyTitle.trim()) {
@@ -223,8 +275,9 @@ export default function StoryEditorPage() {
 
       // Step 3: Generate story blueprint (this triggers scenes, characters, planning)
       setGenerationStep(2);
+      setLocalStatusMessage("Starting generation...");
 
-      await generateStoryMutation.mutateAsync({
+      const kickoff = await generateStoryMutation.mutateAsync({
         storyId: currentStoryId,
         sourceText: storyText.trim(),
         maxScenes: maxScenes,
@@ -233,11 +286,25 @@ export default function StoryEditorPage() {
         generateRenderSpec: false,
         allowAppend: false
       });
+      if (kickoff?.progress?.message) {
+        setLocalStatusMessage(kickoff.progress.message);
+      }
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "Generation failed");
       setStep("setup");
     }
   };
+
+  const progressPayload = progressQuery.data?.progress ?? null;
+  const totalSteps =
+    typeof progressPayload?.total_steps === "number"
+      ? Math.max(1, Math.min(progressPayload.total_steps, PIPELINE_STEPS.length))
+      : PIPELINE_STEPS.length;
+  const visiblePipelineSteps = PIPELINE_STEPS.slice(0, totalSteps);
+  const statusMessage =
+    progressPayload?.message ??
+    localStatusMessage ??
+    (generationStep === 2 ? BLUEPRINT_MESSAGES[blueprintMessageIndex] : null);
 
   const isGenerating = step === "generating";
 
@@ -256,15 +323,15 @@ export default function StoryEditorPage() {
           <p className="mt-2 text-slate-500 text-center">
             Please wait while the AI processes your story...
           </p>
-          {generationStep === 2 && (
+          {statusMessage && (
             <p className="mt-3 text-xs text-indigo-600 text-center">
-              {BLUEPRINT_MESSAGES[blueprintMessageIndex]}
+              {statusMessage}
             </p>
           )}
 
           {/* Progress indicator */}
           <div className="mt-8 space-y-4">
-            {GENERATION_STEPS.map((stepInfo, index) => {
+            {visiblePipelineSteps.map((stepInfo, index) => {
               const isActive = index === generationStep;
               const isComplete = index < generationStep;
               const isPending = index > generationStep;

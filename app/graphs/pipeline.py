@@ -62,7 +62,7 @@ class PipelineState(TypedDict, total=False):
     blind_test_report_artifact_id: str
 
 
-def _node_scene_intent(state: PlanningState) -> dict[str, Any]:
+def _node_llm_scene_intent(state: PlanningState) -> dict[str, Any]:
     artifact = nodes.run_scene_intent_extractor(
         db=state["db"],
         scene_id=state["scene_id"],
@@ -72,7 +72,7 @@ def _node_scene_intent(state: PlanningState) -> dict[str, Any]:
     return {"scene_intent_artifact_id": str(artifact.artifact_id)}
 
 
-def _node_panel_plan(state: PlanningState) -> dict[str, Any]:
+def _node_llm_panel_plan(state: PlanningState) -> dict[str, Any]:
     artifact = nodes.run_panel_plan_generator(
         db=state["db"],
         scene_id=state["scene_id"],
@@ -82,17 +82,17 @@ def _node_panel_plan(state: PlanningState) -> dict[str, Any]:
     return {"panel_plan_artifact_id": str(artifact.artifact_id)}
 
 
-def _node_panel_plan_normalize(state: PlanningState) -> dict[str, Any]:
+def _node_rule_panel_plan_normalize(state: PlanningState) -> dict[str, Any]:
     artifact = nodes.run_panel_plan_normalizer(db=state["db"], scene_id=state["scene_id"])
     return {"panel_plan_normalized_artifact_id": str(artifact.artifact_id)}
 
 
-def _node_layout(state: PlanningState) -> dict[str, Any]:
+def _node_rule_layout(state: PlanningState) -> dict[str, Any]:
     artifact = nodes.run_layout_template_resolver(db=state["db"], scene_id=state["scene_id"])
     return {"layout_template_artifact_id": str(artifact.artifact_id)}
 
 
-def _node_panel_semantics(state: PlanningState) -> dict[str, Any]:
+def _node_llm_panel_semantics(state: PlanningState) -> dict[str, Any]:
     artifact = nodes.run_panel_semantic_filler(
         db=state["db"],
         scene_id=state["scene_id"],
@@ -156,18 +156,21 @@ def _node_render(state: RenderState) -> dict[str, Any]:
 def build_scene_planning_graph():
     graph = StateGraph(PlanningState)
 
-    graph.add_node("scene_intent", _node_scene_intent)
-    graph.add_node("panel_plan", _node_panel_plan)
-    graph.add_node("panel_plan_normalize", _node_panel_plan_normalize)
-    graph.add_node("layout", _node_layout)
-    graph.add_node("panel_semantics", _node_panel_semantics)
+    # LLM nodes
+    graph.add_node("llm_scene_intent", _node_llm_scene_intent)
+    graph.add_node("llm_panel_plan", _node_llm_panel_plan)
+    graph.add_node("llm_panel_semantics", _node_llm_panel_semantics)
 
-    graph.set_entry_point("scene_intent")
-    graph.add_edge("scene_intent", "panel_plan")
-    graph.add_edge("panel_plan", "panel_plan_normalize")
-    graph.add_edge("panel_plan_normalize", "layout")
-    graph.add_edge("layout", "panel_semantics")
-    graph.add_edge("panel_semantics", END)
+    # Rule-based nodes
+    graph.add_node("rule_panel_plan_normalize", _node_rule_panel_plan_normalize)
+    graph.add_node("rule_layout", _node_rule_layout)
+
+    graph.set_entry_point("llm_scene_intent")
+    graph.add_edge("llm_scene_intent", "llm_panel_plan")
+    graph.add_edge("llm_panel_plan", "rule_panel_plan_normalize")
+    graph.add_edge("rule_panel_plan_normalize", "rule_layout")
+    graph.add_edge("rule_layout", "llm_panel_semantics")
+    graph.add_edge("llm_panel_semantics", END)
 
     return graph.compile()
 
@@ -285,6 +288,8 @@ def run_full_pipeline(
             gemini=gemini,
         )
 
+        blind = nodes.run_blind_test_evaluator(db=db, scene_id=scene_id, gemini=gemini)
+
         render_state = run_scene_render(
             db=db,
             scene_id=scene_id,
@@ -293,8 +298,6 @@ def run_full_pipeline(
             prompt_override=prompt_override,
             gemini=gemini,
         )
-
-        blind = nodes.run_blind_test_evaluator(db=db, scene_id=scene_id, gemini=gemini)
 
         out: PipelineState = {
             **planning_state,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import datetime
 from typing import Any, TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -39,6 +40,28 @@ class StoryBuildState(TypedDict, total=False):
     progress: dict
 
 
+def _total_steps(planning_mode: str | None) -> int:
+    return 8 if planning_mode == "full" else 5
+
+
+def _persist_progress(state: StoryBuildState, progress: dict) -> None:
+    story_id = state.get("story_id")
+    if not story_id:
+        return
+    db: Session = state["db"]
+    story = db.get(Story, story_id)
+    if story is None:
+        return
+    payload = dict(progress)
+    payload.setdefault("total_steps", _total_steps(state.get("planning_mode")))
+    story.progress = payload
+    story.generation_status = "running"
+    story.generation_error = None
+    story.progress_updated_at = datetime.utcnow()
+    db.add(story)
+    db.commit()
+
+
 def _node_validate_inputs(state: StoryBuildState) -> dict[str, Any]:
     max_scenes = max(1, min(int(state.get("max_scenes") or 6), 30))
     max_characters = max(1, min(int(state.get("max_characters") or 6), 20))
@@ -54,7 +77,7 @@ def _node_validate_inputs(state: StoryBuildState) -> dict[str, Any]:
             story_style = story_style or story.default_story_style
             image_style = image_style or story.default_image_style
 
-    return {
+    progress = {
         "max_scenes": max_scenes,
         "max_characters": max_characters,
         "panel_count": panel_count,
@@ -62,6 +85,8 @@ def _node_validate_inputs(state: StoryBuildState) -> dict[str, Any]:
         "image_style": image_style,
         "progress": {"current_node": "ValidateStoryInputs", "message": "Validating inputs...", "step": 1},
     }
+    _persist_progress(state, progress["progress"])
+    return progress
 
 
 def _node_scene_splitter(state: StoryBuildState) -> dict[str, Any]:
@@ -77,7 +102,7 @@ def _node_scene_splitter(state: StoryBuildState) -> dict[str, Any]:
                 "source_text": text,
             }
         )
-    return {
+    progress = {
         "scenes": scenes,
         "progress": {
             "current_node": "SceneSplitter",
@@ -85,30 +110,36 @@ def _node_scene_splitter(state: StoryBuildState) -> dict[str, Any]:
             "step": 2,
         },
     }
+    _persist_progress(state, progress["progress"])
+    return progress
 
 
-def _node_character_extractor(state: StoryBuildState) -> dict[str, Any]:
+def _node_llm_character_extractor(state: StoryBuildState) -> dict[str, Any]:
     profiles = nodes.compute_character_profiles_llm(
         state.get("story_text", ""),
         max_characters=state.get("max_characters", 6),
         gemini=state.get("gemini"),
     )
-    return {
+    progress = {
         "characters": profiles,
-        "progress": {"current_node": "CharacterExtractor", "message": "Extracting characters...", "step": 3},
+        "progress": {"current_node": "LLMCharacterExtractor", "message": "Extracting characters...", "step": 3},
     }
+    _persist_progress(state, progress["progress"])
+    return progress
 
 
-def _node_character_normalizer(state: StoryBuildState) -> dict[str, Any]:
+def _node_llm_character_normalizer(state: StoryBuildState) -> dict[str, Any]:
     profiles = nodes.normalize_character_profiles_llm(
         state.get("characters", []),
         source_text=state.get("story_text", ""),
         gemini=state.get("gemini"),
     )
-    return {
+    progress = {
         "characters": profiles,
-        "progress": {"current_node": "CharacterProfileNormalizer", "message": "Normalizing characters...", "step": 4},
+        "progress": {"current_node": "LLMCharacterProfileNormalizer", "message": "Normalizing characters...", "step": 4},
     }
+    _persist_progress(state, progress["progress"])
+    return progress
 
 
 def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
@@ -124,6 +155,27 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
 
     existing_chars = list(db.execute(select(Character).where(Character.story_id == story_id)).scalars().all())
     existing_by_name = {c.name.strip().lower(): c for c in existing_chars if c.name}
+    existing_codes = {c.canonical_code for c in existing_chars if c.canonical_code}
+
+    def _code_from_index(index: int) -> str:
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        result = ""
+        while True:
+            index, rem = divmod(index, 26)
+            result = alphabet[rem] + result
+            if index == 0:
+                break
+            index -= 1
+        return f"CHAR_{result}"
+
+    def _next_character_code() -> str:
+        idx = 0
+        while True:
+            code = _code_from_index(idx)
+            if code not in existing_codes:
+                existing_codes.add(code)
+                return code
+            idx += 1
 
     character_ids: list[str] = []
     for profile in state.get("characters", []):
@@ -131,26 +183,40 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
         if not name:
             continue
         key = name.lower()
+        appearance = profile.get("appearance") if isinstance(profile.get("appearance"), dict) else None
+        hair_description = profile.get("hair_description")
+        if hair_description is None and appearance:
+            hair_description = appearance.get("hair")
+        base_outfit = profile.get("base_outfit") or profile.get("outfit")
         if key in existing_by_name:
             existing_char = existing_by_name[key]
+            if not existing_char.canonical_code:
+                existing_char.canonical_code = _next_character_code()
             if profile.get("gender") and not existing_char.gender:
                 existing_char.gender = profile.get("gender")
             if profile.get("age_range") and not existing_char.age_range:
                 existing_char.age_range = profile.get("age_range")
-            if profile.get("appearance") and not existing_char.appearance:
-                existing_char.appearance = profile.get("appearance")
+            if appearance and not existing_char.appearance:
+                existing_char.appearance = appearance
             if profile.get("identity_line") and not existing_char.identity_line:
                 existing_char.identity_line = profile.get("identity_line")
+            if hair_description and not existing_char.hair_description:
+                existing_char.hair_description = hair_description
+            if base_outfit and not existing_char.base_outfit:
+                existing_char.base_outfit = base_outfit
             character_ids.append(str(existing_char.character_id))
             continue
         character = Character(
             story_id=story_id,
+            canonical_code=_next_character_code(),
             name=name,
             description=profile.get("description"),
             role=profile.get("role") or "secondary",
             gender=profile.get("gender"),
             age_range=profile.get("age_range"),
-            appearance=profile.get("appearance"),
+            appearance=appearance,
+            hair_description=hair_description,
+            base_outfit=base_outfit,
             identity_line=profile.get("identity_line"),
         )
         db.add(character)
@@ -169,30 +235,42 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
 
     db.commit()
 
-    return {
+    progress = {
         "scene_ids": scene_ids,
         "character_ids": character_ids,
         "progress": {"current_node": "PersistStoryBundle", "message": "Saving story bundle...", "step": 5},
     }
+    _persist_progress(state, progress["progress"])
+    return progress
 
 
-def _node_visual_plan_compiler(state: StoryBuildState) -> dict[str, Any]:
+def _node_llm_visual_plan_compiler(state: StoryBuildState) -> dict[str, Any]:
     plans = nodes.compile_visual_plan_bundle_llm(
         scenes=state.get("scenes", []),
         characters=state.get("characters", []),
         story_style=state.get("story_style"),
         gemini=state.get("gemini"),
     )
-    svc = ArtifactService(state["db"])
+    db = state["db"]
+    svc = ArtifactService(db)
     plan_ids: list[str] = []
     for scene_id, plan in zip(state.get("scene_ids", []), plans, strict=False):
-        artifact = svc.create_artifact(scene_id=uuid.UUID(scene_id), type=nodes.ARTIFACT_VISUAL_PLAN, payload=plan)
+        scene_uuid = uuid.UUID(scene_id)
+        artifact = svc.create_artifact(scene_id=scene_uuid, type=nodes.ARTIFACT_VISUAL_PLAN, payload=plan)
         plan_ids.append(str(artifact.artifact_id))
-    return {
+        if isinstance(plan, dict) and plan.get("scene_importance"):
+            scene = db.get(Scene, scene_uuid)
+            if scene is not None:
+                scene.scene_importance = str(plan.get("scene_importance"))
+
+    db.commit()
+    progress = {
         "visual_plan_bundle": plans,
         "visual_plan_artifact_ids": plan_ids,
-        "progress": {"current_node": "StoryToVisualPlanCompiler", "message": "Converting story to visual beats...", "step": 6},
+        "progress": {"current_node": "LLMVisualPlanCompiler", "message": "Converting story to visual beats...", "step": 6},
     }
+    _persist_progress(state, progress["progress"])
+    return progress
 
 
 def _node_per_scene_planning_loop(state: StoryBuildState) -> dict[str, Any]:
@@ -227,6 +305,7 @@ def _node_per_scene_planning_loop(state: StoryBuildState) -> dict[str, Any]:
             "message": f"Planning scene {idx}/{total}...",
             "step": 7,
         }
+        _persist_progress(state, state["progress"])
 
     return {"planning_artifact_ids": planning_artifacts}
 
@@ -237,10 +316,12 @@ def _node_blind_test_runner(state: StoryBuildState) -> dict[str, Any]:
     for scene_id in state.get("scene_ids", []):
         artifact = nodes.run_blind_test_evaluator(state["db"], uuid.UUID(scene_id), gemini=gemini)
         report_ids.append(str(artifact.artifact_id))
-    return {
+    progress = {
         "blind_test_report_ids": report_ids,
         "progress": {"current_node": "BlindTestRunner", "message": "Running blind tests...", "step": 8},
     }
+    _persist_progress(state, progress["progress"])
+    return progress
 
 
 def _summarize_text(text: str, max_words: int = 32) -> str:
@@ -254,22 +335,22 @@ def build_story_build_graph(planning_mode: str = "full"):
     graph = StateGraph(StoryBuildState)
     graph.add_node("validate_inputs", _node_validate_inputs)
     graph.add_node("scene_splitter", _node_scene_splitter)
-    graph.add_node("character_extractor", _node_character_extractor)
-    graph.add_node("character_normalizer", _node_character_normalizer)
+    graph.add_node("llm_character_extractor", _node_llm_character_extractor)
+    graph.add_node("llm_character_normalizer", _node_llm_character_normalizer)
     graph.add_node("persist_story_bundle", _node_persist_story_bundle)
 
     graph.set_entry_point("validate_inputs")
     graph.add_edge("validate_inputs", "scene_splitter")
-    graph.add_edge("scene_splitter", "character_extractor")
-    graph.add_edge("character_extractor", "character_normalizer")
-    graph.add_edge("character_normalizer", "persist_story_bundle")
+    graph.add_edge("scene_splitter", "llm_character_extractor")
+    graph.add_edge("llm_character_extractor", "llm_character_normalizer")
+    graph.add_edge("llm_character_normalizer", "persist_story_bundle")
 
     if planning_mode == "full":
-        graph.add_node("visual_plan_compiler", _node_visual_plan_compiler)
+        graph.add_node("llm_visual_plan_compiler", _node_llm_visual_plan_compiler)
         graph.add_node("per_scene_planning", _node_per_scene_planning_loop)
         graph.add_node("blind_test_runner", _node_blind_test_runner)
-        graph.add_edge("persist_story_bundle", "visual_plan_compiler")
-        graph.add_edge("visual_plan_compiler", "per_scene_planning")
+        graph.add_edge("persist_story_bundle", "llm_visual_plan_compiler")
+        graph.add_edge("llm_visual_plan_compiler", "per_scene_planning")
         graph.add_edge("per_scene_planning", "blind_test_runner")
         graph.add_edge("blind_test_runner", END)
     else:

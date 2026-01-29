@@ -17,6 +17,35 @@
         {"x": 0.0, "y": 0.33, "w": 1.0, "h": 0.34},
         {"x": 0.0, "y": 0.67, "w": 1.0, "h": 0.33}
       ]
+    },
+    {
+      "template_id": "9x16_2_asym",
+      "layout_text": "One dominant panel with a smaller inset panel near the bottom-right",
+      "panels": [
+        {"x": 0.0, "y": 0.0, "w": 1.0, "h": 0.7},
+        {"x": 0.58, "y": 0.72, "w": 0.42, "h": 0.28}
+      ]
+    },
+    {
+      "template_id": "9x16_4_asym",
+      "layout_text": "Dominant panel with two stacked right panels and a wide bottom panel",
+      "panels": [
+        {"x": 0.0, "y": 0.0, "w": 0.62, "h": 0.66},
+        {"x": 0.65, "y": 0.0, "w": 0.35, "h": 0.48},
+        {"x": 0.65, "y": 0.52, "w": 0.35, "h": 0.48},
+        {"x": 0.0, "y": 0.7, "w": 0.62, "h": 0.3}
+      ]
+    },
+    {
+      "template_id": "9x16_5_asym",
+      "layout_text": "Dominant panel with clustered smaller panels for emphasis and pacing",
+      "panels": [
+        {"x": 0.0, "y": 0.0, "w": 0.6, "h": 0.6},
+        {"x": 0.62, "y": 0.0, "w": 0.38, "h": 0.28},
+        {"x": 0.62, "y": 0.32, "w": 0.38, "h": 0.28},
+        {"x": 0.0, "y": 0.64, "w": 0.32, "h": 0.36},
+        {"x": 0.34, "y": 0.64, "w": 0.28, "h": 0.36}
+      ]
     }
   ]
 }

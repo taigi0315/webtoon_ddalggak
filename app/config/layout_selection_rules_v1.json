@@ -2,7 +2,10 @@
   "version": "v1",
   "rules": [
     {"panel_count": 1, "template_id": "9x16_1"},
-    {"panel_count": 3, "template_id": "9x16_3_vertical"}
+    {"panel_count": 2, "template_id": "9x16_2_asym"},
+    {"panel_count": 3, "template_id": "9x16_3_vertical"},
+    {"panel_count": 4, "template_id": "9x16_4_asym"},
+    {"panel_count": 5, "template_id": "9x16_5_asym"}
   ],
   "default_template_id": "9x16_3_vertical"
 }

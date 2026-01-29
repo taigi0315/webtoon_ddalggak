@@ -12,6 +12,7 @@ import {
   styleItemsSchema,
   charactersSchema,
   storyGenerateResponseSchema,
+  storyProgressSchema,
   sceneGenerateFullSchema,
   characterRefsSchema,
   characterRefSchema,
@@ -79,6 +80,11 @@ export async function setStoryStyleDefaults(params: {
 export async function fetchStory(storyId: string) {
   const payload = await fetchJson(`/v1/stories/${storyId}`);
   return storySchema.parse(payload);
+}
+
+export async function fetchStoryProgress(storyId: string) {
+  const payload = await fetchJson(`/v1/stories/${storyId}/progress`);
+  return storyProgressSchema.parse(payload);
 }
 
 export async function fetchStories(projectId: string) {
@@ -246,6 +252,31 @@ export async function generateStoryBlueprint(params: {
     })
   });
   return storyGenerateResponseSchema.parse(payload);
+}
+
+export async function generateStoryBlueprintAsync(params: {
+  storyId: string;
+  sourceText: string;
+  maxScenes?: number;
+  panelCount?: number;
+  styleId?: string;
+  maxCharacters?: number;
+  generateRenderSpec?: boolean;
+  allowAppend?: boolean;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/generate/blueprint_async`, {
+    method: "POST",
+    body: JSON.stringify({
+      source_text: params.sourceText,
+      max_scenes: params.maxScenes ?? 6,
+      panel_count: params.panelCount ?? 3,
+      style_id: params.styleId ?? null,
+      max_characters: params.maxCharacters ?? 6,
+      generate_render_spec: params.generateRenderSpec ?? true,
+      allow_append: params.allowAppend ?? false
+    })
+  });
+  return storyProgressSchema.parse(payload);
 }
 
 export async function generateSceneIntent(sceneId: string) {

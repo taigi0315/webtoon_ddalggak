@@ -14,7 +14,9 @@ export const storySchema = z.object({
   project_id: z.string().uuid(),
   title: z.string(),
   default_story_style: z.string(),
-  default_image_style: z.string()
+  default_image_style: z.string(),
+  generation_status: z.string().nullable().optional(),
+  generation_error: z.string().nullable().optional()
 });
 
 export const sceneSchema = z.object({
@@ -22,6 +24,7 @@ export const sceneSchema = z.object({
   story_id: z.string().uuid(),
   environment_id: z.string().uuid().nullable(),
   source_text: z.string(),
+  scene_importance: z.string().nullable(),
   planning_locked: z.boolean(),
   story_style_override: z.string().nullable(),
   image_style_override: z.string().nullable()
@@ -34,9 +37,15 @@ export const scenesSchema = z.array(sceneSchema);
 export const characterSchema = z.object({
   character_id: z.string().uuid(),
   story_id: z.string().uuid(),
+  canonical_code: z.string().nullable(),
   name: z.string(),
   description: z.string().nullable(),
   role: z.string(),
+  gender: z.string().nullable(),
+  age_range: z.string().nullable(),
+  appearance: z.record(z.any()).nullable(),
+  hair_description: z.string().nullable(),
+  base_outfit: z.string().nullable(),
   identity_line: z.string().nullable(),
   approved: z.boolean()
 });
@@ -69,6 +78,14 @@ export const styleItemsSchema = z.array(styleItemSchema);
 export const storyGenerateResponseSchema = z.object({
   scenes: scenesSchema,
   characters: charactersSchema
+});
+
+export const storyProgressSchema = z.object({
+  story_id: z.string().uuid(),
+  status: z.string(),
+  progress: z.record(z.any()).nullable().optional(),
+  error: z.string().nullable().optional(),
+  updated_at: z.string().nullable().optional()
 });
 
 export const sceneGenerateFullSchema = z.object({
