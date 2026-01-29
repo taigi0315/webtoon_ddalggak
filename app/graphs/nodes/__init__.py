@@ -17,6 +17,7 @@ from app.config import loaders
 from app.core.telemetry import trace_span
 from app.core.settings import settings
 from app.db.models import Character, CharacterReferenceImage, CharacterVariant, Scene, Story, StoryCharacter
+from app.prompts.loader import get_prompt, get_prompt_data, render_prompt
 from app.services.artifacts import ArtifactService
 from app.services.images import ImageService
 from app.services.storage import LocalMediaStore
@@ -36,23 +37,9 @@ ARTIFACT_BLIND_TEST_REPORT = "blind_test_report"
 ARTIFACT_DIALOGUE_SUGGESTIONS = "dialogue_suggestions"
 ARTIFACT_VISUAL_PLAN = "visual_plan"
 
-# ---------------------------------------------------------------------------
-# System Prompts and Global Constraints for LLM Calls
-# ---------------------------------------------------------------------------
-
-SYSTEM_PROMPT_JSON = """You are a strict JSON generator for a webtoon creation pipeline.
-Return ONLY valid JSON. No markdown. No commentary.
-Use double quotes for all keys and string values.
-Do not include trailing commas.
-If information is unknown, use null or an empty list.
-Follow the output schema exactly."""
-
-GLOBAL_CONSTRAINTS = """Constraints:
-- Do NOT invent named characters not present in the input unless clearly implied.
-- Keep outputs concise but complete.
-- Avoid repetition.
-- Respect the requested maximum counts.
-- If unsure, prefer conservative outputs."""
+SYSTEM_PROMPT_JSON = get_prompt("system_prompt_json")
+GLOBAL_CONSTRAINTS = get_prompt("global_constraints")
+VISUAL_PROMPT_FORMULA = get_prompt("visual_prompt_formula")
 
 # ---------------------------------------------------------------------------
 # Valid Grammar IDs (must match panel_grammar_library_v1.json)
@@ -93,137 +80,20 @@ PACING_OPTIONS = frozenset([
     "impact",
 ])
 
-# ---------------------------------------------------------------------------
-# Age-Based Character Visual Prompts (Korean Webtoon Manhwa Style)
-# These are production-grade prompts for consistent character rendering
-# ---------------------------------------------------------------------------
-
-CHARACTER_STYLE_MALE_KID = """cute little boy, webtoon manhwa art style,
-childlike innocent features, large expressive eyes with bright highlights,
-round cherubic face, soft pudgy cheeks, small petite stature,
-short limbs, playful energetic posture, messy or neat styled hair,
-colorful casual children's clothes (t-shirt, shorts, sneakers),
-authentic webtoon style character illustration,
-chibi-like proportions, head-to-body ratio 1:3, youthful innocence"""
-
-CHARACTER_STYLE_MALE_TEEN = """teenage boy character, soft Korean webtoon manhwa art style,
-delicate youthful features, gentle angular face with soft edges,
-smooth clear skin, large expressive eyes with gentle gaze,
-trendy Korean-style haircut (soft side-swept bangs, layered medium-length, or fluffy textured),
-slender graceful build, lean elegant frame without muscle definition,
-tall slim proportions with narrow shoulders, willowy silhouette,
-long slender limbs, refined gentle posture,
-school uniform (neat blazer, crisp white shirt, fitted slacks) or soft casual streetwear,
-authentic Korean webtoon style character illustration,
-clean gentle features, soft approachable demeanor,
-height around 170-178cm with elegant proportions, youthful flower-boy aesthetic"""
-
-CHARACTER_STYLE_MALE_20_30 = """handsome soft masculine features, Korean manhwa male lead aesthetic,
-full body shot showing entire elegant figure from head to shoes,
-standing gracefully in neutral lighting, visible feet and shoes,
-gentle refined jawline (not overly chiseled), soft angular face,
-stylish contemporary Korean hairstyle (soft side-part, gentle waves, fluffy layered, or elegant medium-length),
-warm gentle expression with kind eyes, serene or subtly confident demeanor,
-slender elegant build, graceful narrow shoulders, slim waist,
-very tall slender stature 180-188cm, long lean legs, elongated refined torso,
-willowy model-like proportions, elegant gentle frame without bulk or excessive muscle,
-soft sophisticated silhouette, graceful refined lines,
-authentic Korean webtoon manhwa style character illustration,
-flawless porcelain-like skin, gentle refined presence, elegant relaxed posture,
-soft romantic or professional appearance, flower-boy charm, gentle masculine beauty, approachable refined elegance"""
-
-CHARACTER_STYLE_MALE_40_50 = """distinguished mature male character, soft Korean webtoon manhwa art style,
-refined gentle features showing maturity, subtle expression lines adding character,
-soft dignified presence, well-groomed elegant appearance,
-neat sophisticated hairstyle (possibly subtle grey at temples),
-slender maintained build, graceful mature frame,
-narrow refined shoulders, elegant slim proportions,
-professional refined attire (well-tailored suit, sophisticated casual wear, soft fabrics),
-authentic Korean webtoon style character illustration,
-graceful composed posture, height around 178-185cm with elegant proportions,
-warm approachable expression, wise gentle demeanor,
-sophisticated soft masculine presence, refined distinguished charm"""
-
-CHARACTER_STYLE_MALE_60_70 = """elderly distinguished gentleman character, soft Korean webtoon manhwa art style,
-aged refined features with gentle wisdom lines, warm expressive eyes,
-silver or white hair (neat, dignified styling), kind grandfatherly appearance,
-slender elegant elderly frame, graceful aged posture,
-comfortable refined clothing (soft cardigan, elegant casual wear, traditional hanbok),
-authentic Korean webtoon style character illustration,
-gentle dignified stature around 170-175cm, narrow refined shoulders,
-warm gentle expression radiating wisdom and kindness,
-soft approachable grandfatherly presence, elegant aged grace"""
-
-CHARACTER_STYLE_FEMALE_KID = """cute little girl, webtoon manhwa art style,
-childlike innocent features, oversized sparkly eyes with long lashes,
-round cherubic face, rosy plump cheeks, button nose, small petite stature,
-short limbs, adorable playful posture, cute hairstyle (pigtails, bob, or ponytail with ribbons),
-colorful dress, skirt, or casual children's outfit with bright colors,
-authentic webtoon style character illustration,
-chibi-like proportions, head-to-body ratio 1:3, innocent charming expression"""
-
-CHARACTER_STYLE_FEMALE_TEEN = """teenage girl character, webtoon manhwa art style,
-youthful fresh features, large expressive doe eyes with delicate lashes,
-smooth clear skin with natural blush, cute button nose,
-slender developing figure, long slim legs, petite frame,
-authentic webtoon style character illustration,
-height around 160-170cm proportions, graceful youthful posture,
-bright innocent yet stylish expression, emerging beauty"""
-
-CHARACTER_STYLE_FEMALE_20_30 = """tall elegant stature over 165cm, statuesque supermodel-like figure,
-extremely long toned legs (leg length exceeding torso), dramatically elongated graceful proportions,
-long elegant torso, perfect upright posture, hourglass silhouette with prominent natural breasts,
-full voluptuous bust, narrow defined waist, wide feminine hips, sexy mature curves,
-flawless glossy porcelain skin, stunning beautiful facial features,
-modern chic fashion highlighting long legs and bust, authentic webtoon style character illustration,
-sophisticated powerful presence, in realistic human proportions with no cartoon exaggeration"""
-
-CHARACTER_STYLE_FEMALE_40_50 = """mature elegant female character, webtoon manhwa art style,
-refined beautiful features showing graceful aging, subtle fine lines around eyes,
-sophisticated appearance, well-maintained figure with feminine curves,
-elegant styled hair (shoulder-length bob, soft waves, possible tasteful grey highlights),
-motherly warm presence or professional commanding aura,
-business professional attire or sophisticated elegant fashion,
-authentic Korean webtoon style character illustration,
-height around 160-170cm proportions, composed dignified posture,
-confident experienced expression, timeless beauty with character,
-narrow waist maintained, mature hourglass figure"""
-
-CHARACTER_STYLE_FEMALE_60_70 = """elderly distinguished female character, webtoon manhwa art style,
-aged graceful features, visible wrinkles and smile lines showing wisdom,
-grey or white hair (elegant updo, short styled, or soft curls),
-kind gentle eyes or strict authoritative gaze, grandmotherly presence,
-softer rounder figure with dignified bearing, slightly hunched but noble posture,
-classic comfortable clothing (traditional hanbok, cardigan sets, or elegant simple dresses),
-authentic Korean webtoon style character illustration,
-height around 155-165cm proportions, gentle or firm expression,
-warm nurturing or strict matriarch aura, face showing life's journey"""
-
-# Mapping for age/gender to style prompt
-CHARACTER_STYLE_MAP = {
-    ("male", "child"): CHARACTER_STYLE_MALE_KID,
-    ("male", "kid"): CHARACTER_STYLE_MALE_KID,
-    ("male", "teen"): CHARACTER_STYLE_MALE_TEEN,
-    ("male", "young_adult"): CHARACTER_STYLE_MALE_20_30,
-    ("male", "adult"): CHARACTER_STYLE_MALE_20_30,
-    ("male", "middle_aged"): CHARACTER_STYLE_MALE_40_50,
-    ("male", "elderly"): CHARACTER_STYLE_MALE_60_70,
-    ("female", "child"): CHARACTER_STYLE_FEMALE_KID,
-    ("female", "kid"): CHARACTER_STYLE_FEMALE_KID,
-    ("female", "teen"): CHARACTER_STYLE_FEMALE_TEEN,
-    ("female", "young_adult"): CHARACTER_STYLE_FEMALE_20_30,
-    ("female", "adult"): CHARACTER_STYLE_FEMALE_20_30,
-    ("female", "middle_aged"): CHARACTER_STYLE_FEMALE_40_50,
-    ("female", "elderly"): CHARACTER_STYLE_FEMALE_60_70,
-}
+CHARACTER_STYLE_MAP = get_prompt_data("character_style_map")
 
 
 def get_character_style_prompt(gender: str | None, age_range: str | None) -> str:
     """Get the appropriate character style prompt based on gender and age."""
     if not gender or not age_range:
         return ""
-    key = (gender.lower(), age_range.lower())
-    return CHARACTER_STYLE_MAP.get(key, "")
+    gender_key = gender.lower()
+    age_key = age_range.lower()
+    by_gender = CHARACTER_STYLE_MAP.get(gender_key)
+    if isinstance(by_gender, dict):
+        value = by_gender.get(age_key)
+        return value or ""
+    return ""
 
 
 def _build_gemini_client() -> GeminiClient:
@@ -374,26 +244,6 @@ SHOT_DISTRIBUTION_BY_GENRE = {
     "slice_of_life": {"establishing": "3-4", "medium": "4-5", "closeup": "0-1", "dynamic": "1-2"},
     "fantasy": {"establishing": "2-3", "medium": "4-5", "closeup": "1-2", "dynamic": "2-3"},
 }
-
-# ---------------------------------------------------------------------------
-# Visual Prompt Construction Formula
-# ---------------------------------------------------------------------------
-
-VISUAL_PROMPT_FORMULA = """Visual Prompt Construction Formula (150-250 words):
-
-{shot_type}, vertical 9:16 webtoon panel, {composition_note},
-{environment_with_5+_specific_details} + {style_lighting_description},
-{character_placement} + {action_and_expression},
-{atmosphere_keywords},
-{genre} manhwa style, {rendering_notes}
-
-REQUIRED ELEMENTS:
-1. Shot type (establishing/medium/closeup/etc.)
-2. 5+ specific environment details (architecture, props, lighting, weather)
-3. Character positioning with percentage (e.g., "occupies 40% of frame")
-4. Lighting conditions specific to style
-5. Atmosphere/mood keywords
-6. Color palette notes"""
 
 _NAME_STOPWORDS = {
     "The",
@@ -2102,39 +1952,13 @@ def _prompt_dialogue_script(
     panel_lines_text = "\n".join(panel_lines) if panel_lines else "No panel descriptions available."
     char_list = ", ".join(character_names) if character_names else "Unknown"
 
-    return f"""
-You are a webtoon dialogue scriptwriter. Convert the scene into panel-aligned dialogue.
-
-Rules:
-- Output ONLY valid JSON. No commentary.
-- Each panel must have 0-3 lines max.
-- Dialogue must be spoken/thought text, NOT narration.
-- If narration is needed, use type=\"caption\" and keep it short (max 1 caption per panel).
-- Avoid phrases like \"he says\" or \"she whispers\" in dialogue text.
-- Use speaker names from: {char_list}.
-- Allowed types: speech, thought, caption, sfx.
-
-Scene ID: {scene_id}
-Scene Text:
-{scene_text}
-
-Panels:
-{panel_lines_text}
-
-Required JSON schema:
-{{
-  \"scene_id\": \"{scene_id}\",
-  \"dialogue_by_panel\": [
-    {{
-      \"panel_id\": 1,
-      \"lines\": [
-        {{ \"speaker\": \"NAME\", \"type\": \"speech\", \"text\": \"...\" }}
-      ],
-      \"notes\": \"optional\"
-    }}
-  ]
-}}
-""".strip()
+    return render_prompt(
+        "prompt_dialogue_script",
+        scene_id=scene_id,
+        scene_text=scene_text,
+        panel_lines_text=panel_lines_text,
+        char_list=char_list,
+    )
 
 
 def _generate_dialogue_script(
@@ -2166,32 +1990,13 @@ def _prompt_variant_suggestions(
     character_names: list[str],
 ) -> str:
     char_list = ", ".join(character_names) if character_names else "Unknown"
-    return f"""
-You are a webtoon wardrobe and continuity assistant.
-Based on the story, suggest if any returning character needs a new outfit or appearance change for this story.
-
-Rules:
-- Output ONLY valid JSON, no commentary.
-- If no change is needed, return an empty list.
-- Keep suggestions minimal and realistic (business attire, school uniform, etc.).
-- Use only characters from this list: {char_list}.
-
-Story ID: {story_id}
-Title: {story_title}
-Story Text:
-{scene_text}
-
-Return JSON:
-{{
-  \"suggestions\": [
-    {{
-      \"character_name\": \"NAME\",
-      \"variant_type\": \"outfit_change\",
-      \"override_attributes\": {{ \"outfit\": \"short description\" }}
-    }}
-  ]
-}}
-""".strip()
+    return render_prompt(
+        "prompt_variant_suggestions",
+        story_id=story_id,
+        story_title=story_title,
+        scene_text=scene_text,
+        char_list=char_list,
+    )
 
 
 def generate_character_variant_suggestions(
@@ -2263,13 +2068,12 @@ def _repair_json_with_llm(gemini: GeminiClient, malformed_text: str, expected_sc
     if expected_schema:
         schema_hint = f"\n\nExpected schema:\n{expected_schema}"
 
-    repair_prompt = f"""{SYSTEM_PROMPT_JSON}
-
-The following text was supposed to be valid JSON but failed to parse.
-Fix it and return ONLY the corrected JSON. No explanations.{schema_hint}
-
-Malformed text:
-{malformed_text[:2000]}"""
+    repair_prompt = render_prompt(
+        "prompt_repair_json",
+        system_prompt_json=SYSTEM_PROMPT_JSON,
+        schema_hint=schema_hint,
+        malformed_text=malformed_text[:2000],
+    )
 
     try:
         repaired = gemini.generate_text(prompt=repair_prompt)
@@ -2325,44 +2129,13 @@ def _prompt_scene_intent(scene_text: str, genre: str | None, character_names: li
     genre_text = genre or "general"
     char_list = ", ".join(character_names) if character_names else "unknown"
 
-    return f"""{GLOBAL_CONSTRAINTS}
-
-Analyze the following scene and extract its narrative intent for webtoon adaptation.
-
-OUTPUT SCHEMA (return exactly this structure):
-{{
-  "logline": "One sentence describing the core action/conflict of this scene",
-  "pacing": "slow_burn|normal|fast|impact",
-  "emotional_arc": {{
-    "start": "emotion at scene start (e.g., calm, tense, happy)",
-    "peak": "strongest emotion in scene",
-    "end": "emotion at scene end"
-  }},
-  "visual_motifs": ["list of 2-4 key visual elements to emphasize"],
-  "summary": "2-3 sentence summary of the scene",
-  "beats": ["list of 2-4 key story beats in order"],
-  "setting": "primary location/environment or null",
-  "characters": ["list of characters present in scene"]
-}}
-
-PACING GUIDE:
-- slow_burn: introspective, atmospheric, lingering on emotion
-- normal: standard narrative flow, balanced action and dialogue
-- fast: rapid cuts, urgency, action-driven
-- impact: dramatic reveals, emotional climax, single powerful moment
-
-WHAT MAKES GOOD BEATS:
-- Each beat should be a single discrete visual moment
-- Beats should follow cause-and-effect logic
-- Include character reactions, not just actions
-- Balance dialogue beats with action/reaction beats
-
-Genre: {genre_text}
-Known characters: {char_list}
-
-Scene text:
-{scene_text}
-"""
+    return render_prompt(
+        "prompt_scene_intent",
+        global_constraints=GLOBAL_CONSTRAINTS,
+        genre_text=genre_text,
+        char_list=char_list,
+        scene_text=scene_text,
+    )
 
 
 def _prompt_panel_plan(
@@ -2400,52 +2173,16 @@ QC HARD CONSTRAINTS (you MUST follow these):
 - Max inset panels: 2
 """
 
-    return f"""{GLOBAL_CONSTRAINTS}
-
-Create a panel plan for a {panel_count}-panel webtoon sequence.
-{intent_block}
-{importance_block}
-Characters: {char_list}
-{qc_block}
-VALID GRAMMAR IDs (use ONLY these):
-1. establishing - Wide shot showing environment and context (REQUIRED for panel 1)
-2. dialogue_medium - Two-shot or medium shot for conversation
-3. emotion_closeup - Close-up on face for emotional impact (use sparingly)
-4. action - Dynamic movement or physical action
-5. reaction - Character responding to prior event
-6. object_focus - Important object or detail in focus
-7. reveal - Dramatic reveal of character, object, or information
-8. impact_silence - Dramatic pause with minimal elements, powerful negative space
-
-STORY FUNCTION OPTIONS:
-- setup: establishes context or situation
-- dialogue: conversation or verbal exchange
-- emotion: emotional beat or reaction
-- action: physical action or movement
-- reaction: response to prior event
-- focus: draws attention to important element
-- climax: peak dramatic moment
-- transition: bridges between scenes or beats
-
-OUTPUT SCHEMA:
-{{
-  "panels": [
-    {{
-      "panel_index": 1,
-      "grammar_id": "establishing",
-      "story_function": "setup",
-      "panel_role": "main|inset",
-      "panel_purpose": "dialogue|reaction|reveal|action|establishing|silent_beat",
-      "has_dialogue": true,
-      "utility_score": 0.0,
-      "beat_summary": "Brief description of what happens in this panel"
-    }}
-  ]
-}}
-
-Scene text:
-{scene_text}
-"""
+    return render_prompt(
+        "prompt_panel_plan",
+        global_constraints=GLOBAL_CONSTRAINTS,
+        panel_count=panel_count,
+        intent_block=intent_block.strip(),
+        importance_block=importance_block.strip(),
+        char_list=char_list,
+        qc_block=qc_block.strip(),
+        scene_text=scene_text,
+    )
 
 
 def _prompt_panel_semantics(
@@ -2513,119 +2250,16 @@ GENRE-SPECIFIC VISUAL GUIDELINES ({genre_key}):
 - Props to include: {genre_guide.get('props', 'Scene-appropriate objects')}
 """
 
-    return f"""{GLOBAL_CONSTRAINTS}
-
-Fill in DETAILED visual semantics for each panel. Each description must be 100-150 words minimum.
-This will be used for AI image generation - be SPECIFIC, VISUAL, and COMPLETE.
-{intent_block}
-{genre_block}
-CHARACTERS (use these identity_lines for consistency):
-{char_section}
-
-PANEL PLAN:
-{plan_section}
-
-Layout: {layout_template.get('layout_text', 'vertical scroll')}
-
-**VISUAL PROMPT FORMULA (use this structure for each description):**
-[shot_type], vertical 9:16 webtoon panel, [composition with character % of frame],
-[environment with 5+ specific details: architecture, furniture, props, weather, background activity],
-[lighting conditions: source, quality, color temperature, shadows],
-[character placement: position in frame, posture, action, expression],
-[atmosphere keywords], Korean manhwa style
-
-**GRAMMAR-SPECIFIC REQUIREMENTS:**
-- establishing: Wide shot, characters 20-30% of frame, 5+ environment details, show the WORLD
-- dialogue_medium: Medium shot, characters 40-45%, space for speech bubbles, show relationship
-- emotion_closeup: Extreme close-up, character 50%+, single face, SPECIFIC emotion with physical tells
-- action: Dynamic angle (low/high/dutch), motion blur hint, action verb, 35-40% character
-- reaction: Focus on reacting character, clear emotion in eyes/expression, medium shot
-- object_focus: Macro or close-up, object centered, minimal background, symbolic lighting
-- reveal: High contrast, dramatic single-source lighting, subject entering or being unveiled
-- impact_silence: Minimal elements, 70%+ negative space, frozen moment, stark composition
-
-**ENVIRONMENT DETAILS MUST INCLUDE (5+ per panel):**
-1. Architecture/space (walls, windows, ceiling, floor material)
-2. Furniture/major objects (tables, chairs, counters)
-3. Small props (cups, phones, books, bags)
-4. Lighting source (natural light, lamps, overhead, neon)
-5. Background activity (other people, movement, weather visible through windows)
-6. Atmosphere indicators (steam, dust motes, rain, shadows)
-
-**DIALOGUE REQUIREMENTS (CRITICAL - This carries the story):**
-Minimum dialogue per panel type:
-- Establishing shots: 0-2 lines (can be silent)
-- Normal dialogue panels: 5-8 lines MINIMUM (not just 1-2!)
-- Key emotional panels: 8-12 lines with reactions and subtext
-- Action panels: 2-4 lines for context
-
-**Why rich dialogue matters:**
-- Without enough dialogue, the story feels incomplete
-- Dialogue shows character dynamics, not just plot points
-- Each line must reveal character OR advance plot OR create emotion
-
-**CONVERSATION BUILDING PATTERNS:**
-1. Opening Exchange (3-4 lines):
-   "Question" → "Response" → "Follow-up" → "Reaction"
-
-2. Building Tension (5-6 lines):
-   "Statement" → "Challenge" → "Explanation" → "Disbelief" → "Confirmation"
-
-3. Emotional Peak (7-8 lines):
-   "Confession" → "Shock" → "Clarification" → "Emotional response" → "Deeper reveal" → "Processing"
-
-4. Include: pauses, hesitation, interruptions for realism
-5. Last line of dialogue should have impact or create anticipation
-6. Show distinct character voices (how they speak differently)
-
-VALID CAMERA VALUES: extreme_closeup, closeup, medium_closeup, medium, medium_full, full, wide, establishing
-VALID GAZE VALUES: at_other, at_object, down, away, toward_path, camera
-
-OUTPUT SCHEMA:
-{{
-  "panels": [
-    {{
-      "panel_index": 1,
-      "grammar_id": "establishing",
-      "camera": "wide",
-      "character_frame_percentage": 25,
-      "focus_on": "environment with characters",
-      "description": "150+ word detailed visual description following the formula above",
-      "characters": [
-        {{
-          "name": "Character Name",
-          "position": "left|center|right|background",
-          "frame_position": "lower_third|center|upper_third",
-          "gaze": "at_other|at_object|down|away|toward_path|camera",
-          "expression": "specific emotion with physical description",
-          "action": "specific action verb + body language"
-        }}
-      ],
-      "dialogue": [
-        {{"character": "Name", "text": "Dialogue line", "order": 1}},
-        {{"character": "Name", "text": "Response", "order": 2}}
-      ],
-      "environment": {{
-        "location": "specific place name",
-        "architecture": "walls, windows, ceiling details",
-        "furniture": "major objects in space",
-        "props": ["list of visible small objects"],
-        "background_activity": "what's happening in background"
-      }},
-      "lighting": {{
-        "source": "natural/artificial/mixed",
-        "quality": "soft/harsh/dramatic",
-        "color_temperature": "warm/cool/neutral",
-        "shadows": "description of shadow patterns"
-      }},
-      "atmosphere_keywords": ["list", "of", "mood", "words"]
-    }}
-  ]
-}}
-
-Scene text:
-{scene_text}
-"""
+    return render_prompt(
+        "prompt_panel_semantics",
+        global_constraints=GLOBAL_CONSTRAINTS,
+        intent_block=intent_block.strip(),
+        genre_block=genre_block.strip(),
+        char_section=char_section,
+        plan_section=plan_section,
+        layout_text=layout_template.get("layout_text", "vertical scroll"),
+        scene_text=scene_text,
+    )
 
 
 def _prompt_blind_reader(panel_semantics: dict) -> str:
@@ -2657,58 +2291,24 @@ def _prompt_blind_reader(panel_semantics: dict) -> str:
             desc += f" Characters: {', '.join(char_names)}"
         panels_desc.append(desc)
 
-    return f"""{SYSTEM_PROMPT_JSON}
-
-You are a blind reader who has NEVER seen the original story.
-Based ONLY on the panel descriptions below, reconstruct what story is being told.
-
-Panel descriptions:
-{chr(10).join(panels_desc)}
-
-OUTPUT SCHEMA:
-{{
-  "reconstructed_story": "Your reconstruction of the story based only on the panels (2-4 sentences)",
-  "identified_characters": ["List of character names you can identify"],
-  "plot_points": ["List of plot points you understood"],
-  "unclear_elements": ["List of anything confusing or unclear"]
-}}
-"""
+    return render_prompt(
+        "prompt_blind_reader",
+        system_prompt_json=SYSTEM_PROMPT_JSON,
+        panel_descriptions="\n".join(panels_desc),
+    )
 
 
 def _prompt_comparator(original_text: str, blind_reading: dict) -> str:
     """Stage 2: Compare blind reading to original for scoring."""
-    return f"""{SYSTEM_PROMPT_JSON}
-
-Compare the blind reader's reconstruction to the original story.
-
-ORIGINAL STORY:
-{original_text}
-
-BLIND READER'S RECONSTRUCTION:
-{blind_reading.get('reconstructed_story', 'N/A')}
-
-IDENTIFIED CHARACTERS: {blind_reading.get('identified_characters', [])}
-PLOT POINTS UNDERSTOOD: {blind_reading.get('plot_points', [])}
-UNCLEAR ELEMENTS: {blind_reading.get('unclear_elements', [])}
-
-SCORING RUBRIC:
-- plot_recall (40%): Did the reader understand the main events?
-- emotional_alignment (30%): Did the reader feel the intended emotions?
-- character_identifiability (30%): Could the reader identify who is who?
-
-OUTPUT SCHEMA:
-{{
-  "scores": {{
-    "plot_recall": 0.0-1.0,
-    "emotional_alignment": 0.0-1.0,
-    "character_identifiability": 0.0-1.0
-  }},
-  "weighted_score": 0.0-1.0,
-  "comparison": "Brief comparison of original vs reconstruction",
-  "failure_points": ["List specific panels or elements that failed to communicate"],
-  "repair_suggestions": ["Specific actionable fixes for failed panels"]
-}}
-"""
+    return render_prompt(
+        "prompt_comparator",
+        system_prompt_json=SYSTEM_PROMPT_JSON,
+        original_text=original_text,
+        reconstructed_story=blind_reading.get("reconstructed_story", "N/A"),
+        identified_characters=blind_reading.get("identified_characters", []),
+        plot_points=blind_reading.get("plot_points", []),
+        unclear_elements=blind_reading.get("unclear_elements", []),
+    )
 
 
 def _prompt_blind_test(scene_text: str, panel_semantics: dict) -> str:
@@ -2721,36 +2321,13 @@ def _prompt_blind_test(scene_text: str, panel_semantics: dict) -> str:
             desc += f" Dialogue: {' '.join(dialogue)}"
         panels_desc.append(desc)
 
-    return f"""{SYSTEM_PROMPT_JSON}
-{GLOBAL_CONSTRAINTS}
-
-Evaluate how well the panel descriptions convey the original story.
-
-ORIGINAL STORY:
-{scene_text}
-
-PANEL DESCRIPTIONS:
-{chr(10).join(panels_desc)}
-
-SCORING RUBRIC:
-- plot_recall (40%): Do panels capture main events?
-- emotional_alignment (30%): Do panels convey intended emotions?
-- character_identifiability (30%): Can characters be identified?
-
-OUTPUT SCHEMA:
-{{
-  "reconstructed_story": "What story would a reader understand from panels alone (2-4 sentences)",
-  "comparison": "How well panels match original",
-  "score": 0.0-1.0,
-  "scores": {{
-    "plot_recall": 0.0-1.0,
-    "emotional_alignment": 0.0-1.0,
-    "character_identifiability": 0.0-1.0
-  }},
-  "failure_points": ["Panels or elements that fail to communicate"],
-  "repair_suggestions": ["Specific fixes for failed panels"]
-}}
-"""
+    return render_prompt(
+        "prompt_blind_test",
+        system_prompt_json=SYSTEM_PROMPT_JSON,
+        global_constraints=GLOBAL_CONSTRAINTS,
+        scene_text=scene_text,
+        panel_descriptions="\n".join(panels_desc),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2759,110 +2336,26 @@ OUTPUT SCHEMA:
 
 def _prompt_character_extraction(source_text: str, max_characters: int) -> str:
     """Prompt for LLM-based character extraction."""
-    return f"""{SYSTEM_PROMPT_JSON}
-{GLOBAL_CONSTRAINTS}
-
-Extract only the IMPORTANT characters from the following story text.
-Include explicitly named characters and implied characters ONLY if they are plot-relevant or recurring.
-Do NOT include incidental background roles (e.g., movers, clerks, passersby) unless they directly affect the plot.
-
-Rules:
-- Extract up to {max_characters} characters
-- Include evidence quotes showing where each character appears
-- Assign roles: "main" for central characters (max 2), "secondary" for others
-- For implied characters, create a descriptive name (e.g., "Jina's Mother" not just "mom")
-
-OUTPUT SCHEMA:
-{{
-  "characters": [
-    {{
-      "name": "Character name",
-      "role": "main|secondary",
-      "evidence_quotes": ["Quote from text showing this character"],
-      "implied": false,
-      "relationship_to_main": "relationship if applicable or null"
-    }}
-  ]
-}}
-
-Story text:
-{source_text}
-"""
+    return render_prompt(
+        "prompt_character_extraction",
+        system_prompt_json=SYSTEM_PROMPT_JSON,
+        global_constraints=GLOBAL_CONSTRAINTS,
+        max_characters=max_characters,
+        source_text=source_text,
+    )
 
 
 def _prompt_character_normalization(characters: list[dict], source_text: str) -> str:
     """Prompt for LLM-based character enrichment with Korean manhwa aesthetics."""
     char_list = json.dumps(characters, indent=2)
 
-    return f"""{SYSTEM_PROMPT_JSON}
-{GLOBAL_CONSTRAINTS}
-
-Enrich the following character profiles with DETAILED visual descriptions for Korean webtoon/manhwa rendering.
-Use context clues from the story to infer appearance. Apply Korean manhwa aesthetic standards.
-
-**CRITICAL: These descriptions will be used for AI image generation. Be SPECIFIC and VISUAL.**
-
-Current characters:
-{char_list}
-
-Story context:
-{source_text[:1500]}
-
-**AGE-BASED VISUAL STANDARDS (Korean Manhwa Style):**
-
-MALE CHARACTERS:
-- child (under 12): Chibi proportions 1:3, round cherubic face, large expressive eyes, playful posture
-- teen (13-19): Soft angular face, slender graceful build, flower-boy aesthetic, 170-178cm, school uniform or streetwear
-- young_adult (20-35): Korean male lead aesthetic, refined jawline, tall slender 180-188cm, willowy model proportions, soft side-part hair
-- middle_aged (40-55): Distinguished refined features, subtle grey at temples, 178-185cm, professional attire
-- elderly (60+): Gentle wisdom lines, silver/white hair, 170-175cm, dignified cardigan or hanbok
-
-FEMALE CHARACTERS:
-- child (under 12): Chibi proportions 1:3, oversized sparkly eyes, rosy plump cheeks, cute pigtails/bob
-- teen (13-19): Large doe eyes, slender figure, 160-170cm, graceful youthful posture
-- young_adult (20-35): Statuesque figure over 165cm, long legs exceeding torso, hourglass silhouette, flawless skin
-- middle_aged (40-55): Refined beauty with subtle lines, elegant bob/waves, 160-170cm, professional or sophisticated fashion
-- elderly (60+): Smile lines showing wisdom, grey elegant updo, 155-165cm, traditional hanbok or cardigan sets
-
-For each character, provide:
-- gender: male|female|unknown
-- age_range: child|teen|young_adult|adult|middle_aged|elderly
-- appearance:
-  - hair: color, style, length (be specific: "soft side-swept black bangs" not just "black hair")
-  - face: features, expression tendency (e.g., "gentle angular jawline, warm expressive eyes")
-  - build: body type, height, proportions (e.g., "slender elegant build, 180cm, willowy silhouette")
-- outfit: typical clothing with detail (e.g., "casual cream sweater, fitted dark jeans, clean white sneakers")
-- identity_line: Single comprehensive line for artist (150+ characters)
-
-**IDENTITY LINE FORMAT:**
-"[age_range] [ethnicity] [gender], [hair description], [face/expression], [build/height], [typical outfit], [manhwa style note]"
-
-**GOOD EXAMPLE:**
-"early_20s Korean female, long flowing black hair with soft waves, large expressive doe eyes with delicate lashes, tall statuesque figure 168cm with elegant long legs, cream knit sweater and high-waisted jeans, authentic webtoon romance female lead aesthetic"
-
-**BAD EXAMPLE (too vague):**
-"young woman with dark hair, normal build, casual clothes"
-
-OUTPUT SCHEMA:
-{{
-  "characters": [
-    {{
-      "name": "Character name",
-      "role": "main|secondary",
-      "description": "Brief personality/role description",
-      "gender": "male|female|unknown",
-      "age_range": "young_adult",
-      "appearance": {{
-        "hair": "detailed hair description with color, style, length",
-        "face": "facial features and typical expression",
-        "build": "body type, height in cm, proportions"
-      }},
-      "outfit": "detailed typical outfit description",
-      "identity_line": "Complete 150+ character identity line for artist reference"
-    }}
-  ]
-}}
-"""
+    return render_prompt(
+        "prompt_character_normalization",
+        system_prompt_json=SYSTEM_PROMPT_JSON,
+        global_constraints=GLOBAL_CONSTRAINTS,
+        characters_json=char_list,
+        story_context=source_text[:1500],
+    )
 
 
 def compute_character_profiles_llm(
@@ -2983,61 +2476,14 @@ def _prompt_visual_plan(
     for s in scenes:
         scenes_block.append(f"Scene {s.get('scene_index', '?')}:\n{s.get('source_text', s.get('summary', ''))[:500]}")
 
-    return f"""{SYSTEM_PROMPT_JSON}
-{GLOBAL_CONSTRAINTS}
-
-Convert the following scenes into visual beats for webtoon adaptation.
-Each scene should have 2-6 visual beats depending on complexity.
-
-Story style: {story_style or 'general'}
-
-Characters:
-{chr(10).join(char_identities)}
-
-Scenes:
-{chr(10).join(scenes_block)}
-
-For each scene, identify:
-1. Visual beats (discrete visual moments that can be drawn)
-2. Characters involved in each beat
-3. Environment/setting for each beat
-4. Key objects that must be shown
-5. Emotional tone of each beat
-6. Draft dialogue if applicable
-7. Scene importance tag (setup|build|climax|release|cliffhanger)
-
-Also extract global_environment_anchors: recurring locations or visual elements for consistency.
-
-OUTPUT SCHEMA:
-{{
-  "global_environment_anchors": [
-    {{
-      "name": "location name",
-      "description": "visual description for consistency",
-      "appears_in_scenes": [1, 2]
-    }}
-  ],
-  "scene_plans": [
-    {{
-      "scene_index": 1,
-      "summary": "scene summary",
-      "scene_importance": "setup|build|climax|release|cliffhanger",
-      "beats": [
-        {{
-          "beat_index": 1,
-          "what_happens": "description of the visual moment",
-          "characters_involved": ["Character Name"],
-          "environment": "where this happens",
-          "key_objects": ["important objects to show"],
-          "emotional_tone": "emotion of this beat",
-          "dialogue_draft": ["draft dialogue if any"]
-        }}
-      ],
-      "must_show": ["critical visual elements for this scene"]
-    }}
-  ]
-}}
-"""
+    return render_prompt(
+        "prompt_visual_plan",
+        system_prompt_json=SYSTEM_PROMPT_JSON,
+        global_constraints=GLOBAL_CONSTRAINTS,
+        story_style=story_style or "general",
+        character_identities="\n".join(char_identities),
+        scenes_block="\n".join(scenes_block),
+    )
 
 
 def compile_visual_plan_bundle_llm(
