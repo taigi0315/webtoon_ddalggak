@@ -618,6 +618,9 @@ def run_panel_plan_generator(
         characters = _list_characters(db, scene.story_id)
         character_names = [c.name for c in characters]
         panel_count = max(1, int(panel_count))
+        importance = scene.scene_importance
+        if importance:
+            panel_count = _panel_count_for_importance(importance, scene.source_text, panel_count)
 
         # Get scene_intent if available
         scene_intent_artifact = svc.get_latest_artifact(scene_id, ARTIFACT_SCENE_INTENT)
@@ -640,6 +643,7 @@ def run_panel_plan_generator(
                     scene.source_text,
                     panel_count,
                     scene_intent=scene_intent,
+                    scene_importance=importance,
                     character_names=character_names,
                     qc_rules=qc_rules,
                 ),
@@ -759,6 +763,14 @@ def run_prompt_compiler(
         scene = _get_scene(db, scene_id)
         story = db.get(Story, scene.story_id)
         characters = _list_characters(db, scene.story_id)
+        reference_char_ids = _character_ids_with_reference_images(db, scene.story_id)
+        panel_count = _panel_count(panel_semantics.payload)
+        layout_panels = layout.payload.get("panels")
+        layout_count = len(layout_panels) if isinstance(layout_panels, list) else None
+        if layout_count is not None and panel_count != layout_count:
+            raise ValueError(
+                f"Layout/template panel count mismatch: panel_semantics={panel_count} layout={layout_count}"
+            )
 
         prompt = prompt_override
         if not prompt:
@@ -767,6 +779,7 @@ def run_prompt_compiler(
                 layout_template=layout.payload,
                 style_id=style_id,
                 characters=characters,
+                reference_char_ids=reference_char_ids,
                 story_style=(story.default_story_style if story else None),
             )
 
@@ -774,7 +787,7 @@ def run_prompt_compiler(
             "prompt": prompt,
             "style_id": style_id,
             "layout_template_id": layout.payload.get("template_id"),
-            "panel_count": _panel_count(panel_semantics.payload),
+            "panel_count": panel_count,
             "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         }
         return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_SPEC, payload=payload)
@@ -920,13 +933,24 @@ def compile_visual_plan_bundle(
     story_style: str | None = None,
 ) -> list[dict]:
     plans: list[dict] = []
+    total = len(scenes)
     for scene in scenes:
         summary = scene.get("summary") or _summarize_text(scene.get("source_text", ""))
+        importance = scene.get("scene_importance")
+        if not importance:
+            idx = scene.get("scene_index") or 1
+            if idx == 1:
+                importance = "setup"
+            elif total and idx == total:
+                importance = "cliffhanger"
+            else:
+                importance = "build"
         plan = {
             "scene_index": scene.get("scene_index"),
             "summary": summary,
             "beats": _extract_beats(scene.get("source_text", ""), max_beats=3),
             "must_show": _extract_must_show(scene.get("source_text", "")),
+            "scene_importance": importance,
             "characters": [c.get("name") for c in characters if c.get("name")],
             "story_style": story_style,
         }
@@ -1026,6 +1050,28 @@ def _extract_must_show(text: str) -> list[str]:
         if len(common) >= 4:
             break
     return common
+
+
+def _panel_count_for_importance(
+    scene_importance: str,
+    scene_text: str,
+    fallback: int,
+) -> int:
+    importance = (scene_importance or "").lower()
+    word_count = len(re.findall(r"\w+", scene_text or ""))
+    if importance in {"climax", "cliffhanger"}:
+        return 1
+    if importance == "release":
+        return 3 if word_count >= 120 else 2
+    if importance == "setup":
+        return 4 if word_count >= 120 else 3
+    if importance == "build":
+        if word_count >= 160:
+            return 5
+        if word_count >= 90:
+            return 4
+        return 3
+    return max(1, int(fallback))
 
 
 def _heuristic_panel_plan(scene_text: str, panel_count: int) -> dict:
@@ -1311,34 +1357,48 @@ def _compile_prompt(
     layout_template: dict,
     style_id: str,
     characters: list[Character],
+    reference_char_ids: set[uuid.UUID] | None = None,
     story_style: str | None = None,
 ) -> str:
     """Compile a production-grade image generation prompt with rich visual details."""
     style_desc = _style_description(style_id)
     story_desc = _story_style_description(story_style)
     layout_text = layout_template.get("layout_text", "")
+    reference_char_ids = reference_char_ids or set()
+    panel_semantics = _inject_character_identities(
+        panel_semantics=panel_semantics,
+        characters=characters,
+        reference_char_ids=reference_char_ids,
+    )
     panels = panel_semantics.get("panels", []) or []
     panel_count = len(panels)
 
     # Build concise character lines (reference images provide detailed appearance)
     identity_lines = []
+    codes = _character_codes(characters)
     for c in characters:
-        appearance = getattr(c, "appearance", None)
-        char_lines = [f"  - {c.name} ({c.role or 'character'})"]
-        if c.identity_line:
-            char_lines.append(f"    Identity: {c.identity_line}")
-        if isinstance(appearance, dict):
-            brief = []
-            if appearance.get("hair"):
-                brief.append(f"Hair: {appearance['hair']}")
-            if appearance.get("face"):
-                brief.append(f"Face: {appearance['face']}")
-            if appearance.get("build"):
-                brief.append(f"Build: {appearance['build']}")
-            if brief:
-                char_lines.append(f"    Appearance: {'; '.join(brief)}")
-        elif c.description:
-            char_lines.append(f"    Appearance: {c.description}")
+        code = codes.get(c.character_id)
+        role = c.role or "character"
+        char_lines = [f"  - {code} ({c.name}) [{role}]"]
+        if c.character_id in reference_char_ids:
+            if c.base_outfit:
+                char_lines.append(f"    Outfit: {c.base_outfit}")
+        else:
+            if c.base_outfit:
+                char_lines.append(f"    Outfit: {c.base_outfit}")
+            appearance = getattr(c, "appearance", None)
+            if isinstance(appearance, dict):
+                brief = []
+                if appearance.get("hair"):
+                    brief.append(f"Hair: {appearance['hair']}")
+                if appearance.get("face"):
+                    brief.append(f"Face: {appearance['face']}")
+                if appearance.get("build"):
+                    brief.append(f"Build: {appearance['build']}")
+                if brief:
+                    char_lines.append(f"    Appearance: {'; '.join(brief)}")
+            elif c.description:
+                char_lines.append(f"    Appearance: {c.description}")
         identity_lines.extend(char_lines)
 
     # Get genre-specific visual guidelines
@@ -1348,24 +1408,29 @@ def _compile_prompt(
     mapping = loaders.load_grammar_to_prompt_mapping_v1().mapping
 
     lines = [
-        "**CRITICAL: VERTICAL 9:16 ASPECT RATIO**",
-        "Create a vertical webtoon/manhwa style image optimized for vertical scrolling.",
+        "**ASPECT RATIO & FORMAT:**",
+        "- CRITICAL: Vertical 9:16 webtoon/manhwa image for vertical scrolling.",
         "",
-        f"**VISUAL STYLE:** {style_desc}",
-        f"**STORY GENRE:** {story_desc}",
-        f"**LAYOUT:** {layout_text or f'{panel_count} panels, vertical flow'}",
-        f"**PANEL COUNT:** {panel_count} (do not add or remove panels)",
+        "**REFERENCE IMAGE AUTHORITY:**",
+        "- Character reference images are the PRIMARY source of facial identity, proportions, and features.",
+        "- Do NOT reinterpret or redesign faces based on text.",
+        "- Text descriptions are for role, action, emotion, and clothing ONLY.",
+        "- Faces, hairstyles, glasses shape, and proportions must match reference images exactly.",
+        "",
+        f"**STYLE & GENRE:** {style_desc} | {story_desc}",
+        "",
+        "**PANEL COMPOSITION RULES:**",
+        f"- Layout: {layout_text or f'{panel_count} panels, vertical flow'}",
+        f"- Panel count: {panel_count} (do not add or remove panels)",
+        "- Panels do NOT need equal sizes or grid alignment.",
+        "- You may use one dominant panel with smaller inset panels.",
+        "- Panels can vary in size and position if reading order is clear (top to bottom).",
+        "- If there is a reveal/impact/emotional peak, make that panel dominant.",
         "",
         f"**GENRE VISUAL GUIDELINES ({genre_key}):**",
         f"- Lighting: {genre_guide.get('lighting', 'natural ambient')}",
         f"- Atmosphere: {genre_guide.get('atmosphere', 'appropriate to mood')}",
         f"- Color palette: {genre_guide.get('color_palette', 'natural tones')}",
-        "",
-        "**PANEL COMPOSITION GUIDELINES:**",
-        "- Panels do NOT need equal sizes or grid alignment.",
-        "- You may use one dominant panel with smaller inset panels.",
-        "- Panels can vary in size and position if reading order is clear (top to bottom).",
-        "- If there is a reveal/impact/emotional peak, make that panel dominant.",
         "",
     ]
 
@@ -1374,7 +1439,7 @@ def _compile_prompt(
         lines.extend(identity_lines)
         lines.append("")
 
-    lines.append("**PANELS (no text in image; dialogue is context only):**")
+    lines.append("**PANELS (action/emotion/environment only; no text in image):**")
     for panel in panels:
         grammar_id = panel.get("grammar_id")
         grammar_hint = mapping.get(grammar_id, "")
@@ -1433,15 +1498,12 @@ def _compile_prompt(
 
     lines.extend([
         "**TECHNICAL REQUIREMENTS:**",
-        "- CRITICAL: Vertical 9:16 aspect ratio (height significantly greater than width)",
         "- Korean webtoon/manhwa art style (Naver webtoon quality)",
-        "- Optimized for vertical scrolling webtoon format",
         "- Show full body only when the scene composition requires it",
         "- Masterpiece best quality professional illustration",
         "- No text, speech bubbles, or watermarks in image",
         "- Leave clear space for dialogue bubbles to be added later",
         "- Consistent character appearance across panels",
-        "- Follow reference images; avoid contradicting character traits",
         "",
         "**NEGATIVE:** text, watermark, signature, logo, speech bubbles, conflicting descriptions, "
         "square image, 1:1 ratio, horizontal image, landscape orientation, "
@@ -1479,6 +1541,159 @@ def _panel_semantics_text(panel_semantics: dict) -> str:
         for line in panel.get("dialogue") or []:
             parts.append(str(line))
     return " ".join(parts)
+
+
+def _character_ids_with_reference_images(db: Session, story_id: uuid.UUID) -> set[uuid.UUID]:
+    stmt = (
+        select(CharacterReferenceImage.character_id)
+        .join(Character, CharacterReferenceImage.character_id == Character.character_id)
+        .where(
+            Character.story_id == story_id,
+            CharacterReferenceImage.approved.is_(True),
+            CharacterReferenceImage.ref_type == "face",
+        )
+        .distinct()
+    )
+    return set(db.execute(stmt).scalars().all())
+
+
+def _character_codes(characters: list[Character]) -> dict[uuid.UUID, str]:
+    def _code_from_index(index: int) -> str:
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        result = ""
+        while True:
+            index, rem = divmod(index, 26)
+            result = alphabet[rem] + result
+            if index == 0:
+                break
+            index -= 1
+        return f"CHAR_{result}"
+
+    codes: dict[uuid.UUID, str] = {}
+    used = {c.canonical_code for c in characters if c.canonical_code}
+    idx = 0
+    for c in characters:
+        if c.canonical_code:
+            codes[c.character_id] = c.canonical_code
+            continue
+        while True:
+            code = _code_from_index(idx)
+            idx += 1
+            if code not in used:
+                used.add(code)
+                codes[c.character_id] = code
+                break
+    return codes
+
+
+def _inject_character_identities(
+    panel_semantics: dict,
+    characters: list[Character],
+    reference_char_ids: set[uuid.UUID],
+) -> dict:
+    if not panel_semantics or not characters:
+        return panel_semantics
+
+    codes = _character_codes(characters)
+    name_map: dict[str, dict[str, str]] = {}
+    for c in characters:
+        code = codes.get(c.character_id, "CHAR_X")
+        base = f"{code} ({c.name})"
+        if c.character_id in reference_char_ids:
+            parts = [base, "matching reference image"]
+            if c.base_outfit:
+                parts.append(f"wearing {c.base_outfit}")
+            label = ", ".join(parts)
+        else:
+            parts = [base]
+            if c.base_outfit:
+                parts.append(f"wearing {c.base_outfit}")
+            if c.hair_description:
+                parts.append(f"hair: {c.hair_description}")
+            label = ", ".join(parts)
+        name_map[c.name.lower()] = {"label": label, "code": base}
+
+    forbidden_terms = [
+        "hair",
+        "hairstyle",
+        "bangs",
+        "eyes",
+        "eye",
+        "jawline",
+        "cheekbones",
+        "face",
+        "facial",
+        "height",
+        "tall",
+        "short",
+        "slender",
+        "muscular",
+        "curvy",
+        "build",
+        "physique",
+        "proportions",
+        "handsome",
+        "beautiful",
+        "pretty",
+        "attractive",
+    ]
+
+    def _strip_forbidden_descriptors(text: str) -> str:
+        cleaned = text
+        cleaned = re.sub(r"\b\d{2,3}\s?cm\b", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\b\d\.\d\s?m\b", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\b\d'\d{1,2}\"?\b", "", cleaned)
+        for term in forbidden_terms:
+            cleaned = re.sub(rf"\b{re.escape(term)}\b", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+        return cleaned
+
+    def _replace_text(text: str) -> str:
+        if not text:
+            return text
+        updated = text
+        matched_reference = False
+        for name, payload in name_map.items():
+            pattern = re.compile(rf"\b({re.escape(name)})('s)?\b", re.IGNORECASE)
+            if pattern.search(updated):
+                for c in characters:
+                    if c.name and c.name.lower() == name and c.character_id in reference_char_ids:
+                        matched_reference = True
+                        break
+
+            def _repl(match: re.Match) -> str:
+                suffix = match.group(2) or ""
+                return f"{payload['label']}{suffix}"
+
+            updated = pattern.sub(_repl, updated)
+        if matched_reference:
+            updated = _strip_forbidden_descriptors(updated)
+        return updated
+
+    cloned = dict(panel_semantics)
+    panels = []
+    for panel in panel_semantics.get("panels", []) or []:
+        updated_panel = dict(panel)
+        if updated_panel.get("description"):
+            updated_panel["description"] = _replace_text(str(updated_panel["description"]))
+        if updated_panel.get("dialogue"):
+            updated_dialogue = []
+            for line in updated_panel["dialogue"]:
+                if isinstance(line, dict):
+                    char_name = str(line.get("character") or "")
+                    key = char_name.lower()
+                    if key in name_map:
+                        updated_line = dict(line)
+                        updated_line["character"] = name_map[key]["label"]
+                        updated_dialogue.append(updated_line)
+                    else:
+                        updated_dialogue.append(line)
+                else:
+                    updated_dialogue.append(_replace_text(str(line)))
+            updated_panel["dialogue"] = updated_dialogue
+        panels.append(updated_panel)
+    cloned["panels"] = panels
+    return cloned
 
 
 def _rough_similarity(text_a: str, text_b: str) -> float:
@@ -1704,6 +1919,7 @@ def _prompt_panel_plan(
     scene_text: str,
     panel_count: int,
     scene_intent: dict | None = None,
+    scene_importance: str | None = None,
     character_names: list[str] | None = None,
     qc_rules: dict | None = None,
 ) -> str:
@@ -1716,6 +1932,9 @@ Scene Intent:
 - Pacing: {scene_intent.get('pacing', 'normal')}
 - Emotional arc: {scene_intent.get('emotional_arc', {})}
 """
+    importance_block = ""
+    if scene_importance:
+        importance_block = f"\nScene importance: {scene_importance}\n"
 
     char_list = ", ".join(character_names) if character_names else "unknown characters"
 
@@ -1733,6 +1952,7 @@ QC HARD CONSTRAINTS (you MUST follow these):
 
 Create a panel plan for a {panel_count}-panel webtoon sequence.
 {intent_block}
+{importance_block}
 Characters: {char_list}
 {qc_block}
 VALID GRAMMAR IDs (use ONLY these):
@@ -2328,6 +2548,7 @@ For each scene, identify:
 4. Key objects that must be shown
 5. Emotional tone of each beat
 6. Draft dialogue if applicable
+7. Scene importance tag (setup|build|climax|release|cliffhanger)
 
 Also extract global_environment_anchors: recurring locations or visual elements for consistency.
 
@@ -2344,6 +2565,7 @@ OUTPUT SCHEMA:
     {{
       "scene_index": 1,
       "summary": "scene summary",
+      "scene_importance": "setup|build|climax|release|cliffhanger",
       "beats": [
         {{
           "beat_index": 1,
@@ -2390,6 +2612,7 @@ def compile_visual_plan_bundle_llm(
             plan = {
                 "scene_index": scene_idx,
                 "summary": scene_plan.get("summary", ""),
+                "scene_importance": scene_plan.get("scene_importance"),
                 "beats": scene_plan.get("beats", []),
                 "must_show": scene_plan.get("must_show", []),
                 "characters": [c.get("name") for c in characters if c.get("name")],

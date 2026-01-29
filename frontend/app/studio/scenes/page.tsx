@@ -69,10 +69,21 @@ export default function ScenesPage() {
 
   useEffect(() => {
     if (!scenesQuery.data || scenesQuery.data.length === 0) return;
+    const storageKey = storyId ? `lastSceneId:${storyId}` : "";
+    const storedSceneId = storageKey ? window.localStorage.getItem(storageKey) : null;
     if (!selectedSceneId) {
-      setSelectedSceneId(scenesQuery.data[0].scene_id);
+      if (storedSceneId && scenesQuery.data.some((scene) => scene.scene_id === storedSceneId)) {
+        setSelectedSceneId(storedSceneId);
+      } else {
+        setSelectedSceneId(scenesQuery.data[0].scene_id);
+      }
     }
   }, [scenesQuery.data, selectedSceneId]);
+
+  useEffect(() => {
+    if (!storyId || !selectedSceneId) return;
+    window.localStorage.setItem(`lastSceneId:${storyId}`, selectedSceneId);
+  }, [storyId, selectedSceneId]);
 
   const selectedScene = useMemo(
     () => scenesQuery.data?.find((scene) => scene.scene_id === selectedSceneId),

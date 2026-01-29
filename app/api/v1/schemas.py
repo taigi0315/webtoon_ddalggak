@@ -1,6 +1,7 @@
 import uuid
 
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 
 class ProjectCreate(BaseModel):
@@ -26,8 +27,18 @@ class StoryRead(BaseModel):
     title: str
     default_story_style: str
     default_image_style: str
+    generation_status: str | None = None
+    generation_error: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class StoryProgressRead(BaseModel):
+    story_id: uuid.UUID
+    status: str
+    progress: dict | None = None
+    error: str | None = None
+    updated_at: datetime | None = None
 
 
 class SceneCreate(BaseModel):
@@ -40,6 +51,7 @@ class SceneRead(BaseModel):
     story_id: uuid.UUID
     environment_id: uuid.UUID | None
     source_text: str
+    scene_importance: str | None
     planning_locked: bool
     story_style_override: str | None
     image_style_override: str | None
@@ -80,15 +92,26 @@ class CharacterCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     role: str = Field(default="secondary", min_length=1, max_length=32)
+    gender: str | None = Field(default=None, min_length=1, max_length=16)
+    age_range: str | None = Field(default=None, min_length=1, max_length=32)
+    appearance: dict | None = None
+    hair_description: str | None = None
+    base_outfit: str | None = None
     identity_line: str | None = None
 
 
 class CharacterRead(BaseModel):
     character_id: uuid.UUID
     story_id: uuid.UUID
+    canonical_code: str | None
     name: str
     description: str | None
     role: str
+    gender: str | None
+    age_range: str | None
+    appearance: dict | None
+    hair_description: str | None
+    base_outfit: str | None
     identity_line: str | None
     approved: bool
 
@@ -99,6 +122,11 @@ class CharacterUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     role: str | None = Field(default=None, min_length=1, max_length=32)
+    gender: str | None = Field(default=None, min_length=1, max_length=16)
+    age_range: str | None = Field(default=None, min_length=1, max_length=32)
+    appearance: dict | None = None
+    hair_description: str | None = None
+    base_outfit: str | None = None
     identity_line: str | None = None
 
 

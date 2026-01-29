@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlalchemy import select
 
 from app.api.deps import DbSessionDep
@@ -12,9 +13,11 @@ from app.api.v1.schemas import (
     StorySetStyleDefaultsRequest,
     StoryGenerateRequest,
     StoryGenerateResponse,
+    StoryProgressRead,
 )
 from app.config.loaders import has_image_style, has_story_style
 from app.core.settings import settings
+from app.db.session import get_sessionmaker
 from app.db.models import Character, Project, Scene, Story
 from app.graphs import nodes
 from app.graphs.story_build import run_story_build_graph
@@ -150,6 +153,118 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
 
     all_characters = list(db.execute(select(Character).where(Character.story_id == story_id)).scalars().all())
     return StoryGenerateResponse(scenes=scenes, characters=all_characters)
+
+
+def _run_story_build_job(story_id: uuid.UUID, payload: StoryGenerateRequest) -> None:
+    SessionLocal = get_sessionmaker()
+    db = SessionLocal()
+    try:
+        story = db.get(Story, story_id)
+        if story is None:
+            return
+        story.generation_status = "running"
+        story.generation_error = None
+        story.progress = {
+            "current_node": "Queued",
+            "message": "Queued for generation...",
+            "step": 0,
+            "total_steps": 5,
+        }
+        story.progress_updated_at = datetime.utcnow()
+        db.add(story)
+        db.commit()
+
+        gemini = _build_gemini_client()
+        planning_mode = "characters_only"
+        run_story_build_graph(
+            db=db,
+            story_id=story_id,
+            story_text=payload.source_text,
+            max_scenes=payload.max_scenes,
+            max_characters=payload.max_characters,
+            panel_count=payload.panel_count,
+            allow_append=payload.allow_append,
+            story_style=story.default_story_style,
+            image_style=payload.style_id or story.default_image_style,
+            gemini=gemini,
+            planning_mode=planning_mode,
+        )
+
+        story = db.get(Story, story_id)
+        if story is not None:
+            story.generation_status = "succeeded"
+            story.generation_error = None
+            story.progress_updated_at = datetime.utcnow()
+            db.add(story)
+            db.commit()
+    except Exception as exc:  # noqa: BLE001
+        story = db.get(Story, story_id)
+        if story is not None:
+            story.generation_status = "failed"
+            story.generation_error = str(exc)
+            story.progress_updated_at = datetime.utcnow()
+            db.add(story)
+            db.commit()
+    finally:
+        db.close()
+
+
+@router.post("/stories/{story_id}/generate/blueprint_async", response_model=StoryProgressRead)
+def generate_story_blueprint_async(
+    story_id: uuid.UUID,
+    payload: StoryGenerateRequest,
+    background_tasks: BackgroundTasks,
+    db=DbSessionDep,
+):
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="story not found")
+
+    existing_scenes = list(db.execute(select(Scene).where(Scene.story_id == story_id)).scalars().all())
+    if existing_scenes and not payload.allow_append:
+        raise HTTPException(
+            status_code=400,
+            detail="story already has scenes; set allow_append to true to append more",
+        )
+
+    if payload.style_id and not has_image_style(payload.style_id):
+        raise HTTPException(status_code=400, detail="unknown style_id")
+
+    story.generation_status = "running"
+    story.generation_error = None
+    story.progress = {
+        "current_node": "Queued",
+        "message": "Queued for generation...",
+        "step": 0,
+        "total_steps": 5,
+    }
+    story.progress_updated_at = datetime.utcnow()
+    db.add(story)
+    db.commit()
+
+    background_tasks.add_task(_run_story_build_job, story_id, payload)
+
+    return StoryProgressRead(
+        story_id=story_id,
+        status=story.generation_status,
+        progress=story.progress,
+        error=story.generation_error,
+        updated_at=story.progress_updated_at,
+    )
+
+
+@router.get("/stories/{story_id}/progress", response_model=StoryProgressRead)
+def get_story_progress(story_id: uuid.UUID, db=DbSessionDep):
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="story not found")
+    return StoryProgressRead(
+        story_id=story_id,
+        status=story.generation_status,
+        progress=story.progress,
+        error=story.generation_error,
+        updated_at=story.progress_updated_at,
+    )
 
 
 @router.post("/stories/{story_id}/set-style-defaults", response_model=StoryRead)

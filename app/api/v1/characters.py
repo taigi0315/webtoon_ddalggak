@@ -21,6 +21,26 @@ from app.graphs import nodes
 
 router = APIRouter(tags=["characters"])
 
+def _code_from_index(index: int) -> str:
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    result = ""
+    while True:
+        index, rem = divmod(index, 26)
+        result = alphabet[rem] + result
+        if index == 0:
+            break
+        index -= 1
+    return f"CHAR_{result}"
+
+
+def _next_character_code(existing_codes: set[str]) -> str:
+    idx = 0
+    while True:
+        code = _code_from_index(idx)
+        if code not in existing_codes:
+            return code
+        idx += 1
+
 
 @router.post("/stories/{story_id}/characters", response_model=CharacterRead)
 def create_character(story_id: uuid.UUID, payload: CharacterCreate, db=DbSessionDep):
@@ -28,11 +48,21 @@ def create_character(story_id: uuid.UUID, payload: CharacterCreate, db=DbSession
     if story is None:
         raise HTTPException(status_code=404, detail="story not found")
 
+    existing_codes = {
+        c.canonical_code for c in db.execute(select(Character.canonical_code).where(Character.story_id == story_id)).scalars().all()
+        if c
+    }
     character = Character(
         story_id=story_id,
+        canonical_code=_next_character_code(existing_codes),
         name=payload.name,
         description=payload.description,
         role=payload.role,
+        gender=payload.gender,
+        age_range=payload.age_range,
+        appearance=payload.appearance,
+        hair_description=payload.hair_description,
+        base_outfit=payload.base_outfit,
         identity_line=payload.identity_line,
     )
     db.add(character)
@@ -62,6 +92,16 @@ def create_character(story_id: uuid.UUID, payload: CharacterCreate, db=DbSession
             character.identity_line = existing.identity_line
         if not character.role:
             character.role = existing.role
+        if character.gender is None:
+            character.gender = existing.gender
+        if character.age_range is None:
+            character.age_range = existing.age_range
+        if character.appearance is None:
+            character.appearance = existing.appearance
+        if character.hair_description is None:
+            character.hair_description = existing.hair_description
+        if character.base_outfit is None:
+            character.base_outfit = existing.base_outfit
 
         refs = (
             db.execute(
@@ -105,6 +145,16 @@ def update_character(character_id: uuid.UUID, payload: CharacterUpdate, db=DbSes
         character.description = payload.description
     if "role" in payload.model_fields_set and payload.role is not None:
         character.role = payload.role
+    if "gender" in payload.model_fields_set:
+        character.gender = payload.gender
+    if "age_range" in payload.model_fields_set:
+        character.age_range = payload.age_range
+    if "appearance" in payload.model_fields_set:
+        character.appearance = payload.appearance
+    if "hair_description" in payload.model_fields_set:
+        character.hair_description = payload.hair_description
+    if "base_outfit" in payload.model_fields_set:
+        character.base_outfit = payload.base_outfit
     if "identity_line" in payload.model_fields_set:
         character.identity_line = payload.identity_line
 
