@@ -8,6 +8,12 @@
       "image_url": "/image_styles/NO_STYLE.png"
     },
     {
+      "id": "soft_webtoon",
+      "label": "Soft Webtoon",
+      "description": "Soft pastel shading, gentle lineart, warm romantic mood.",
+      "image_url": "/image_styles/SOFT_WEBTOON.png"
+    },
+    {
       "id": "NO_STYLE",
       "label": "No Style",
       "description": "Neutral baseline rendering without stylistic bias.",

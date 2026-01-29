@@ -20,7 +20,8 @@ def create_layer(scene_id: uuid.UUID, payload: LayerCreate, db=DbSessionDep):
     if payload.layer_type not in _ALLOWED_LAYER_TYPES:
         raise HTTPException(status_code=400, detail="invalid layer_type")
 
-    layer = Layer(scene_id=scene_id, layer_type=payload.layer_type, objects=[obj.model_dump(by_alias=True) for obj in payload.objects])
+    objects = [obj.model_dump(by_alias=True, mode="json") for obj in payload.objects]
+    layer = Layer(scene_id=scene_id, layer_type=payload.layer_type, objects=objects)
     db.add(layer)
     db.commit()
     db.refresh(layer)
@@ -38,7 +39,7 @@ def update_layer(layer_id: uuid.UUID, payload: LayerUpdate, db=DbSessionDep):
     if layer is None:
         raise HTTPException(status_code=404, detail="layer not found")
 
-    layer.objects = [obj.model_dump(by_alias=True) for obj in payload.objects]
+    layer.objects = [obj.model_dump(by_alias=True, mode="json") for obj in payload.objects]
     db.add(layer)
     db.commit()
     db.refresh(layer)
