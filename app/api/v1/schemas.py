@@ -254,6 +254,21 @@ class CharacterVariantSuggestionRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CharacterVariantGenerationResult(BaseModel):
+    character_id: uuid.UUID
+    story_id: uuid.UUID
+    variant_id: uuid.UUID | None = None
+    reference_image_id: uuid.UUID | None = None
+    variant_type: str | None = None
+    override_attributes: dict | None = None
+    status: str
+    detail: str | None = None
+
+
+class CharacterVariantGenerateRequest(BaseModel):
+    character_id: uuid.UUID | None = None
+
+
 class DialogueBubble(BaseModel):
     bubble_id: uuid.UUID
     panel_id: int = Field(ge=1)

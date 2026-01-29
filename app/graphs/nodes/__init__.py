@@ -20,6 +20,7 @@ from app.graphs.nodes.planning import (
 from app.graphs.nodes.rendering import (
     compute_prompt_compiler,
     generate_character_reference_image,
+    generate_character_variant_reference_image,
     generate_character_variant_suggestions,
     run_image_renderer,
     run_prompt_compiler,
@@ -75,6 +76,7 @@ __all__ = [
     "compute_scene_chunker",
     "compute_prompt_compiler",
     "generate_character_reference_image",
+    "generate_character_variant_reference_image",
     "generate_character_variant_suggestions",
     "get_character_style_prompt",
     "_build_gemini_client",

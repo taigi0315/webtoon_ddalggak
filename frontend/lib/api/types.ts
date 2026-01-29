@@ -176,3 +176,22 @@ export const characterVariantSuggestionSchema = z.object({
 export const characterVariantSuggestionsSchema = z.array(characterVariantSuggestionSchema);
 
 export type CharacterVariantSuggestion = z.infer<typeof characterVariantSuggestionSchema>;
+
+export const characterVariantGenerationResultSchema = z.object({
+  character_id: z.string().uuid(),
+  story_id: z.string().uuid(),
+  variant_id: z.string().uuid().nullable().optional(),
+  reference_image_id: z.string().uuid().nullable().optional(),
+  variant_type: z.string().nullable().optional(),
+  override_attributes: z.record(z.any()).nullable().optional(),
+  status: z.string(),
+  detail: z.string().nullable().optional()
+});
+
+export const characterVariantGenerationResultsSchema = z.array(
+  characterVariantGenerationResultSchema
+);
+
+export type CharacterVariantGenerationResult = z.infer<
+  typeof characterVariantGenerationResultSchema
+>;

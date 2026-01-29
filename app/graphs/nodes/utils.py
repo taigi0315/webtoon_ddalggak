@@ -773,6 +773,15 @@ def _compile_prompt(
     panel_count = len(panels)
 
     # Build concise character lines (reference images provide detailed appearance)
+    def _trim_outfit(text: str | None, max_words: int = 10) -> str | None:
+        if not text:
+            return None
+        words = re.findall(r"\w+|[^\w\s]", str(text))
+        if not words:
+            return None
+        trimmed = " ".join(words[:max_words]).strip()
+        return trimmed
+
     identity_lines = []
     codes = _character_codes(characters)
     for c in characters:
@@ -787,7 +796,9 @@ def _compile_prompt(
             if variant_outfit:
                 char_lines.append(f"    Outfit: {variant_outfit}")
             elif c.base_outfit:
-                char_lines.append(f"    Outfit: {c.base_outfit}")
+                trimmed = _trim_outfit(c.base_outfit)
+                if trimmed:
+                    char_lines.append(f"    Outfit: {trimmed}")
         else:
             if variant_outfit:
                 char_lines.append(f"    Outfit: {variant_outfit}")
@@ -847,10 +858,27 @@ def _compile_prompt(
         lines.append("")
 
     lines.append("**PANELS (action/emotion/environment only; no text in image):**")
+    def _strip_layout_tokens(text: str) -> str:
+        cleaned = text
+        patterns = [
+            r"\bvertical\s*9:16\s*webtoon\s*panel\b",
+            r"\b9:16\s*webtoon\s*panel\b",
+            r"\bvertical\s*9:16\b",
+            r"\b9:16\s*vertical\b",
+            r"\bvertical\s*panel\b",
+        ]
+        for pattern in patterns:
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+        cleaned = cleaned.strip(" ,;:-")
+        return cleaned
+
     for panel in panels:
         grammar_id = panel.get("grammar_id")
         grammar_hint = mapping.get(grammar_id, "")
         desc = panel.get("description", "")
+        if isinstance(desc, str) and desc:
+            desc = _strip_layout_tokens(desc)
 
         # Extract environment and lighting if available
         environment = panel.get("environment", {})
@@ -1054,6 +1082,7 @@ def _inject_character_identities(
     for c in characters:
         code = codes.get(c.character_id, "CHAR_X")
         base = f"{code} ({c.name})"
+        dialogue_label = base
         variant = variants_by_character.get(c.character_id)
         variant_outfit = None
         if variant and isinstance(variant.override_attributes, dict):
@@ -1062,8 +1091,6 @@ def _inject_character_identities(
             parts = [base, "matching reference image"]
             if variant_outfit:
                 parts.append(f"wearing {variant_outfit}")
-            elif c.base_outfit:
-                parts.append(f"wearing {c.base_outfit}")
             label = ", ".join(parts)
         else:
             parts = [base]
@@ -1074,7 +1101,7 @@ def _inject_character_identities(
             if c.hair_description:
                 parts.append(f"hair: {c.hair_description}")
             label = ", ".join(parts)
-        name_map[c.name.lower()] = {"label": label, "code": base}
+        name_map[c.name.lower()] = {"label": label, "code": base, "dialogue_label": dialogue_label}
 
     forbidden_terms = [
         "hair",
@@ -1111,7 +1138,7 @@ def _inject_character_identities(
         cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
         return cleaned
 
-    def _replace_text(text: str) -> str:
+    def _replace_text(text: str, label_key: str = "label") -> str:
         if not text:
             return text
         updated = text
@@ -1126,7 +1153,7 @@ def _inject_character_identities(
 
             def _repl(match: re.Match) -> str:
                 suffix = match.group(2) or ""
-                return f"{payload['label']}{suffix}"
+                return f"{payload[label_key]}{suffix}"
 
             updated = pattern.sub(_repl, updated)
         if matched_reference:
@@ -1138,7 +1165,7 @@ def _inject_character_identities(
     for panel in panel_semantics.get("panels", []) or []:
         updated_panel = dict(panel)
         if updated_panel.get("description"):
-            updated_panel["description"] = _replace_text(str(updated_panel["description"]))
+            updated_panel["description"] = _replace_text(str(updated_panel["description"]), "label")
         if updated_panel.get("dialogue"):
             updated_dialogue = []
             for line in updated_panel["dialogue"]:
@@ -1147,12 +1174,12 @@ def _inject_character_identities(
                     key = char_name.lower()
                     if key in name_map:
                         updated_line = dict(line)
-                        updated_line["character"] = name_map[key]["label"]
+                        updated_line["character"] = name_map[key]["dialogue_label"]
                         updated_dialogue.append(updated_line)
                     else:
                         updated_dialogue.append(line)
                 else:
-                    updated_dialogue.append(_replace_text(str(line)))
+                    updated_dialogue.append(_replace_text(str(line), "dialogue_label"))
             updated_panel["dialogue"] = updated_dialogue
         panels.append(updated_panel)
     cloned["panels"] = panels

@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.models import Artifact
@@ -17,30 +18,42 @@ class ArtifactService:
         payload: dict,
         parent_id: uuid.UUID | None = None,
     ) -> Artifact:
-        latest = self.db.execute(
-            select(Artifact)
-            .where(Artifact.scene_id == scene_id, Artifact.type == type)
-            .order_by(desc(Artifact.version))
-            .limit(1)
-        ).scalar_one_or_none()
+        for _ in range(3):
+            latest = self.db.execute(
+                select(Artifact)
+                .where(Artifact.scene_id == scene_id, Artifact.type == type)
+                .order_by(desc(Artifact.version))
+                .limit(1)
+            ).scalar_one_or_none()
 
-        next_version = 1
-        if latest is not None:
-            next_version = latest.version + 1
-            if parent_id is None:
-                parent_id = latest.artifact_id
+            next_version = 1
+            next_parent_id = parent_id
+            if latest is not None:
+                next_version = latest.version + 1
+                if next_parent_id is None:
+                    next_parent_id = latest.artifact_id
 
-        artifact = Artifact(
-            scene_id=scene_id,
-            type=type,
-            version=next_version,
-            parent_id=parent_id,
-            payload=payload,
+            artifact = Artifact(
+                scene_id=scene_id,
+                type=type,
+                version=next_version,
+                parent_id=next_parent_id,
+                payload=payload,
+            )
+            self.db.add(artifact)
+            try:
+                self.db.commit()
+            except IntegrityError:
+                self.db.rollback()
+                continue
+            self.db.refresh(artifact)
+            return artifact
+
+        raise IntegrityError(
+            "artifact version conflict after retries",
+            params=None,
+            orig=None,
         )
-        self.db.add(artifact)
-        self.db.commit()
-        self.db.refresh(artifact)
-        return artifact
 
     def list_artifacts(self, scene_id: uuid.UUID, type: str | None = None) -> list[Artifact]:
         stmt = select(Artifact).where(Artifact.scene_id == scene_id)

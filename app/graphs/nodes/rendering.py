@@ -132,6 +132,115 @@ def generate_character_reference_image(
     db.refresh(ref)
     return ref
 
+
+def _format_variant_attributes(override_attributes: dict) -> str:
+    if not override_attributes:
+        return ""
+    parts: list[str] = []
+    outfit = override_attributes.get("outfit") or override_attributes.get("clothing")
+    if outfit:
+        parts.append(f"Outfit: {outfit}.")
+    hair = override_attributes.get("hair") or override_attributes.get("hairstyle")
+    if hair:
+        parts.append(f"Hair: {hair}.")
+    accessories = override_attributes.get("accessories") or override_attributes.get("accessory")
+    if accessories:
+        parts.append(f"Accessories: {accessories}.")
+    props = override_attributes.get("props") or override_attributes.get("items")
+    if props:
+        parts.append(f"Props: {props}.")
+    if override_attributes.get("bag"):
+        parts.append(f"Bag: {override_attributes.get('bag')}.")
+    used_keys = {"outfit", "clothing", "hair", "hairstyle", "accessories", "accessory", "props", "items", "bag"}
+    extras = {k: v for k, v in override_attributes.items() if k not in used_keys}
+    if extras:
+        extras_text = ", ".join([f"{key}: {value}" for key, value in extras.items()])
+        parts.append(f"Additional details: {extras_text}.")
+    return " ".join(parts)
+
+
+def _load_reference_image_bytes(ref: CharacterReferenceImage) -> tuple[bytes, str]:
+    path = _resolve_media_path(ref.image_url)
+    with open(path, "rb") as handle:
+        data = handle.read()
+    mime_type = mimetypes.guess_type(path)[0] or "image/png"
+    return data, mime_type
+
+
+def generate_character_variant_reference_image(
+    db: Session,
+    character_id: uuid.UUID,
+    variant_type: str,
+    override_attributes: dict,
+    base_reference: CharacterReferenceImage,
+    story_style: str | None = None,
+    gemini: GeminiClient | None = None,
+) -> CharacterReferenceImage:
+    character = db.get(Character, character_id)
+    if character is None:
+        raise ValueError("character not found")
+
+    if not character.description and not character.identity_line:
+        raise ValueError("character needs description or identity_line to generate reference images")
+
+    gemini = gemini or _build_gemini_client()
+
+    style_prompt = get_character_style_prompt(character.gender, character.age_range)
+    identity = character.identity_line or character.description or character.name
+    story_style_text = story_style or (character.story.default_story_style if character.story else None)
+    variant_text = _format_variant_attributes(override_attributes)
+
+    prompt_parts = [
+        "High-quality character reference image for a Korean webtoon.",
+        f"Character: {character.name}.",
+        f"Identity: {identity}.",
+        f"Variant: {variant_type.replace('_', ' ')}.",
+        "Use the provided reference image for face, proportions, and features.",
+        "Preserve identity exactly; only update the variant details.",
+        "Full body if possible.",
+    ]
+    if story_style_text:
+        prompt_parts.append(f"Story style: {story_style_text}.")
+    if variant_text:
+        prompt_parts.append(variant_text)
+    if style_prompt:
+        prompt_parts.append(style_prompt)
+    prompt_parts.append("Plain background, clean silhouette.")
+
+    prompt = " ".join([part for part in prompt_parts if part])
+
+    ref_image = _load_reference_image_bytes(base_reference)
+    image_bytes, mime_type, metadata = _render_image_from_prompt(
+        prompt,
+        gemini=gemini,
+        reference_images=[ref_image],
+    )
+
+    store = LocalMediaStore(root_dir=settings.media_root, url_prefix=settings.media_url_prefix)
+    _, url = store.save_image_bytes(image_bytes=image_bytes, mime_type=mime_type)
+
+    ref = CharacterReferenceImage(
+        character_id=character_id,
+        image_url=url,
+        ref_type="face",
+        approved=False,
+        is_primary=False,
+        metadata_={
+            "mime_type": mime_type,
+            "model": metadata.get("model"),
+            "request_id": metadata.get("request_id"),
+            "usage": metadata.get("usage"),
+            "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            "variant_type": variant_type,
+            "override_attributes": override_attributes,
+            "base_reference_id": str(base_reference.reference_image_id),
+        },
+    )
+    db.add(ref)
+    db.commit()
+    db.refresh(ref)
+    return ref
+
 def generate_character_variant_suggestions(
     db: Session,
     story_id: uuid.UUID,

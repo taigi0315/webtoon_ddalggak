@@ -14,11 +14,14 @@ from app.api.v1.schemas import (
     CharacterSetPrimaryRefRequest,
     CharacterGenerateRefsRequest,
     CharacterGenerateRefsResponse,
+    CharacterVariantGenerateRequest,
+    CharacterVariantGenerationResult,
     CharacterVariantSuggestionRead,
 )
 from app.db.models import (
     Character,
     CharacterReferenceImage,
+    CharacterVariant,
     CharacterVariantSuggestion,
     Story,
     StoryCharacter,
@@ -216,6 +219,145 @@ def refresh_character_variant_suggestions(story_id: uuid.UUID, db=DbSessionDep):
     for suggestion in created:
         db.refresh(suggestion)
     return created
+
+
+@router.post(
+    "/stories/{story_id}/character-variant-suggestions/generate",
+    response_model=list[CharacterVariantGenerationResult],
+)
+def generate_character_variant_suggestion_refs(
+    story_id: uuid.UUID,
+    payload: CharacterVariantGenerateRequest | None = None,
+    db=DbSessionDep,
+):
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="story not found")
+
+    suggestions = list(
+        db.execute(
+            select(CharacterVariantSuggestion).where(CharacterVariantSuggestion.story_id == story_id)
+        )
+        .scalars()
+        .all()
+    )
+    if not suggestions:
+        generated = nodes.generate_character_variant_suggestions(db, story_id)
+        for item in generated:
+            suggestion = CharacterVariantSuggestion(
+                story_id=story_id,
+                character_id=item["character_id"],
+                variant_type=item.get("variant_type") or "outfit_change",
+                override_attributes=item.get("override_attributes") or {},
+            )
+            db.add(suggestion)
+            suggestions.append(suggestion)
+        db.commit()
+        for suggestion in suggestions:
+            db.refresh(suggestion)
+
+    if payload and payload.character_id:
+        suggestions = [s for s in suggestions if s.character_id == payload.character_id]
+        if not suggestions:
+            return [
+                CharacterVariantGenerationResult(
+                    character_id=payload.character_id,
+                    story_id=story_id,
+                    status="skipped",
+                    detail="no suggestion for character",
+                )
+            ]
+
+    results: list[CharacterVariantGenerationResult] = []
+    for suggestion in suggestions:
+        character = db.get(Character, suggestion.character_id)
+        if character is None:
+            results.append(
+                CharacterVariantGenerationResult(
+                    character_id=suggestion.character_id,
+                    story_id=story_id,
+                    variant_type=suggestion.variant_type,
+                    override_attributes=suggestion.override_attributes,
+                    status="skipped",
+                    detail="character not found",
+                )
+            )
+            continue
+
+        base_ref = (
+            db.execute(
+                select(CharacterReferenceImage)
+                .where(
+                    CharacterReferenceImage.character_id == suggestion.character_id,
+                    CharacterReferenceImage.ref_type == "face",
+                    CharacterReferenceImage.approved.is_(True),
+                )
+                .order_by(CharacterReferenceImage.is_primary.desc(), CharacterReferenceImage.created_at.desc())
+                .limit(1)
+            )
+            .scalars()
+            .one_or_none()
+        )
+        if base_ref is None:
+            results.append(
+                CharacterVariantGenerationResult(
+                    character_id=suggestion.character_id,
+                    story_id=story_id,
+                    variant_type=suggestion.variant_type,
+                    override_attributes=suggestion.override_attributes,
+                    status="skipped",
+                    detail="no approved base reference image",
+                )
+            )
+            continue
+
+        try:
+            ref = nodes.generate_character_variant_reference_image(
+                db=db,
+                character_id=suggestion.character_id,
+                variant_type=suggestion.variant_type,
+                override_attributes=suggestion.override_attributes,
+                base_reference=base_ref,
+                story_style=story.default_story_style,
+            )
+        except Exception as exc:  # noqa: BLE001
+            results.append(
+                CharacterVariantGenerationResult(
+                    character_id=suggestion.character_id,
+                    story_id=story_id,
+                    variant_type=suggestion.variant_type,
+                    override_attributes=suggestion.override_attributes,
+                    status="error",
+                    detail=str(exc),
+                )
+            )
+            continue
+
+        variant = CharacterVariant(
+            character_id=suggestion.character_id,
+            story_id=story_id,
+            variant_type=suggestion.variant_type or "outfit_change",
+            override_attributes=suggestion.override_attributes or {},
+            reference_image_id=ref.reference_image_id,
+            is_active_for_story=False,
+        )
+        db.add(variant)
+        db.commit()
+        db.refresh(variant)
+
+        results.append(
+            CharacterVariantGenerationResult(
+                character_id=suggestion.character_id,
+                story_id=story_id,
+                variant_id=variant.variant_id,
+                reference_image_id=ref.reference_image_id,
+                variant_type=variant.variant_type,
+                override_attributes=variant.override_attributes,
+                status="generated",
+            )
+        )
+
+    return results
 
 
 @router.post("/characters/{character_id}/approve", response_model=CharacterRead)

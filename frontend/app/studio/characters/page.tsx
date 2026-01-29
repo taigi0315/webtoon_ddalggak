@@ -13,7 +13,7 @@ import {
   createCharacterVariant,
   activateCharacterVariant,
   fetchCharacterVariantSuggestions,
-  refreshCharacterVariantSuggestions,
+  generateCharacterVariantSuggestions,
   generateCharacterRefs,
   approveCharacterRef,
   setPrimaryCharacterRef,
@@ -51,13 +51,6 @@ export default function CharacterStudioPage() {
     queryKey: ["character-variant-suggestions", storyId],
     queryFn: () => fetchCharacterVariantSuggestions(storyId),
     enabled: storyId.length > 0
-  });
-
-  const refreshSuggestionsMutation = useMutation({
-    mutationFn: () => refreshCharacterVariantSuggestions(storyId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["character-variant-suggestions", storyId] });
-    }
   });
 
   // Load from localStorage
@@ -156,13 +149,6 @@ export default function CharacterStudioPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              className="btn-ghost text-xs"
-              onClick={() => refreshSuggestionsMutation.mutate()}
-              disabled={refreshSuggestionsMutation.isPending || !storyId}
-            >
-              {refreshSuggestionsMutation.isPending ? "Refreshing..." : "Refresh Suggestions"}
-            </button>
             <select
               className="input text-sm"
               value={storyId}
@@ -281,6 +267,7 @@ function CharacterDetail({
   const [variantType, setVariantType] = useState("outfit_change");
   const [variantOutfit, setVariantOutfit] = useState("");
   const [variantRefId, setVariantRefId] = useState<string | null>(null);
+  const [previewRefId, setPreviewRefId] = useState<string | null>(null);
 
   // Fetch refs for this character
   const refsQuery = useQuery({
@@ -297,6 +284,28 @@ function CharacterDetail({
     mutationFn: generateCharacterRefs,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["characterRefs", character.character_id] });
+    }
+  });
+
+  const generateSuggestionsMutation = useMutation({
+    mutationFn: () =>
+      generateCharacterVariantSuggestions({
+        storyId,
+        characterId: character.character_id
+      }),
+    onSuccess: (data) => {
+      const generated = data.find(
+        (item) =>
+          item.character_id === character.character_id &&
+          item.status === "generated" &&
+          item.reference_image_id
+      );
+      if (generated?.reference_image_id) {
+        setPreviewRefId(generated.reference_image_id);
+      }
+      queryClient.invalidateQueries({ queryKey: ["character-variant-suggestions", storyId] });
+      queryClient.invalidateQueries({ queryKey: ["characterRefs", character.character_id] });
+      queryClient.invalidateQueries({ queryKey: ["characterVariants", storyId, character.character_id] });
     }
   });
 
@@ -391,7 +400,10 @@ function CharacterDetail({
   };
 
   const primaryRef = refsQuery.data?.find((r) => r.is_primary);
-  const previewRef = primaryRef ?? refsQuery.data?.[0];
+  const previewRef =
+    refsQuery.data?.find((r) => r.reference_image_id === previewRefId) ??
+    primaryRef ??
+    refsQuery.data?.[0];
   const hasApprovedRef = character.approved;
   const hasPrompt = Boolean(character.description || character.identity_line);
   const approvedRefs = refsQuery.data?.filter((ref) => ref.approved) ?? [];
@@ -403,6 +415,7 @@ function CharacterDetail({
     setZoom(1);
     setVariantOutfit("");
     setVariantRefId(null);
+    setPreviewRefId(null);
   }, [character.character_id, character.description, character.identity_line]);
 
   useEffect(() => {
@@ -615,15 +628,27 @@ function CharacterDetail({
         </div>
 
         <div className="mt-6 border-t border-slate-200 pt-4">
-          <h4 className="text-sm font-semibold text-ink">Story Variant</h4>
+          <h4 className="text-sm font-semibold text-ink">Manual Story Variant</h4>
           <p className="mt-1 text-xs text-slate-500">
-            Create a story-specific variant (outfit/hair change) and select the active one.
+            Fine-tune a story-specific variant (outfit/hair change) and select the active one.
           </p>
           {suggestions.some((item) => item.character_id === character.character_id) && (
             <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
               Suggested by story planner. Review and adjust before creating the variant.
             </div>
           )}
+
+          <div className="mt-3">
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => generateSuggestionsMutation.mutate()}
+              disabled={generateSuggestionsMutation.isPending || !storyId}
+            >
+              {generateSuggestionsMutation.isPending
+                ? "Generating suggested variant..."
+                : "Generate suggested variant for this character"}
+            </button>
+          </div>
 
           <div className="mt-3 space-y-3">
             <div>

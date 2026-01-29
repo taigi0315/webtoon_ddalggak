@@ -190,68 +190,68 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
                 return code
             idx += 1
 
-        character_ids: list[str] = []
-        for profile in state.get("characters", []):
-            name = str(profile.get("name") or "").strip()
-            if not name:
-                continue
-            key = name.lower()
-            appearance = profile.get("appearance") if isinstance(profile.get("appearance"), dict) else None
-            hair_description = profile.get("hair_description")
-            if hair_description is None and appearance:
-                hair_description = appearance.get("hair")
-            base_outfit = profile.get("base_outfit") or profile.get("outfit")
-            if key in existing_by_name:
-                existing_char = existing_by_name[key]
-                if not existing_char.canonical_code:
-                    existing_char.canonical_code = _next_character_code()
-                if profile.get("gender") and not existing_char.gender:
-                    existing_char.gender = profile.get("gender")
-                if profile.get("age_range") and not existing_char.age_range:
-                    existing_char.age_range = profile.get("age_range")
-                if appearance and not existing_char.appearance:
-                    existing_char.appearance = appearance
-                if profile.get("identity_line") and not existing_char.identity_line:
-                    existing_char.identity_line = profile.get("identity_line")
-                if hair_description and not existing_char.hair_description:
-                    existing_char.hair_description = hair_description
-                if base_outfit and not existing_char.base_outfit:
-                    existing_char.base_outfit = base_outfit
-                if existing_char.character_id not in existing_story_links:
-                    db.add(StoryCharacter(story_id=story_id, character_id=existing_char.character_id))
-                    existing_story_links.add(existing_char.character_id)
-                character_ids.append(str(existing_char.character_id))
-                continue
-            character = Character(
-                project_id=story.project_id,
-                canonical_code=_next_character_code(),
-                name=name,
-                description=profile.get("description"),
-                role=profile.get("role") or "secondary",
-                gender=profile.get("gender"),
-                age_range=profile.get("age_range"),
-                appearance=appearance,
-                hair_description=hair_description,
-                base_outfit=base_outfit,
-                identity_line=profile.get("identity_line"),
-            )
-            db.add(character)
-            db.flush()
-            db.add(StoryCharacter(story_id=story_id, character_id=character.character_id))
-            existing_story_links.add(character.character_id)
-            character_ids.append(str(character.character_id))
+    character_ids: list[str] = []
+    for profile in state.get("characters", []):
+        name = str(profile.get("name") or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        appearance = profile.get("appearance") if isinstance(profile.get("appearance"), dict) else None
+        hair_description = profile.get("hair_description")
+        if hair_description is None and appearance:
+            hair_description = appearance.get("hair")
+        base_outfit = profile.get("base_outfit") or profile.get("outfit")
+        if key in existing_by_name:
+            existing_char = existing_by_name[key]
+            if not existing_char.canonical_code:
+                existing_char.canonical_code = _next_character_code()
+            if profile.get("gender") and not existing_char.gender:
+                existing_char.gender = profile.get("gender")
+            if profile.get("age_range") and not existing_char.age_range:
+                existing_char.age_range = profile.get("age_range")
+            if appearance and not existing_char.appearance:
+                existing_char.appearance = appearance
+            if profile.get("identity_line") and not existing_char.identity_line:
+                existing_char.identity_line = profile.get("identity_line")
+            if hair_description and not existing_char.hair_description:
+                existing_char.hair_description = hair_description
+            if base_outfit and not existing_char.base_outfit:
+                existing_char.base_outfit = base_outfit
+            if existing_char.character_id not in existing_story_links:
+                db.add(StoryCharacter(story_id=story_id, character_id=existing_char.character_id))
+                existing_story_links.add(existing_char.character_id)
+            character_ids.append(str(existing_char.character_id))
+            continue
+        character = Character(
+            project_id=story.project_id,
+            canonical_code=_next_character_code(),
+            name=name,
+            description=profile.get("description"),
+            role=profile.get("role") or "secondary",
+            gender=profile.get("gender"),
+            age_range=profile.get("age_range"),
+            appearance=appearance,
+            hair_description=hair_description,
+            base_outfit=base_outfit,
+            identity_line=profile.get("identity_line"),
+        )
+        db.add(character)
+        db.flush()
+        db.add(StoryCharacter(story_id=story_id, character_id=character.character_id))
+        existing_story_links.add(character.character_id)
+        character_ids.append(str(character.character_id))
 
-        scene_ids: list[str] = []
-        for scene in state.get("scenes", []):
-            row = Scene(
-                story_id=story_id,
-                source_text=scene.get("source_text") or "",
-            )
-            db.add(row)
-            db.flush()
-            scene_ids.append(str(row.scene_id))
+    scene_ids: list[str] = []
+    for scene in state.get("scenes", []):
+        row = Scene(
+            story_id=story_id,
+            source_text=scene.get("source_text") or "",
+        )
+        db.add(row)
+        db.flush()
+        scene_ids.append(str(row.scene_id))
 
-        db.commit()
+    db.commit()
 
     progress = {
         "scene_ids": scene_ids,

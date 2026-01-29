@@ -20,7 +20,8 @@ import {
   dialogueSuggestionsSchema,
   characterVariantsSchema,
   characterVariantSchema,
-  characterVariantSuggestionsSchema
+  characterVariantSuggestionsSchema,
+  characterVariantGenerationResultsSchema
 } from "@/lib/api/types";
 
 export async function fetchHealth() {
@@ -349,6 +350,17 @@ export async function refreshCharacterVariantSuggestions(storyId: string) {
     method: "POST"
   });
   return characterVariantSuggestionsSchema.parse(payload);
+}
+
+export async function generateCharacterVariantSuggestions(params: {
+  storyId: string;
+  characterId?: string;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/character-variant-suggestions/generate`, {
+    method: "POST",
+    body: JSON.stringify({ character_id: params.characterId ?? null })
+  });
+  return characterVariantGenerationResultsSchema.parse(payload);
 }
 
 export async function createCharacterVariant(params: {
