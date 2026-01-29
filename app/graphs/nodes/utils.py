@@ -1614,37 +1614,201 @@ def _prompt_variant_suggestions(
     )
 
 
-def _repair_json_with_llm(gemini: GeminiClient, malformed_text: str, expected_schema: str | None = None) -> dict | None:
-    """Attempt to repair malformed JSON using LLM as a last resort."""
+# ---------------------------------------------------------------------------
+# JSON Parsing Utilities with Self-Repair
+# ---------------------------------------------------------------------------
+
+
+def _strip_markdown_fences(text: str) -> str:
+    """Remove markdown code fences from LLM output."""
+    patterns = [
+        r"```json\s*\n?(.*?)\n?```",
+        r"```\s*\n?(.*?)\n?```",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return text
+
+
+def _clean_json_text(text: str) -> str:
+    """Clean common LLM JSON output issues."""
+    cleaned = text.strip()
+    cleaned = _strip_markdown_fences(cleaned)
+
+    lines = cleaned.split('\n')
+
+    # Find first line that starts JSON
+    start_idx = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('{') or stripped.startswith('['):
+            start_idx = i
+            break
+
+    # Find last line that ends JSON
+    end_idx = len(lines) - 1
+    for i in range(len(lines) - 1, -1, -1):
+        stripped = lines[i].strip()
+        if stripped.endswith('}') or stripped.endswith(']'):
+            end_idx = i
+            break
+
+    cleaned = '\n'.join(lines[start_idx:end_idx + 1])
+
+    # Remove trailing commas before } or ]
+    cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)
+
+    return cleaned.strip()
+
+
+def _extract_json_object(text: str) -> str | None:
+    """Extract the outermost JSON object using bracket matching."""
+    start = text.find('{')
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape_next = False
+
+    for i, char in enumerate(text[start:], start):
+        if escape_next:
+            escape_next = False
+            continue
+        if char == '\\':
+            escape_next = True
+            continue
+        if char == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == '{':
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+
+    return None
+
+
+def _extract_json_array(text: str) -> str | None:
+    """Extract the outermost JSON array using bracket matching."""
+    start = text.find('[')
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape_next = False
+
+    for i, char in enumerate(text[start:], start):
+        if escape_next:
+            escape_next = False
+            continue
+        if char == '\\':
+            escape_next = True
+            continue
+        if char == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == '[':
+            depth += 1
+        elif char == ']':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+
+    return None
+
+
+def _repair_json_with_llm(
+    gemini: GeminiClient,
+    malformed_text: str,
+    expected_schema: str | None = None,
+    max_repair_attempts: int = 2,
+) -> dict | list | None:
+    """Attempt to repair malformed JSON using LLM with retries."""
     schema_hint = ""
     if expected_schema:
         schema_hint = f"\n\nExpected schema:\n{expected_schema}"
 
-    repair_prompt = render_prompt(
-        "prompt_repair_json",
-        system_prompt_json=SYSTEM_PROMPT_JSON,
-        schema_hint=schema_hint,
-        malformed_text=malformed_text[:2000],
-    )
+    for attempt in range(max_repair_attempts):
+        repair_prompt = render_prompt(
+            "prompt_repair_json",
+            system_prompt_json=SYSTEM_PROMPT_JSON,
+            schema_hint=schema_hint,
+            malformed_text=malformed_text[:2000],
+        )
 
-    try:
-        repaired = gemini.generate_text(prompt=repair_prompt)
-        return json.loads(repaired)
-    except (json.JSONDecodeError, Exception) as exc:  # noqa: BLE001
-        logger.warning("JSON repair failed: %s", exc)
-        return None
+        try:
+            repaired = gemini.generate_text(prompt=repair_prompt)
+
+            # Try direct parse
+            try:
+                return json.loads(repaired)
+            except json.JSONDecodeError:
+                pass
+
+            # Try cleaned parse
+            cleaned = _clean_json_text(repaired)
+            try:
+                return json.loads(cleaned)
+            except json.JSONDecodeError:
+                pass
+
+            # Try object extraction
+            obj_text = _extract_json_object(repaired)
+            if obj_text:
+                try:
+                    return json.loads(obj_text)
+                except json.JSONDecodeError:
+                    pass
+
+            # Try array extraction
+            arr_text = _extract_json_array(repaired)
+            if arr_text:
+                try:
+                    return json.loads(arr_text)
+                except json.JSONDecodeError:
+                    pass
+
+            logger.warning(
+                "JSON repair attempt %d/%d failed to produce valid JSON",
+                attempt + 1,
+                max_repair_attempts,
+            )
+
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "JSON repair attempt %d/%d raised exception: %s",
+                attempt + 1,
+                max_repair_attempts,
+                exc,
+            )
+
+    return None
 
 
 def _maybe_json_from_gemini(
     gemini: GeminiClient,
     prompt: str,
     expected_schema: str | None = None,
-) -> dict | None:
+) -> dict | list | None:
     """
-    Three-tier JSON extraction:
-    1. Direct parse
-    2. Regex extract JSON block
-    3. LLM-based repair
+    Multi-tier JSON extraction with self-repair.
+
+    Tiers:
+    1. Direct parse of raw response
+    2. Parse after cleaning (strip fences, trailing commas)
+    3. Extract JSON object using bracket matching
+    4. Extract JSON array using bracket matching
+    5. LLM-based repair (up to 2 attempts)
     """
     full_prompt = f"{SYSTEM_PROMPT_JSON}\n\n{prompt}"
 
@@ -1660,16 +1824,45 @@ def _maybe_json_from_gemini(
     except json.JSONDecodeError:
         pass
 
-    # Tier 2: Regex extract JSON block
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
+    # Tier 2: Clean and parse
+    cleaned_text = _clean_json_text(text)
+    try:
+        return json.loads(cleaned_text)
+    except json.JSONDecodeError:
+        pass
+
+    # Tier 3: Extract JSON object
+    obj_text = _extract_json_object(text)
+    if obj_text:
         try:
-            return json.loads(match.group(0))
+            return json.loads(obj_text)
         except json.JSONDecodeError:
             pass
 
-    # Tier 3: LLM-based repair
-    return _repair_json_with_llm(gemini, text, expected_schema)
+    # Tier 4: Extract JSON array
+    arr_text = _extract_json_array(text)
+    if arr_text:
+        try:
+            return json.loads(arr_text)
+        except json.JSONDecodeError:
+            pass
+
+    # Tier 5: LLM-based repair
+    logger.info(
+        "All direct JSON parsing failed, attempting LLM repair. Preview: %s",
+        text[:200] if text else "empty",
+    )
+
+    result = _repair_json_with_llm(gemini, text, expected_schema)
+    if result is not None:
+        logger.info("JSON parsed successfully via LLM repair")
+        return result
+
+    logger.warning(
+        "All JSON parsing methods failed. Text preview: %s",
+        text[:300] if text else "empty",
+    )
+    return None
 
 
 # ---------------------------------------------------------------------------

@@ -22,24 +22,27 @@
 
 ## 1. Critical Priority - Reliability & Stability
 
-### 1.1 JSON Parsing Self-Repair Fallback
-**File:** `app/graphs/nodes/utils.py` (lines 1638-1672)
+### 1.1 JSON Parsing Self-Repair Fallback ✅ COMPLETED
+**File:** `app/graphs/nodes/utils.py` (lines 1617-1770)
+**Tests:** `tests/test_json_parsing.py` (25 tests)
+**Completed:** 2026-01-29
 
-**Current Issues:**
-- `_maybe_json_from_gemini()` has limited error recovery
-- Does not strip markdown code fences (```json) before parsing
-- Regex `r"\{.*\}"` only captures objects, not arrays
-- Greedy regex can fail with nested structures
-- No retry mechanism within the function itself
-- Limited logging for debugging parse failures
+**Implementation Summary:**
+- Added `_strip_markdown_fences()` - removes ```json and ``` code fences
+- Added `_clean_json_text()` - strips prose, removes trailing commas
+- Added `_extract_json_object()` - bracket-matching extraction for `{}`
+- Added `_extract_json_array()` - bracket-matching extraction for `[]`
+- Enhanced `_repair_json_with_llm()` - now retries up to 2 times with all extraction methods
+- Updated `_maybe_json_from_gemini()` - 5-tier extraction: direct → cleaned → object → array → LLM repair
+- Added comprehensive logging at each tier
 
-**Improvement Points:**
-- Add markdown fence stripping (```json, ```)
-- Implement bracket-matching extraction for both objects `{}` and arrays `[]`
-- Clean trailing commas (common LLM mistake)
-- Add structured result type with metadata for monitoring
-- Improve logging with text preview on failure
-- Add multiple repair attempts with schema hints
+**Original Issues (now resolved):**
+- ~~`_maybe_json_from_gemini()` has limited error recovery~~
+- ~~Does not strip markdown code fences~~
+- ~~Regex only captures objects, not arrays~~
+- ~~Greedy regex can fail with nested structures~~
+- ~~No retry mechanism within the function itself~~
+- ~~Limited logging for debugging parse failures~~
 
 ---
 
@@ -611,20 +614,20 @@ class StoryProgress(BaseModel):
 
 ## Summary Statistics
 
-| Priority | Count |
-|----------|-------|
-| Critical | 3 |
-| High | 7 |
-| Medium | 9 |
-| Lower | 6 |
-| **Total** | **25** |
+| Priority | Total | Completed | Remaining |
+|----------|-------|-----------|-----------|
+| Critical | 3 | 1 | 2 |
+| High | 7 | 0 | 7 |
+| Medium | 9 | 0 | 9 |
+| Lower | 6 | 0 | 6 |
+| **Total** | **25** | **1** | **24** |
 
 ---
 
 ## Recommended Implementation Order
 
 ### Phase 1: Stability (Week 1-2)
-1. JSON Parsing Self-Repair (1.1)
+1. ~~JSON Parsing Self-Repair (1.1)~~ ✅ DONE
 2. Graceful Degradation for Gemini (1.2)
 3. Developer Setup Guide (4.1)
 
