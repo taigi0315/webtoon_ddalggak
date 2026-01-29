@@ -140,6 +140,7 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
             image_style=payload.style_id or story.default_image_style,
             gemini=gemini,
             planning_mode=planning_mode,
+            require_hero_single=payload.require_hero_single,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -196,6 +197,7 @@ def _run_story_build_job(story_id: uuid.UUID, payload: StoryGenerateRequest) -> 
             image_style=payload.style_id or story.default_image_style,
             gemini=gemini,
             planning_mode=planning_mode,
+            require_hero_single=payload.require_hero_single,
         )
 
         story = db.get(Story, story_id)

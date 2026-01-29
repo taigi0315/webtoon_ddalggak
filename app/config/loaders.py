@@ -39,6 +39,12 @@ class LayoutTemplatesV1(BaseModel):
 class LayoutSelectionRule(BaseModel):
     panel_count: int = Field(ge=1)
     template_id: str = Field(min_length=1)
+    # Optional decision-table fields: match if non-empty
+    scene_importance: list[str] = Field(default_factory=list)
+    pace: list[str] = Field(default_factory=list)
+    # Weight-based selectors
+    min_large_panels: int = Field(default=0)
+    min_max_weight: float = Field(default=0.0)
 
 
 class LayoutSelectionRulesV1(BaseModel):
@@ -176,16 +182,62 @@ def _panel_plan_count(panel_plan) -> int:
     raise TypeError("panel_plan must be a list or dict with key 'panels'")
 
 
-def select_template(panel_plan, derived_features: dict | None = None) -> LayoutTemplate:
+def select_template(panel_plan, derived_features: dict | None = None, excluded_template_ids: list[str] | None = None) -> LayoutTemplate:
+    """Select a layout template using the decision-table rules.
+
+    - derived_features: optional dict (e.g., scene_importance, pace)
+    - excluded_template_ids: list of template_ids to avoid when selecting (used by guardrails)
+    """
     derived_features = derived_features or {}
+    excluded_template_ids = excluded_template_ids or []
 
     panel_count = _panel_plan_count(panel_plan)
     if panel_count <= 0:
-        raise ValueError("panel_plan must contain at least 1 panel")
+        # Allow fallback to default template when panel plan is empty
+        rules = load_layout_selection_rules_v1()
+        return get_layout_template(rules.default_template_id)
 
     rules = load_layout_selection_rules_v1()
     for rule in rules.rules:
-        if rule.panel_count == panel_count:
-            return get_layout_template(rule.template_id)
+        # panel_count must match first
+        if rule.panel_count != panel_count:
+            continue
 
+        # Skip excluded templates
+        if rule.template_id in excluded_template_ids:
+            continue
+
+        # If rule declares scene_importance values, check derived feature
+        if rule.scene_importance:
+            sf = derived_features.get("scene_importance")
+            if not sf or sf not in rule.scene_importance:
+                continue
+
+        # If rule declares pace, check derived feature
+        if rule.pace:
+            pf = derived_features.get("pace")
+            if not pf or pf not in rule.pace:
+                continue
+
+        # Weight-based checks
+        if rule.min_large_panels and rule.min_large_panels > 0:
+            num_large = int(derived_features.get("num_large", 0))
+            if num_large < rule.min_large_panels:
+                continue
+
+        if rule.min_max_weight and rule.min_max_weight > 0.0:
+            max_w = float(derived_features.get("max_weight", 0.0))
+            if max_w < float(rule.min_max_weight):
+                continue
+
+        # All checks passed for this rule
+        return get_layout_template(rule.template_id)
+
+    # No explicit rule matched; try to pick a non-excluded template from the templates list
+    templates = load_layout_templates_9x16_v1()
+    for t in templates.templates:
+        if t.template_id not in excluded_template_ids:
+            return t
+
+    # As a final fallback, return the default (even if excluded)
     return get_layout_template(rules.default_template_id)

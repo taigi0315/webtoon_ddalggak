@@ -139,6 +139,8 @@ class StoryGenerateRequest(BaseModel):
     max_characters: int = Field(default=6, ge=1, le=20)
     generate_render_spec: bool = True
     allow_append: bool = False
+    # If true, ensure at least one single-panel "hero" scene is present in the episode
+    require_hero_single: bool = False
 
 
 class StoryGenerateResponse(BaseModel):

@@ -285,9 +285,24 @@ def run_panel_plan_generator(
                 plan = {"panels": llm["panels"]}
 
         plan = _evaluate_and_prune_panel_plan(plan)
+        # Assign weights and must_be_large flags to panels based on utility and scene importance
+        plan = _assign_panel_weights(plan, importance)
+        if not isinstance(plan, dict):
+            plan = {"panels": []}
+
+        # Try to include scene-level must_show (from visual plan) into panel plan for derived features
+        visual_plan_art = svc.get_latest_artifact(scene_id, ARTIFACT_VISUAL_PLAN)
+        if visual_plan_art and isinstance(visual_plan_art.payload, dict):
+            plan["must_show"] = visual_plan_art.payload.get("must_show", [])
+
+        # Compute and attach derived features (weights aggregates, hero count, etc.)
+        characters = [c.name for c in _list_characters(db, scene.story_id)]
+        derived = _derive_panel_plan_features(plan, characters)
+        plan["derived_features"] = derived
+
         return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_PANEL_PLAN, payload=plan)
 
-def run_layout_template_resolver(db: Session, scene_id: uuid.UUID):
+def run_layout_template_resolver(db: Session, scene_id: uuid.UUID, excluded_template_ids: list[str] | None = None):
     with trace_span("graph.layout_template_resolver", scene_id=str(scene_id)):
         svc = ArtifactService(db)
         panel_plan = svc.get_latest_artifact(scene_id, ARTIFACT_PANEL_PLAN_NORMALIZED)
@@ -296,11 +311,22 @@ def run_layout_template_resolver(db: Session, scene_id: uuid.UUID):
         if panel_plan is None:
             raise ValueError("panel_plan artifact not found")
 
-        template = loaders.select_template(panel_plan.payload)
+        # Derive simple features from panel plan for decision rules
+        # Merge scene_importance with any derived features on the panel plan
+        derived_features = dict(panel_plan.payload.get("derived_features", {}) or {})
+        derived_features.setdefault("scene_importance", panel_plan.payload.get("scene_importance"))
+
+        template = loaders.select_template(panel_plan.payload, derived_features=derived_features, excluded_template_ids=excluded_template_ids)
+        # Apply panel weights to template geometry when relevant
+        try:
+            weighted_template = _apply_weights_to_template(panel_plan.payload, template)
+        except Exception:
+            weighted_template = template
+
         payload = {
-            "template_id": template.template_id,
-            "layout_text": template.layout_text,
-            "panels": [p.model_dump() for p in template.panels],
+            "template_id": weighted_template.template_id,
+            "layout_text": weighted_template.layout_text,
+            "panels": [p.model_dump() for p in weighted_template.panels],
         }
         return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_LAYOUT_TEMPLATE, payload=payload)
 

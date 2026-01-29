@@ -64,6 +64,12 @@ async def test_generate_full_pipeline_mocked(client, monkeypatch, tmp_path):
         f"/v1/scenes/{scene_id}/generate/full",
         json={"panel_count": 3, "style_id": "default"},
     )
+    # Debug output for failing cases
+    print('DEBUG_RESP_STATUS', resp.status_code)
+    try:
+        print('DEBUG_RESP_BODY', await resp.aread())
+    except Exception:
+        pass
     assert resp.status_code == 200
     body = resp.json()
 

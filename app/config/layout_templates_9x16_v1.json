@@ -46,6 +46,23 @@
         {"x": 0.0, "y": 0.64, "w": 0.32, "h": 0.36},
         {"x": 0.34, "y": 0.64, "w": 0.28, "h": 0.36}
       ]
+    },
+    {
+      "template_id": "9x16_stacked_weighted_3",
+      "layout_text": "One large panel and two smaller panels stacked beneath (weighted stacked)",
+      "panels": [
+        {"x": 0.0, "y": 0.0, "w": 1.0, "h": 0.6},
+        {"x": 0.0, "y": 0.6, "w": 1.0, "h": 0.2},
+        {"x": 0.0, "y": 0.8, "w": 1.0, "h": 0.2}
+      ]
+    },
+    {
+      "template_id": "9x16_2_70_30",
+      "layout_text": "Two panels with a 70/30 vertical split for dialogue emphasis",
+      "panels": [
+        {"x": 0.0, "y": 0.0, "w": 1.0, "h": 0.7},
+        {"x": 0.0, "y": 0.7, "w": 1.0, "h": 0.3}
+      ]
     }
   ]
 }
