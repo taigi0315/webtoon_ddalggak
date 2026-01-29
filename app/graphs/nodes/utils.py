@@ -109,6 +109,10 @@ def _build_gemini_client() -> GeminiClient:
         timeout_seconds=settings.gemini_timeout_seconds,
         max_retries=settings.gemini_max_retries,
         initial_backoff_seconds=settings.gemini_initial_backoff_seconds,
+        fallback_text_model=settings.gemini_fallback_text_model,
+        fallback_image_model=settings.gemini_fallback_image_model,
+        circuit_breaker_threshold=settings.gemini_circuit_breaker_threshold,
+        circuit_breaker_timeout=settings.gemini_circuit_breaker_timeout,
     )
 
 

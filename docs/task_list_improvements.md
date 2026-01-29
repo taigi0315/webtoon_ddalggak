@@ -46,21 +46,25 @@
 
 ---
 
-### 1.2 Graceful Degradation for Gemini Failures
-**File:** `app/services/vertex_gemini.py`, `app/graphs/nodes/utils.py`
+### 1.2 Graceful Degradation for Gemini Failures ✅ COMPLETED
+**File:** `app/services/vertex_gemini.py`, `app/core/settings.py`
+**Tests:** `tests/test_gemini_error_handling.py` (18 tests)
+**Completed:** 2026-01-29
 
-**Current Issues:**
-- Timeout just raises RuntimeError
-- Rate limit handling exists but no circuit breaker
-- Content filter blocks not handled gracefully
-- No fallback model support
+**Implementation Summary:**
+- Added custom exception classes: `GeminiError`, `GeminiRateLimitError`, `GeminiContentFilterError`, `GeminiTimeoutError`, `GeminiCircuitOpenError`, `GeminiModelUnavailableError`
+- Implemented `CircuitBreakerState` class with open/half-open/closed states
+- Added error classification: `_classify_error()` determines error type and retryability
+- Added content filter detection: `_check_response_safety()` checks for blocked content
+- Added fallback model support: tries alternate model on rate limit/timeout/unavailable
+- Added settings: `GEMINI_FALLBACK_TEXT_MODEL`, `GEMINI_FALLBACK_IMAGE_MODEL`, `GEMINI_CIRCUIT_BREAKER_THRESHOLD`, `GEMINI_CIRCUIT_BREAKER_TIMEOUT`
+- Added `get_circuit_breaker_status()` and `reset_circuit_breaker()` methods
 
-**Improvement Points:**
-- Implement circuit breaker pattern (after N failures, pause and alert)
-- Add timeout fallback: use cached/previous artifact if available
-- Handle content filter with user-friendly error message
-- Add fallback model configuration (gemini-pro → gemini-flash)
-- Document failure modes and expected behavior
+**Original Issues (now resolved):**
+- ~~Timeout just raises RuntimeError~~ → Now raises `GeminiTimeoutError` with retry info
+- ~~Rate limit handling exists but no circuit breaker~~ → Full circuit breaker with half-open recovery
+- ~~Content filter blocks not handled gracefully~~ → `GeminiContentFilterError` with blocked categories
+- ~~No fallback model support~~ → Automatic fallback on retryable errors
 
 ---
 
@@ -616,11 +620,11 @@ class StoryProgress(BaseModel):
 
 | Priority | Total | Completed | Remaining |
 |----------|-------|-----------|-----------|
-| Critical | 3 | 1 | 2 |
+| Critical | 3 | 2 | 1 |
 | High | 7 | 0 | 7 |
 | Medium | 9 | 0 | 9 |
 | Lower | 6 | 0 | 6 |
-| **Total** | **25** | **1** | **24** |
+| **Total** | **25** | **2** | **23** |
 
 ---
 
@@ -628,7 +632,7 @@ class StoryProgress(BaseModel):
 
 ### Phase 1: Stability (Week 1-2)
 1. ~~JSON Parsing Self-Repair (1.1)~~ ✅ DONE
-2. Graceful Degradation for Gemini (1.2)
+2. ~~Graceful Degradation for Gemini (1.2)~~ ✅ DONE
 3. Developer Setup Guide (4.1)
 
 ### Phase 2: Maintainability (Week 3-4)
