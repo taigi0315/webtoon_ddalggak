@@ -18,7 +18,7 @@ from app.api.v1.schemas import (
 from app.config.loaders import has_image_style, has_story_style
 from app.core.settings import settings
 from app.db.session import get_sessionmaker
-from app.db.models import Character, Project, Scene, Story
+from app.db.models import Character, Project, Scene, Story, StoryCharacter
 from app.graphs import nodes
 from app.graphs.story_build import run_story_build_graph
 from app.services.vertex_gemini import GeminiClient
@@ -151,7 +151,15 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
         for scene in scenes:
             nodes.run_prompt_compiler(db=db, scene_id=scene.scene_id, style_id=style_id)
 
-    all_characters = list(db.execute(select(Character).where(Character.story_id == story_id)).scalars().all())
+    all_characters = list(
+        db.execute(
+            select(Character)
+            .join(StoryCharacter, StoryCharacter.character_id == Character.character_id)
+            .where(StoryCharacter.story_id == story_id)
+        )
+        .scalars()
+        .all()
+    )
     return StoryGenerateResponse(scenes=scenes, characters=all_characters)
 
 

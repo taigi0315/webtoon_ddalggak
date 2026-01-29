@@ -70,6 +70,7 @@ class StyleItem(BaseModel):
     id: str = Field(min_length=1)
     label: str = Field(min_length=1)
     description: str = Field(min_length=1)
+    image_url: str | None = None
 
 
 class StyleLibraryV1(BaseModel):

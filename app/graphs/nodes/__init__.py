@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import loaders
 from app.core.telemetry import trace_span
 from app.core.settings import settings
-from app.db.models import Character, CharacterReferenceImage, Scene, Story
+from app.db.models import Character, CharacterReferenceImage, CharacterVariant, Scene, Story, StoryCharacter
 from app.services.artifacts import ArtifactService
 from app.services.images import ImageService
 from app.services.storage import LocalMediaStore
@@ -651,6 +651,7 @@ def run_panel_plan_generator(
             if isinstance(llm, dict) and isinstance(llm.get("panels"), list):
                 plan = {"panels": llm["panels"]}
 
+        plan = _evaluate_and_prune_panel_plan(plan)
         return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_PANEL_PLAN, payload=plan)
 
 
@@ -764,6 +765,7 @@ def run_prompt_compiler(
         story = db.get(Story, scene.story_id)
         characters = _list_characters(db, scene.story_id)
         reference_char_ids = _character_ids_with_reference_images(db, scene.story_id)
+        variants_by_character = _active_variants_by_character(db, scene.story_id)
         panel_count = _panel_count(panel_semantics.payload)
         layout_panels = layout.payload.get("panels")
         layout_count = len(layout_panels) if isinstance(layout_panels, list) else None
@@ -780,6 +782,7 @@ def run_prompt_compiler(
                 style_id=style_id,
                 characters=characters,
                 reference_char_ids=reference_char_ids,
+                variants_by_character=variants_by_character,
                 story_style=(story.default_story_style if story else None),
             )
 
@@ -920,8 +923,24 @@ def run_blind_test_evaluator(
 def run_dialogue_extractor(db: Session, scene_id: uuid.UUID):
     with trace_span("graph.dialogue_extractor", scene_id=str(scene_id)):
         scene = _get_scene(db, scene_id)
-        suggestions = _extract_dialogue_suggestions(scene.source_text)
-        payload = {"suggestions": suggestions}
+        panel_semantics = ArtifactService(db).get_latest_artifact(scene_id, ARTIFACT_PANEL_SEMANTICS)
+        characters = _list_characters(db, scene.story_id)
+        character_names = [c.name for c in characters if c.name]
+        panel_payload = panel_semantics.payload if panel_semantics else {}
+        gemini = None
+        try:
+            gemini = _build_gemini_client()
+        except Exception:  # noqa: BLE001
+            gemini = None
+
+        dialogue_script = _generate_dialogue_script(
+            scene_id=scene_id,
+            scene_text=scene.source_text,
+            panel_semantics=panel_payload,
+            character_names=character_names,
+            gemini=gemini,
+        )
+        payload = {"dialogue_by_panel": dialogue_script.get("dialogue_by_panel", [])}
         return ArtifactService(db).create_artifact(
             scene_id=scene_id, type=ARTIFACT_DIALOGUE_SUGGESTIONS, payload=payload
         )
@@ -966,7 +985,12 @@ def _get_scene(db: Session, scene_id: uuid.UUID) -> Scene:
 
 
 def _list_characters(db: Session, story_id: uuid.UUID) -> list[Character]:
-    return list(db.execute(select(Character).where(Character.story_id == story_id)).scalars().all())
+    stmt = (
+        select(Character)
+        .join(StoryCharacter, StoryCharacter.character_id == Character.character_id)
+        .where(StoryCharacter.story_id == story_id)
+    )
+    return list(db.execute(stmt).scalars().all())
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -1169,6 +1193,90 @@ def _normalize_panel_plan(panel_plan: dict) -> dict:
     return {"panels": panels}
 
 
+def _panel_purpose_from(panel: dict) -> str:
+    grammar_id = panel.get("grammar_id")
+    story_function = panel.get("story_function")
+    if story_function:
+        return str(story_function)
+    mapping = {
+        "dialogue_medium": "dialogue",
+        "emotion_closeup": "reaction",
+        "reaction": "reaction",
+        "action": "action",
+        "object_focus": "reveal",
+        "reveal": "reveal",
+        "impact_silence": "silent_beat",
+        "establishing": "establishing",
+    }
+    return mapping.get(grammar_id, "dialogue")
+
+
+def _annotate_panel_utility(panel: dict) -> dict:
+    panel_role = panel.get("panel_role")
+    if panel_role not in {"main", "inset"}:
+        panel_role = "main"
+    panel["panel_role"] = panel_role
+
+    panel_purpose = panel.get("panel_purpose")
+    if panel_purpose not in {
+        "dialogue",
+        "reaction",
+        "reveal",
+        "action",
+        "establishing",
+        "silent_beat",
+    }:
+        panel_purpose = _panel_purpose_from(panel)
+    panel["panel_purpose"] = panel_purpose
+
+    has_dialogue = panel.get("has_dialogue")
+    if not isinstance(has_dialogue, bool):
+        has_dialogue = panel.get("grammar_id") == "dialogue_medium" or panel_purpose == "dialogue"
+    panel["has_dialogue"] = has_dialogue
+
+    if has_dialogue:
+        utility = 1.0
+    elif panel_purpose in {"reveal", "reaction", "action"}:
+        utility = 0.7
+    elif panel_purpose == "silent_beat":
+        utility = 0.4
+    elif panel_purpose == "establishing":
+        utility = 0.5
+    else:
+        utility = 0.3
+    panel["utility_score"] = float(panel.get("utility_score", utility))
+    return panel
+
+
+def _evaluate_and_prune_panel_plan(panel_plan: dict) -> dict:
+    panels = list(panel_plan.get("panels") or [])
+    if not panels:
+        return {"panels": []}
+
+    annotated = [_annotate_panel_utility(dict(panel)) for panel in panels]
+
+    meaningful = {"reveal", "reaction", "action", "silent_beat"}
+    pruned = []
+    inset_panels = []
+    for panel in annotated:
+        is_inset = panel.get("panel_role") == "inset"
+        if is_inset and not panel.get("has_dialogue") and panel.get("panel_purpose") not in meaningful:
+            continue
+        if is_inset:
+            inset_panels.append(panel)
+        pruned.append(panel)
+
+    if len(inset_panels) > 2:
+        inset_panels_sorted = sorted(inset_panels, key=lambda p: p.get("utility_score", 0))
+        to_drop = {p.get("panel_index") for p in inset_panels_sorted[:-2]}
+        pruned = [p for p in pruned if p.get("panel_index") not in to_drop]
+
+    for idx, panel in enumerate(pruned, start=1):
+        panel["panel_index"] = idx
+
+    return {"panels": pruned}
+
+
 def _heuristic_panel_semantics(
     scene_text: str,
     panel_plan: dict,
@@ -1359,6 +1467,7 @@ def _compile_prompt(
     characters: list[Character],
     reference_char_ids: set[uuid.UUID] | None = None,
     story_style: str | None = None,
+    variants_by_character: dict[uuid.UUID, CharacterVariant] | None = None,
 ) -> str:
     """Compile a production-grade image generation prompt with rich visual details."""
     style_desc = _style_description(style_id)
@@ -1369,6 +1478,7 @@ def _compile_prompt(
         panel_semantics=panel_semantics,
         characters=characters,
         reference_char_ids=reference_char_ids,
+        variants_by_character=variants_by_character,
     )
     panels = panel_semantics.get("panels", []) or []
     panel_count = len(panels)
@@ -1379,12 +1489,20 @@ def _compile_prompt(
     for c in characters:
         code = codes.get(c.character_id)
         role = c.role or "character"
+        variant = variants_by_character.get(c.character_id) if variants_by_character else None
+        variant_outfit = None
+        if variant and isinstance(variant.override_attributes, dict):
+            variant_outfit = variant.override_attributes.get("outfit") or variant.override_attributes.get("clothing")
         char_lines = [f"  - {code} ({c.name}) [{role}]"]
         if c.character_id in reference_char_ids:
-            if c.base_outfit:
+            if variant_outfit:
+                char_lines.append(f"    Outfit: {variant_outfit}")
+            elif c.base_outfit:
                 char_lines.append(f"    Outfit: {c.base_outfit}")
         else:
-            if c.base_outfit:
+            if variant_outfit:
+                char_lines.append(f"    Outfit: {variant_outfit}")
+            elif c.base_outfit:
                 char_lines.append(f"    Outfit: {c.base_outfit}")
             appearance = getattr(c, "appearance", None)
             if isinstance(appearance, dict):
@@ -1544,17 +1662,63 @@ def _panel_semantics_text(panel_semantics: dict) -> str:
 
 
 def _character_ids_with_reference_images(db: Session, story_id: uuid.UUID) -> set[uuid.UUID]:
+    variant_ids = _active_variant_reference_images(db, story_id).keys()
     stmt = (
         select(CharacterReferenceImage.character_id)
-        .join(Character, CharacterReferenceImage.character_id == Character.character_id)
+        .join(StoryCharacter, CharacterReferenceImage.character_id == StoryCharacter.character_id)
         .where(
-            Character.story_id == story_id,
+            StoryCharacter.story_id == story_id,
             CharacterReferenceImage.approved.is_(True),
             CharacterReferenceImage.ref_type == "face",
         )
         .distinct()
     )
-    return set(db.execute(stmt).scalars().all())
+    return set(db.execute(stmt).scalars().all()).union(set(variant_ids))
+
+
+def _active_variant_reference_images(
+    db: Session,
+    story_id: uuid.UUID,
+) -> dict[uuid.UUID, CharacterReferenceImage]:
+    variants = _active_variants_by_character(db, story_id).values()
+    if not variants:
+        return {}
+    ref_ids = {v.reference_image_id for v in variants if v.reference_image_id}
+    if not ref_ids:
+        return {}
+    ref_lookup = {
+        ref.reference_image_id: ref
+        for ref in db.execute(
+            select(CharacterReferenceImage).where(CharacterReferenceImage.reference_image_id.in_(ref_ids))
+        )
+        .scalars()
+        .all()
+    }
+    results: dict[uuid.UUID, CharacterReferenceImage] = {}
+    for variant in variants:
+        ref = ref_lookup.get(variant.reference_image_id)
+        if ref is None:
+            continue
+        results[variant.character_id] = ref
+    return results
+
+
+def _active_variants_by_character(
+    db: Session,
+    story_id: uuid.UUID,
+) -> dict[uuid.UUID, CharacterVariant]:
+    variants = list(
+        db.execute(
+            select(CharacterVariant)
+            .where(
+                CharacterVariant.story_id == story_id,
+                CharacterVariant.is_active_for_story.is_(True),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return {variant.character_id: variant for variant in variants}
 
 
 def _character_codes(characters: list[Character]) -> dict[uuid.UUID, str]:
@@ -1590,23 +1754,33 @@ def _inject_character_identities(
     panel_semantics: dict,
     characters: list[Character],
     reference_char_ids: set[uuid.UUID],
+    variants_by_character: dict[uuid.UUID, CharacterVariant] | None = None,
 ) -> dict:
     if not panel_semantics or not characters:
         return panel_semantics
 
     codes = _character_codes(characters)
     name_map: dict[str, dict[str, str]] = {}
+    variants_by_character = variants_by_character or {}
     for c in characters:
         code = codes.get(c.character_id, "CHAR_X")
         base = f"{code} ({c.name})"
+        variant = variants_by_character.get(c.character_id)
+        variant_outfit = None
+        if variant and isinstance(variant.override_attributes, dict):
+            variant_outfit = variant.override_attributes.get("outfit") or variant.override_attributes.get("clothing")
         if c.character_id in reference_char_ids:
             parts = [base, "matching reference image"]
-            if c.base_outfit:
+            if variant_outfit:
+                parts.append(f"wearing {variant_outfit}")
+            elif c.base_outfit:
                 parts.append(f"wearing {c.base_outfit}")
             label = ", ".join(parts)
         else:
             parts = [base]
-            if c.base_outfit:
+            if variant_outfit:
+                parts.append(f"wearing {variant_outfit}")
+            elif c.base_outfit:
                 parts.append(f"wearing {c.base_outfit}")
             if c.hair_description:
                 parts.append(f"hair: {c.hair_description}")
@@ -1741,11 +1915,12 @@ def _load_character_reference_images(
     story_id: uuid.UUID,
     max_images: int = 6,
 ) -> list[tuple[bytes, str]]:
+    variant_refs = _active_variant_reference_images(db, story_id)
     stmt = (
         select(CharacterReferenceImage)
-        .join(Character, CharacterReferenceImage.character_id == Character.character_id)
+        .join(StoryCharacter, CharacterReferenceImage.character_id == StoryCharacter.character_id)
         .where(
-            Character.story_id == story_id,
+            StoryCharacter.story_id == story_id,
             CharacterReferenceImage.approved.is_(True),
             CharacterReferenceImage.ref_type == "face",
         )
@@ -1758,6 +1933,10 @@ def _load_character_reference_images(
 
     refs = list(db.execute(stmt).scalars().all())
     picked: dict[uuid.UUID, CharacterReferenceImage] = {}
+    for character_id, ref in variant_refs.items():
+        picked[character_id] = ref
+        if len(picked) >= max_images:
+            break
     for ref in refs:
         if ref.character_id in picked:
             continue
@@ -1805,6 +1984,277 @@ def _extract_dialogue_suggestions(text: str) -> list[dict]:
             }
         )
     return suggestions
+
+
+def _dialogue_panel_ids(panel_semantics: dict) -> list[int]:
+    panels = panel_semantics.get("panels") if isinstance(panel_semantics, dict) else None
+    if not isinstance(panels, list) or not panels:
+        return []
+    panel_ids: list[int] = []
+    for idx, panel in enumerate(panels):
+        if isinstance(panel, dict):
+            panel_id = panel.get("panel_index") or panel.get("panel_id")
+            if isinstance(panel_id, int):
+                panel_ids.append(panel_id)
+                continue
+        panel_ids.append(idx + 1)
+    return panel_ids
+
+
+def _normalize_dialogue_script(raw: dict | None, panel_ids: list[int]) -> dict:
+    normalized = {"scene_id": None, "dialogue_by_panel": []}
+    if isinstance(raw, dict):
+        normalized["scene_id"] = raw.get("scene_id")
+        raw_panels = raw.get("dialogue_by_panel")
+        if isinstance(raw_panels, list):
+            normalized["dialogue_by_panel"] = raw_panels
+
+    panel_map = {p.get("panel_id"): p for p in normalized.get("dialogue_by_panel", []) if isinstance(p, dict)}
+    result_panels = []
+    def _is_narration_like(text: str) -> bool:
+        lowered = text.lower()
+        return any(
+            phrase in lowered
+            for phrase in (
+                " he says",
+                " she says",
+                " he whispers",
+                " she whispers",
+                " he thinks",
+                " she thinks",
+                " he stares",
+                " she stares",
+                " he looks",
+                " she looks",
+                " he walks",
+                " she walks",
+                " he steps",
+                " she steps",
+            )
+        )
+
+    for panel_id in panel_ids:
+        panel = panel_map.get(panel_id, {"panel_id": panel_id, "lines": [], "notes": None})
+        lines = panel.get("lines")
+        cleaned_lines = []
+        caption_used = False
+        if isinstance(lines, list):
+            for line in lines:
+                if not isinstance(line, dict):
+                    continue
+                text = str(line.get("text") or "").strip()
+                if not text:
+                    continue
+                speaker = str(line.get("speaker") or "unknown").strip() or "unknown"
+                line_type = str(line.get("type") or "speech").strip().lower()
+                if line_type not in {"speech", "thought", "caption", "sfx"}:
+                    line_type = "speech"
+                if _is_narration_like(text) and line_type in {"speech", "thought"}:
+                    continue
+                if line_type == "caption":
+                    if caption_used:
+                        continue
+                    caption_used = True
+                cleaned_lines.append({"speaker": speaker, "type": line_type, "text": text})
+                if len(cleaned_lines) >= 3:
+                    break
+        result_panels.append(
+            {
+                "panel_id": panel_id,
+                "lines": cleaned_lines,
+                "notes": panel.get("notes"),
+            }
+        )
+    normalized["dialogue_by_panel"] = result_panels
+    return normalized
+
+
+def _fallback_dialogue_script(scene_text: str, panel_ids: list[int]) -> dict:
+    dialogue_lines = _extract_dialogue_lines(scene_text)
+    lines_iter = iter(dialogue_lines)
+    panels = []
+    for panel_id in panel_ids:
+        panel_lines = []
+        for _ in range(3):
+            line = next(lines_iter, None)
+            if not line:
+                break
+            panel_lines.append({"speaker": "unknown", "type": "speech", "text": line})
+        panels.append({"panel_id": panel_id, "lines": panel_lines, "notes": None})
+    return {"scene_id": None, "dialogue_by_panel": panels}
+
+
+def _prompt_dialogue_script(
+    scene_id: uuid.UUID,
+    scene_text: str,
+    panel_semantics: dict,
+    character_names: list[str],
+) -> str:
+    panel_ids = _dialogue_panel_ids(panel_semantics)
+    panels = panel_semantics.get("panels") if isinstance(panel_semantics, dict) else []
+    panel_lines = []
+    for panel in panels or []:
+        if not isinstance(panel, dict):
+            continue
+        pid = panel.get("panel_index") or panel.get("panel_id")
+        desc = panel.get("description") or ""
+        panel_lines.append(f"- Panel {pid}: {desc}")
+    panel_lines_text = "\n".join(panel_lines) if panel_lines else "No panel descriptions available."
+    char_list = ", ".join(character_names) if character_names else "Unknown"
+
+    return f"""
+You are a webtoon dialogue scriptwriter. Convert the scene into panel-aligned dialogue.
+
+Rules:
+- Output ONLY valid JSON. No commentary.
+- Each panel must have 0-3 lines max.
+- Dialogue must be spoken/thought text, NOT narration.
+- If narration is needed, use type=\"caption\" and keep it short (max 1 caption per panel).
+- Avoid phrases like \"he says\" or \"she whispers\" in dialogue text.
+- Use speaker names from: {char_list}.
+- Allowed types: speech, thought, caption, sfx.
+
+Scene ID: {scene_id}
+Scene Text:
+{scene_text}
+
+Panels:
+{panel_lines_text}
+
+Required JSON schema:
+{{
+  \"scene_id\": \"{scene_id}\",
+  \"dialogue_by_panel\": [
+    {{
+      \"panel_id\": 1,
+      \"lines\": [
+        {{ \"speaker\": \"NAME\", \"type\": \"speech\", \"text\": \"...\" }}
+      ],
+      \"notes\": \"optional\"
+    }}
+  ]
+}}
+""".strip()
+
+
+def _generate_dialogue_script(
+    scene_id: uuid.UUID,
+    scene_text: str,
+    panel_semantics: dict,
+    character_names: list[str],
+    gemini: GeminiClient | None = None,
+) -> dict:
+    panel_ids = _dialogue_panel_ids(panel_semantics)
+    if not panel_ids:
+        panel_ids = list(range(1, 5))
+
+    if gemini is None:
+        return _fallback_dialogue_script(scene_text, panel_ids)
+
+    prompt = _prompt_dialogue_script(scene_id, scene_text, panel_semantics, character_names)
+    expected_schema = "{ scene_id: string, dialogue_by_panel: [{ panel_id: number, lines: [{ speaker: string, type: string, text: string }], notes: string|null }] }"
+    raw = _maybe_json_from_gemini(gemini, prompt, expected_schema=expected_schema)
+    if not isinstance(raw, dict):
+        return _fallback_dialogue_script(scene_text, panel_ids)
+    return _normalize_dialogue_script(raw, panel_ids)
+
+
+def _prompt_variant_suggestions(
+    story_id: uuid.UUID,
+    story_title: str,
+    scene_text: str,
+    character_names: list[str],
+) -> str:
+    char_list = ", ".join(character_names) if character_names else "Unknown"
+    return f"""
+You are a webtoon wardrobe and continuity assistant.
+Based on the story, suggest if any returning character needs a new outfit or appearance change for this story.
+
+Rules:
+- Output ONLY valid JSON, no commentary.
+- If no change is needed, return an empty list.
+- Keep suggestions minimal and realistic (business attire, school uniform, etc.).
+- Use only characters from this list: {char_list}.
+
+Story ID: {story_id}
+Title: {story_title}
+Story Text:
+{scene_text}
+
+Return JSON:
+{{
+  \"suggestions\": [
+    {{
+      \"character_name\": \"NAME\",
+      \"variant_type\": \"outfit_change\",
+      \"override_attributes\": {{ \"outfit\": \"short description\" }}
+    }}
+  ]
+}}
+""".strip()
+
+
+def generate_character_variant_suggestions(
+    db: Session,
+    story_id: uuid.UUID,
+    gemini: GeminiClient | None = None,
+) -> list[dict]:
+    story = db.get(Story, story_id)
+    if story is None:
+        raise ValueError("story not found")
+
+    scenes = list(db.execute(select(Scene).where(Scene.story_id == story_id)).scalars().all())
+    scene_text = "\n\n".join([s.source_text for s in scenes[:5] if s.source_text])[:4000]
+    characters = _list_characters(db, story_id)
+    character_names = [c.name for c in characters if c.name]
+    if not character_names:
+        return []
+
+    if gemini is None:
+        try:
+            gemini = _build_gemini_client()
+        except Exception:  # noqa: BLE001
+            gemini = None
+
+    if gemini is None:
+        return []
+
+    prompt = _prompt_variant_suggestions(story_id, story.title, scene_text, character_names)
+    raw = _maybe_json_from_gemini(
+        gemini,
+        prompt,
+        expected_schema="{ suggestions: [{ character_name: string, variant_type: string, override_attributes: object }] }",
+    )
+    if not isinstance(raw, dict):
+        return []
+
+    suggestions = raw.get("suggestions")
+    if not isinstance(suggestions, list):
+        return []
+
+    by_name = {c.name.lower(): c for c in characters if c.name}
+    normalized: list[dict] = []
+    for item in suggestions:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("character_name") or "").strip()
+        if not name:
+            continue
+        character = by_name.get(name.lower())
+        if not character:
+            continue
+        variant_type = str(item.get("variant_type") or "outfit_change").strip()
+        override_attributes = item.get("override_attributes") if isinstance(item.get("override_attributes"), dict) else {}
+        if not override_attributes:
+            continue
+        normalized.append(
+            {
+                "character_id": character.character_id,
+                "variant_type": variant_type,
+                "override_attributes": override_attributes,
+            }
+        )
+    return normalized
 
 
 def _repair_json_with_llm(gemini: GeminiClient, malformed_text: str, expected_schema: str | None = None) -> dict | None:
@@ -1946,6 +2396,8 @@ QC HARD CONSTRAINTS (you MUST follow these):
 - No more than 2 consecutive panels with the same grammar_id
 - First panel MUST be 'establishing'
 - Last panel SHOULD be 'reaction' or 'reveal' for closure
+- Inset panels must be meaningful (dialogue, reveal, reaction, action, or intentional silent beat)
+- Max inset panels: 2
 """
 
     return f"""{GLOBAL_CONSTRAINTS}
@@ -1982,6 +2434,10 @@ OUTPUT SCHEMA:
       "panel_index": 1,
       "grammar_id": "establishing",
       "story_function": "setup",
+      "panel_role": "main|inset",
+      "panel_purpose": "dialogue|reaction|reveal|action|establishing|silent_beat",
+      "has_dialogue": true,
+      "utility_score": 0.0,
       "beat_summary": "Brief description of what happens in this panel"
     }}
   ]

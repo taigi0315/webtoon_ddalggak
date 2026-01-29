@@ -86,6 +86,7 @@ class StyleItemRead(BaseModel):
     id: str
     label: str
     description: str
+    image_url: str | None = None
 
 
 class CharacterCreate(BaseModel):
@@ -102,7 +103,7 @@ class CharacterCreate(BaseModel):
 
 class CharacterRead(BaseModel):
     character_id: uuid.UUID
-    story_id: uuid.UUID
+    project_id: uuid.UUID
     canonical_code: str | None
     name: str
     description: str | None
@@ -162,6 +163,30 @@ class CharacterRefRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CharacterVariantCreate(BaseModel):
+    variant_type: str = Field(default="outfit_change", min_length=1, max_length=32)
+    override_attributes: dict | None = None
+    reference_image_id: uuid.UUID | None = None
+    is_active_for_story: bool = True
+
+
+class CharacterVariantRead(BaseModel):
+    variant_id: uuid.UUID
+    character_id: uuid.UUID
+    story_id: uuid.UUID
+    variant_type: str
+    override_attributes: dict
+    reference_image_id: uuid.UUID | None
+    is_active_for_story: bool
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class CharacterVariantActivate(BaseModel):
+    is_active_for_story: bool = True
+
+
 class CharacterApproveRefRequest(BaseModel):
     reference_image_id: uuid.UUID
 
@@ -180,17 +205,21 @@ class CharacterGenerateRefsResponse(BaseModel):
     generated_refs: list["CharacterRefRead"]
 
 
-class DialogueSuggestion(BaseModel):
-    """Pre-generated dialogue extracted from scene text for later positioning."""
+class DialogueLine(BaseModel):
     speaker: str
+    type: str
     text: str
-    emotion: str = "neutral"
-    panel_hint: int | None = None
+
+
+class DialoguePanelBlock(BaseModel):
+    panel_id: int
+    lines: list[DialogueLine]
+    notes: str | None = None
 
 
 class DialogueSuggestionsRead(BaseModel):
     scene_id: uuid.UUID
-    suggestions: list[DialogueSuggestion]
+    dialogue_by_panel: list[DialoguePanelBlock]
 
 
 class ArtifactRead(BaseModel):
@@ -212,6 +241,17 @@ class BubblePosition(BaseModel):
 class BubbleSize(BaseModel):
     w: float = Field(ge=0.01, le=1.0)
     h: float = Field(ge=0.01, le=1.0)
+
+
+class CharacterVariantSuggestionRead(BaseModel):
+    suggestion_id: uuid.UUID
+    story_id: uuid.UUID
+    character_id: uuid.UUID
+    variant_type: str
+    override_attributes: dict
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
 
 
 class DialogueBubble(BaseModel):

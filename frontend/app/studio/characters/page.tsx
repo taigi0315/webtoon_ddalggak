@@ -9,6 +9,11 @@ import {
   fetchProjects,
   fetchStories,
   fetchCharacterRefs,
+  fetchCharacterVariants,
+  createCharacterVariant,
+  activateCharacterVariant,
+  fetchCharacterVariantSuggestions,
+  refreshCharacterVariantSuggestions,
   generateCharacterRefs,
   approveCharacterRef,
   setPrimaryCharacterRef,
@@ -16,7 +21,7 @@ import {
   updateCharacter,
   approveCharacter
 } from "@/lib/api/queries";
-import type { Character, CharacterRef } from "@/lib/api/types";
+import type { Character, CharacterRef, CharacterVariant, CharacterVariantSuggestion } from "@/lib/api/types";
 
 export default function CharacterStudioPage() {
   const queryClient = useQueryClient();
@@ -40,6 +45,19 @@ export default function CharacterStudioPage() {
     queryKey: ["characters", storyId],
     queryFn: () => fetchCharacters(storyId),
     enabled: storyId.length > 0
+  });
+
+  const variantSuggestionsQuery = useQuery({
+    queryKey: ["character-variant-suggestions", storyId],
+    queryFn: () => fetchCharacterVariantSuggestions(storyId),
+    enabled: storyId.length > 0
+  });
+
+  const refreshSuggestionsMutation = useMutation({
+    mutationFn: () => refreshCharacterVariantSuggestions(storyId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["character-variant-suggestions", storyId] });
+    }
   });
 
   // Load from localStorage
@@ -138,6 +156,13 @@ export default function CharacterStudioPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => refreshSuggestionsMutation.mutate()}
+              disabled={refreshSuggestionsMutation.isPending || !storyId}
+            >
+              {refreshSuggestionsMutation.isPending ? "Refreshing..." : "Refresh Suggestions"}
+            </button>
             <select
               className="input text-sm"
               value={storyId}
@@ -202,7 +227,13 @@ export default function CharacterStudioPage() {
             {!selectedCharacter && (
               <div className="card text-sm text-slate-500">Select a character to begin.</div>
             )}
-            {selectedCharacter && <CharacterDetail character={selectedCharacter} />}
+            {selectedCharacter && (
+              <CharacterDetail
+                character={selectedCharacter}
+                storyId={storyId}
+                suggestions={variantSuggestionsQuery.data ?? []}
+              />
+            )}
           </div>
         </div>
 
@@ -234,11 +265,22 @@ export default function CharacterStudioPage() {
   );
 }
 
-function CharacterDetail({ character }: { character: Character }) {
+function CharacterDetail({
+  character,
+  storyId,
+  suggestions
+}: {
+  character: Character;
+  storyId: string;
+  suggestions: CharacterVariantSuggestion[];
+}) {
   const queryClient = useQueryClient();
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [identityDraft, setIdentityDraft] = useState("");
   const [zoom, setZoom] = useState(1);
+  const [variantType, setVariantType] = useState("outfit_change");
+  const [variantOutfit, setVariantOutfit] = useState("");
+  const [variantRefId, setVariantRefId] = useState<string | null>(null);
 
   // Fetch refs for this character
   const refsQuery = useQuery({
@@ -246,10 +288,33 @@ function CharacterDetail({ character }: { character: Character }) {
     queryFn: () => fetchCharacterRefs(character.character_id)
   });
 
+  const variantsQuery = useQuery({
+    queryKey: ["characterVariants", storyId, character.character_id],
+    queryFn: () => fetchCharacterVariants({ storyId, characterId: character.character_id })
+  });
+
   const generateRefsMutation = useMutation({
     mutationFn: generateCharacterRefs,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["characterRefs", character.character_id] });
+    }
+  });
+
+  const createVariantMutation = useMutation({
+    mutationFn: createCharacterVariant,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["characterVariants", storyId, character.character_id]
+      });
+    }
+  });
+
+  const activateVariantMutation = useMutation({
+    mutationFn: activateCharacterVariant,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["characterVariants", storyId, character.character_id]
+      });
     }
   });
 
@@ -329,12 +394,28 @@ function CharacterDetail({ character }: { character: Character }) {
   const previewRef = primaryRef ?? refsQuery.data?.[0];
   const hasApprovedRef = character.approved;
   const hasPrompt = Boolean(character.description || character.identity_line);
+  const approvedRefs = refsQuery.data?.filter((ref) => ref.approved) ?? [];
+  const activeVariant = variantsQuery.data?.find((variant) => variant.is_active_for_story);
 
   useEffect(() => {
     setDescriptionDraft(character.description ?? "");
     setIdentityDraft(character.identity_line ?? "");
     setZoom(1);
+    setVariantOutfit("");
+    setVariantRefId(null);
   }, [character.character_id, character.description, character.identity_line]);
+
+  useEffect(() => {
+    const match = suggestions.find((item) => item.character_id === character.character_id);
+    if (!match) return;
+    const outfit = match.override_attributes?.outfit ?? match.override_attributes?.clothing ?? "";
+    if (!variantOutfit && outfit) {
+      setVariantOutfit(outfit);
+    }
+    if (match.variant_type && match.variant_type !== variantType) {
+      setVariantType(match.variant_type);
+    }
+  }, [character.character_id, suggestions, variantOutfit, variantType]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr,320px]">
@@ -343,6 +424,11 @@ function CharacterDetail({ character }: { character: Character }) {
           <div>
             <h3 className="text-lg font-semibold text-ink">{character.name}</h3>
             <p className="text-xs text-slate-500 capitalize">{character.role}</p>
+            {activeVariant && (
+              <p className="mt-1 text-[11px] text-indigo-600">
+                Active variant: {activeVariant.variant_type.replace("_", " ")}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -526,6 +612,126 @@ function CharacterDetail({ character }: { character: Character }) {
           {updateCharacterMutation.isSuccess && (
             <span className="text-xs text-green-600">Saved</span>
           )}
+        </div>
+
+        <div className="mt-6 border-t border-slate-200 pt-4">
+          <h4 className="text-sm font-semibold text-ink">Story Variant</h4>
+          <p className="mt-1 text-xs text-slate-500">
+            Create a story-specific variant (outfit/hair change) and select the active one.
+          </p>
+          {suggestions.some((item) => item.character_id === character.character_id) && (
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+              Suggested by story planner. Review and adjust before creating the variant.
+            </div>
+          )}
+
+          <div className="mt-3 space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-500">Variant Type</label>
+              <select
+                className="input mt-2 w-full text-sm"
+                value={variantType}
+                onChange={(event) => setVariantType(event.target.value)}
+              >
+                <option value="outfit_change">Outfit change</option>
+                <option value="hair_change">Hair change</option>
+                <option value="time_skip">Time skip</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500">Outfit / Appearance</label>
+              <input
+                className="input mt-2 w-full text-sm"
+                placeholder="e.g., Blue hoodie + sneakers"
+                value={variantOutfit}
+                onChange={(event) => setVariantOutfit(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500">Reference Image (optional)</label>
+              <select
+                className="input mt-2 w-full text-sm"
+                value={variantRefId ?? ""}
+                onChange={(event) => setVariantRefId(event.target.value || null)}
+              >
+                <option value="">Use base reference</option>
+                {approvedRefs.map((ref) => (
+                  <option key={ref.reference_image_id} value={ref.reference_image_id}>
+                    Ref {ref.reference_image_id.slice(0, 8)}
+                    {ref.is_primary ? " (Primary)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              className="btn-primary text-xs"
+              onClick={() =>
+                createVariantMutation.mutate({
+                  storyId,
+                  characterId: character.character_id,
+                  variantType,
+                  overrideAttributes: variantOutfit ? { outfit: variantOutfit } : {},
+                  referenceImageId: variantRefId,
+                  isActiveForStory: true
+                })
+              }
+              disabled={createVariantMutation.isPending}
+            >
+              {createVariantMutation.isPending ? "Creating..." : "Create & Activate Variant"}
+            </button>
+            {createVariantMutation.isError && (
+              <span className="text-xs text-rose-500">Failed to create variant.</span>
+            )}
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {variantsQuery.isLoading && (
+              <p className="text-xs text-slate-500">Loading variants...</p>
+            )}
+            {variantsQuery.data?.length === 0 && (
+              <p className="text-xs text-slate-500">No variants yet.</p>
+            )}
+            {variantsQuery.data?.map((variant: CharacterVariant) => (
+              <div
+                key={variant.variant_id}
+                className={`rounded-lg border px-3 py-2 text-xs ${
+                  variant.is_active_for_story
+                    ? "border-indigo-300 bg-indigo-50"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-slate-700 capitalize">
+                    {variant.variant_type.replace("_", " ")}
+                  </div>
+                  {variant.is_active_for_story && (
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">
+                      Active
+                    </span>
+                  )}
+                </div>
+                {variant.override_attributes?.outfit && (
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    Outfit: {variant.override_attributes.outfit}
+                  </div>
+                )}
+                <button
+                  className="btn-ghost text-[10px] mt-2"
+                  onClick={() =>
+                    activateVariantMutation.mutate({
+                      storyId,
+                      characterId: character.character_id,
+                      variantId: variant.variant_id,
+                      isActiveForStory: true
+                    })
+                  }
+                  disabled={activateVariantMutation.isPending || variant.is_active_for_story}
+                >
+                  {variant.is_active_for_story ? "Active" : "Set Active"}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </aside>
     </div>

@@ -10,7 +10,7 @@ from app.api.v1.schemas import (
     DialogueLayerUpdate,
     DialogueSuggestionsRead,
 )
-from app.db.models import DialogueLayer, Scene, Character
+from app.db.models import DialogueLayer, Scene, Character, StoryCharacter
 from app.services.artifacts import ArtifactService
 from app.graphs import nodes
 from app.graphs.nodes import ARTIFACT_DIALOGUE_SUGGESTIONS
@@ -71,38 +71,32 @@ def get_dialogue_suggestions(scene_id: uuid.UUID, db=DbSessionDep):
 
     svc = ArtifactService(db)
     artifact = svc.get_latest_artifact(scene_id, ARTIFACT_DIALOGUE_SUGGESTIONS)
-    suggestions = artifact.payload.get("suggestions", []) if artifact else []
+    dialogue_by_panel = artifact.payload.get("dialogue_by_panel", []) if artifact else []
 
-    if not artifact:
-        suggestions = nodes._extract_dialogue_suggestions(scene.source_text)
+    if not artifact or not dialogue_by_panel:
+        artifact = nodes.run_dialogue_extractor(db, scene_id)
+        dialogue_by_panel = artifact.payload.get("dialogue_by_panel", [])
 
     characters = list(
-        db.execute(select(Character).where(Character.story_id == scene.story_id)).scalars().all()
+        db.execute(
+            select(Character)
+            .join(StoryCharacter, StoryCharacter.character_id == Character.character_id)
+            .where(StoryCharacter.story_id == scene.story_id)
+        )
+        .scalars()
+        .all()
     )
     names = [char.name for char in characters if char.name]
-    has_unknown = any((item.get("speaker") in {None, "", "unknown"} for item in suggestions))
-
-    if names and has_unknown:
+    if names:
         idx = 0
-        for item in suggestions:
-            speaker = item.get("speaker")
-            if not speaker or speaker == "unknown":
-                item["speaker"] = names[idx % len(names)]
-                idx += 1
-
-        artifact = svc.create_artifact(
-            scene_id=scene_id,
-            type=ARTIFACT_DIALOGUE_SUGGESTIONS,
-            payload={"suggestions": suggestions},
-        )
-    elif artifact is None:
-        artifact = svc.create_artifact(
-            scene_id=scene_id,
-            type=ARTIFACT_DIALOGUE_SUGGESTIONS,
-            payload={"suggestions": suggestions},
-        )
+        for panel in dialogue_by_panel:
+            for line in panel.get("lines", []):
+                speaker = line.get("speaker")
+                if not speaker or speaker == "unknown":
+                    line["speaker"] = names[idx % len(names)]
+                    idx += 1
 
     return DialogueSuggestionsRead(
         scene_id=scene_id,
-        suggestions=artifact.payload.get("suggestions", []),
+        dialogue_by_panel=dialogue_by_panel,
     )

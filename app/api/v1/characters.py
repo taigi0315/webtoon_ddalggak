@@ -14,8 +14,15 @@ from app.api.v1.schemas import (
     CharacterSetPrimaryRefRequest,
     CharacterGenerateRefsRequest,
     CharacterGenerateRefsResponse,
+    CharacterVariantSuggestionRead,
 )
-from app.db.models import Character, CharacterReferenceImage, Story
+from app.db.models import (
+    Character,
+    CharacterReferenceImage,
+    CharacterVariantSuggestion,
+    Story,
+    StoryCharacter,
+)
 from app.graphs import nodes
 
 
@@ -49,11 +56,35 @@ def create_character(story_id: uuid.UUID, payload: CharacterCreate, db=DbSession
         raise HTTPException(status_code=404, detail="story not found")
 
     existing_codes = {
-        c.canonical_code for c in db.execute(select(Character.canonical_code).where(Character.story_id == story_id)).scalars().all()
+        c.canonical_code
+        for c in db.execute(select(Character.canonical_code).where(Character.project_id == story.project_id)).scalars().all()
         if c
     }
+
+    existing = (
+        db.execute(
+            select(Character)
+            .where(
+                Character.project_id == story.project_id,
+                func.lower(Character.name) == func.lower(payload.name),
+            )
+            .order_by(Character.created_at.desc())
+            .limit(1)
+        )
+        .scalars()
+        .one_or_none()
+    )
+
+    if existing is not None:
+        link = db.get(StoryCharacter, {"story_id": story_id, "character_id": existing.character_id})
+        if link is None:
+            db.add(StoryCharacter(story_id=story_id, character_id=existing.character_id))
+            db.commit()
+        db.refresh(existing)
+        return existing
+
     character = Character(
-        story_id=story_id,
+        project_id=story.project_id,
         canonical_code=_next_character_code(existing_codes),
         name=payload.name,
         description=payload.description,
@@ -67,66 +98,7 @@ def create_character(story_id: uuid.UUID, payload: CharacterCreate, db=DbSession
     )
     db.add(character)
     db.flush()
-
-    # Reuse project-level character references by name
-    existing = (
-        db.execute(
-            select(Character)
-            .join(Story, Character.story_id == Story.story_id)
-            .where(
-                Story.project_id == story.project_id,
-                func.lower(Character.name) == func.lower(payload.name),
-                Character.character_id != character.character_id,
-            )
-            .order_by(Character.created_at.desc())
-            .limit(1)
-        )
-        .scalars()
-        .one_or_none()
-    )
-
-    if existing is not None:
-        if character.description is None:
-            character.description = existing.description
-        if character.identity_line is None:
-            character.identity_line = existing.identity_line
-        if not character.role:
-            character.role = existing.role
-        if character.gender is None:
-            character.gender = existing.gender
-        if character.age_range is None:
-            character.age_range = existing.age_range
-        if character.appearance is None:
-            character.appearance = existing.appearance
-        if character.hair_description is None:
-            character.hair_description = existing.hair_description
-        if character.base_outfit is None:
-            character.base_outfit = existing.base_outfit
-
-        refs = (
-            db.execute(
-                select(CharacterReferenceImage)
-                .where(CharacterReferenceImage.character_id == existing.character_id)
-            )
-            .scalars()
-            .all()
-        )
-        for ref in refs:
-            db.add(
-                CharacterReferenceImage(
-                    character_id=character.character_id,
-                    image_url=ref.image_url,
-                    ref_type=ref.ref_type,
-                    approved=ref.approved,
-                    is_primary=ref.is_primary,
-                    metadata_=ref.metadata_ or {},
-                )
-            )
-        if existing.approved:
-            character.approved = True
-        if character.approved or refs:
-            character.appearance = dict(character.appearance or {})
-            character.appearance["project_reused"] = True
+    db.add(StoryCharacter(story_id=story_id, character_id=character.character_id))
 
     db.commit()
     db.refresh(character)
@@ -170,8 +142,80 @@ def list_characters(story_id: uuid.UUID, db=DbSessionDep):
     if story is None:
         raise HTTPException(status_code=404, detail="story not found")
 
-    stmt = select(Character).where(Character.story_id == story_id)
+    stmt = (
+        select(Character)
+        .join(StoryCharacter, StoryCharacter.character_id == Character.character_id)
+        .where(StoryCharacter.story_id == story_id)
+    )
     return list(db.execute(stmt).scalars().all())
+
+
+@router.get(
+    "/stories/{story_id}/character-variant-suggestions",
+    response_model=list[CharacterVariantSuggestionRead],
+)
+def get_character_variant_suggestions(story_id: uuid.UUID, db=DbSessionDep):
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="story not found")
+
+    existing = list(
+        db.execute(
+            select(CharacterVariantSuggestion).where(CharacterVariantSuggestion.story_id == story_id)
+        )
+        .scalars()
+        .all()
+    )
+    if existing:
+        return existing
+
+    suggestions = nodes.generate_character_variant_suggestions(db, story_id)
+    created: list[CharacterVariantSuggestion] = []
+    for item in suggestions:
+        suggestion = CharacterVariantSuggestion(
+            story_id=story_id,
+            character_id=item["character_id"],
+            variant_type=item.get("variant_type") or "outfit_change",
+            override_attributes=item.get("override_attributes") or {},
+        )
+        db.add(suggestion)
+        created.append(suggestion)
+    db.commit()
+    for suggestion in created:
+        db.refresh(suggestion)
+    return created
+
+
+@router.post(
+    "/stories/{story_id}/character-variant-suggestions/refresh",
+    response_model=list[CharacterVariantSuggestionRead],
+)
+def refresh_character_variant_suggestions(story_id: uuid.UUID, db=DbSessionDep):
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="story not found")
+
+    db.execute(
+        select(CharacterVariantSuggestion).where(CharacterVariantSuggestion.story_id == story_id)
+    )
+    db.query(CharacterVariantSuggestion).filter(CharacterVariantSuggestion.story_id == story_id).delete()
+    db.commit()
+
+    suggestions = nodes.generate_character_variant_suggestions(db, story_id)
+    created: list[CharacterVariantSuggestion] = []
+    for item in suggestions:
+        suggestion = CharacterVariantSuggestion(
+            story_id=story_id,
+            character_id=item["character_id"],
+            variant_type=item.get("variant_type") or "outfit_change",
+            override_attributes=item.get("override_attributes") or {},
+        )
+        db.add(suggestion)
+        created.append(suggestion)
+    db.commit()
+    for suggestion in created:
+        db.refresh(suggestion)
+    return created
 
 
 @router.post("/characters/{character_id}/approve", response_model=CharacterRead)
@@ -298,8 +342,19 @@ def generate_character_refs(character_id: uuid.UUID, payload: CharacterGenerateR
         )
 
     story_style = None
-    if character.story:
-        story_style = character.story.default_story_style
+    linked_story = (
+        db.execute(
+            select(Story)
+            .join(StoryCharacter, StoryCharacter.story_id == Story.story_id)
+            .where(StoryCharacter.character_id == character_id)
+            .order_by(Story.created_at.desc())
+            .limit(1)
+        )
+        .scalars()
+        .one_or_none()
+    )
+    if linked_story is not None:
+        story_style = linked_story.default_story_style
 
     generated_refs: list[CharacterReferenceImage] = []
     for ref_type in payload.ref_types:
