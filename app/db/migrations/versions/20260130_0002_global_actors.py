@@ -20,20 +20,20 @@ depends_on = None
 
 def upgrade() -> None:
     # Make project_id nullable on characters for global actors
-    op.alter_column(
-        "characters",
-        "project_id",
-        existing_type=sa.Uuid(),
-        nullable=True,
-    )
+    with op.batch_alter_table("characters") as batch_op:
+        batch_op.alter_column(
+            "project_id",
+            existing_type=sa.Uuid(),
+            nullable=True,
+        )
 
 
 def downgrade() -> None:
     # Make project_id required again
     # Note: This may fail if NULL values exist - manual cleanup required
-    op.alter_column(
-        "characters",
-        "project_id",
-        existing_type=sa.Uuid(),
-        nullable=False,
-    )
+    with op.batch_alter_table("characters") as batch_op:
+        batch_op.alter_column(
+            "project_id",
+            existing_type=sa.Uuid(),
+            nullable=False,
+        )

@@ -702,7 +702,7 @@ def import_reference_from_library(
     if not library_char.is_library_saved:
         raise HTTPException(status_code=400, detail="Source character is not in library")
 
-    if target_char.project_id != library_char.project_id:
+    if library_char.project_id is not None and target_char.project_id != library_char.project_id:
         raise HTTPException(status_code=400, detail="Project mismatch")
 
     # Get primary face ref from library char
@@ -767,10 +767,10 @@ def load_character_from_library(
     if library_char is None:
         raise HTTPException(status_code=404, detail="library character not found")
 
-    if library_char.project_id != story.project_id:
+    if library_char.project_id is not None and library_char.project_id != story.project_id:
         raise HTTPException(
             status_code=400,
-            detail="Library character must be from the same project",
+            detail="Library character must be from the same project or global",
         )
 
     if not library_char.is_library_saved:

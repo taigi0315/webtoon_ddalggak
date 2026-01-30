@@ -19,19 +19,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "scenes",
-        sa.Column("environment_id", sa.Uuid(as_uuid=True), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_scenes_environment_id",
-        "scenes",
-        "environment_anchors",
-        ["environment_id"],
-        ["environment_id"],
-    )
+    with op.batch_alter_table("scenes") as batch_op:
+        batch_op.add_column(sa.Column("environment_id", sa.Uuid(as_uuid=True), nullable=True))
+        batch_op.create_foreign_key(
+            "fk_scenes_environment_id",
+            "environment_anchors",
+            ["environment_id"],
+            ["environment_id"],
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_scenes_environment_id", "scenes", type_="foreignkey")
-    op.drop_column("scenes", "environment_id")
+    with op.batch_alter_table("scenes") as batch_op:
+        batch_op.drop_constraint("fk_scenes_environment_id", type_="foreignkey")
+        batch_op.drop_column("environment_id")

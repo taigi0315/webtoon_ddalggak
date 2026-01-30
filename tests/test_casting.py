@@ -397,7 +397,7 @@ def mock_gemini_client():
 def mock_storage():
     """Mock the storage service."""
     with patch("app.services.casting._save_image") as mock:
-        mock.return_value = "/media/test_image.png"
+        mock.return_value = "http://mock-storage/image.png"
         yield mock
 
 

@@ -1266,23 +1266,19 @@ async def test_full_casting_workflow(db_session, project):
 ## File Checklist
 
 ### New Files to Create
-- [ ] `app/db/migrations/versions/20260130_0001_actor_system.py`
-- [ ] `app/api/v1/casting.py`
-- [ ] `app/services/casting.py`
-- [ ] `app/prompts/v1/casting/profile_sheet.yaml`
-- [ ] `app/prompts/v1/casting/variant_generation.yaml`
-- [ ] `frontend/app/studio/casting/page.tsx`
-- [ ] `frontend/components/casting/CharacterGenerationForm.tsx`
-- [ ] `frontend/components/casting/CharacterLibraryGrid.tsx`
-- [ ] `frontend/components/casting/CharacterDetailView.tsx`
-- [ ] `frontend/components/casting/VariantPanel.tsx`
-- [ ] `tests/test_casting_api.py`
+- [x] `app/db/migrations/versions/20260130_0001_actor_system.py`
+- [x] `app/api/v1/casting.py`
+- [x] `app/services/casting.py`
+- [x] `app/prompts/v1/casting/profile_sheet.yaml`
+- [x] `app/prompts/v1/casting/variant_generation.yaml`
+- [x] `frontend/app/casting/page.tsx` (Moved from studio/casting)
+- [x] `tests/test_casting.py`
 
 ### Files to Modify
-- [ ] `app/db/models.py` - Add new fields to Character and CharacterVariant
-- [ ] `app/api/v1/schemas.py` - Add Actor system schemas
-- [ ] `app/api/v1/__init__.py` or `app/main.py` - Register casting router
-- [ ] `frontend/components/Sidebar.tsx` - Add Casting nav item
+- [x] `app/db/models.py` - Add new fields to Character and CharacterVariant
+- [x] `app/api/v1/schemas.py` - Add Actor system schemas
+- [x] `app/api/v1/__init__.py` or `app/main.py` - Register casting router
+- [x] `frontend/components/shell/SidebarNav.tsx` - Add Casting nav item
 
 ---
 

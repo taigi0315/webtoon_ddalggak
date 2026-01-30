@@ -1,5 +1,6 @@
-.PHONY: help install install-back install-front dev dev-install dev-back dev-front db-up db-migrate db-down api ui kill test lint clean test-data
+.PHONY: help install install-back install-front dev dev-install dev-back dev-arize dev-front db-up db-migrate db-down api ui kill test lint clean test-data
 
+# Default target
 # Default target
 help:
 	@echo "Available commands:"
@@ -9,6 +10,7 @@ help:
 	@echo "  dev        Show dev commands"
 	@echo "  dev-install Install dev dependencies"
 	@echo "  dev-back   Run backend only"
+	@echo "  dev-arize  Run backend with Arize Phoenix (requires Docker)"
 	@echo "  dev-front  Run frontend only"
 	@echo "  db-up      Start Postgres via Docker Compose"
 	@echo "  db-down    Stop Postgres"
@@ -55,9 +57,14 @@ ui:
 dev:
 	@echo "Use one of:"
 	@echo "  make dev-back   # backend only"
+	@echo "  make dev-arize  # backend with phoenix"
 	@echo "  make dev-front  # frontend only"
 
 dev-back:
+	@echo "Starting backend..."
+	uvicorn app.main:app --reload
+
+dev-arize:
 	docker compose up -d phoenix
 	@echo "Starting backend with Phoenix OTEL endpoint..."
 	PHOENIX_OTEL_ENDPOINT=http://localhost:6006/v1/traces uvicorn app.main:app --reload

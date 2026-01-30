@@ -19,148 +19,184 @@ depends_on = None
 
 def upgrade() -> None:
     # projects -> stories
-    op.execute("ALTER TABLE stories DROP CONSTRAINT IF EXISTS stories_project_id_fkey")
-    op.execute(
-        "ALTER TABLE stories ADD CONSTRAINT stories_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE"
-    )
+    with op.batch_alter_table("stories") as batch_op:
+        # Note: In SQLite batch mode, we rely on table recreation to replace constraints.
+        # We define the new FK configuration here.
+        batch_op.create_foreign_key(
+            "stories_project_id_fkey", "projects", ["project_id"], ["project_id"], ondelete="CASCADE"
+        )
 
     # stories -> scenes/characters/episodes
-    op.execute("ALTER TABLE scenes DROP CONSTRAINT IF EXISTS scenes_story_id_fkey")
-    op.execute(
-        "ALTER TABLE scenes ADD CONSTRAINT scenes_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(story_id) ON DELETE CASCADE"
-    )
-    op.execute("ALTER TABLE characters DROP CONSTRAINT IF EXISTS characters_story_id_fkey")
-    op.execute(
-        "ALTER TABLE characters ADD CONSTRAINT characters_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(story_id) ON DELETE CASCADE"
-    )
-    op.execute("ALTER TABLE episodes DROP CONSTRAINT IF EXISTS episodes_story_id_fkey")
-    op.execute(
-        "ALTER TABLE episodes ADD CONSTRAINT episodes_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(story_id) ON DELETE CASCADE"
-    )
+    with op.batch_alter_table("scenes") as batch_op:
+        batch_op.create_foreign_key(
+            "scenes_story_id_fkey", "stories", ["story_id"], ["story_id"], ondelete="CASCADE"
+        )
+
+    with op.batch_alter_table("characters") as batch_op:
+        batch_op.create_foreign_key(
+            "characters_story_id_fkey", "stories", ["story_id"], ["story_id"], ondelete="CASCADE"
+        )
+
+    with op.batch_alter_table("episodes") as batch_op:
+        batch_op.create_foreign_key(
+            "episodes_story_id_fkey", "stories", ["story_id"], ["story_id"], ondelete="CASCADE"
+        )
 
     # scenes -> environment anchors
-    op.execute("ALTER TABLE scenes DROP CONSTRAINT IF EXISTS scenes_environment_id_fkey")
-    op.execute(
-        "ALTER TABLE scenes ADD CONSTRAINT scenes_environment_id_fkey FOREIGN KEY (environment_id) REFERENCES environment_anchors(environment_id) ON DELETE SET NULL"
-    )
+    with op.batch_alter_table("scenes") as batch_op:
+        batch_op.create_foreign_key(
+            "scenes_environment_id_fkey",
+            "environment_anchors",
+            ["environment_id"],
+            ["environment_id"],
+            ondelete="SET NULL",
+        )
 
     # characters -> reference images
-    op.execute("ALTER TABLE character_reference_images DROP CONSTRAINT IF EXISTS character_reference_images_character_id_fkey")
-    op.execute(
-        "ALTER TABLE character_reference_images ADD CONSTRAINT character_reference_images_character_id_fkey FOREIGN KEY (character_id) REFERENCES characters(character_id) ON DELETE CASCADE"
-    )
+    with op.batch_alter_table("character_reference_images") as batch_op:
+        batch_op.create_foreign_key(
+            "character_reference_images_character_id_fkey",
+            "characters",
+            ["character_id"],
+            ["character_id"],
+            ondelete="CASCADE",
+        )
 
     # scenes -> artifacts/dialogue/layers/exports/episode_scenes
-    op.execute("ALTER TABLE artifacts DROP CONSTRAINT IF EXISTS artifacts_scene_id_fkey")
-    op.execute(
-        "ALTER TABLE artifacts ADD CONSTRAINT artifacts_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id) ON DELETE CASCADE"
-    )
-    op.execute("ALTER TABLE dialogue_layers DROP CONSTRAINT IF EXISTS dialogue_layers_scene_id_fkey")
-    op.execute(
-        "ALTER TABLE dialogue_layers ADD CONSTRAINT dialogue_layers_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id) ON DELETE CASCADE"
-    )
-    op.execute("ALTER TABLE layers DROP CONSTRAINT IF EXISTS layers_scene_id_fkey")
-    op.execute(
-        "ALTER TABLE layers ADD CONSTRAINT layers_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id) ON DELETE CASCADE"
-    )
-    op.execute("ALTER TABLE exports DROP CONSTRAINT IF EXISTS exports_scene_id_fkey")
-    op.execute(
-        "ALTER TABLE exports ADD CONSTRAINT exports_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id) ON DELETE SET NULL"
-    )
-    op.execute("ALTER TABLE episode_scenes DROP CONSTRAINT IF EXISTS episode_scenes_scene_id_fkey")
-    op.execute(
-        "ALTER TABLE episode_scenes ADD CONSTRAINT episode_scenes_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id) ON DELETE CASCADE"
-    )
+    with op.batch_alter_table("artifacts") as batch_op:
+        batch_op.create_foreign_key(
+            "artifacts_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"], ondelete="CASCADE"
+        )
+
+    with op.batch_alter_table("dialogue_layers") as batch_op:
+        batch_op.create_foreign_key(
+            "dialogue_layers_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"], ondelete="CASCADE"
+        )
+
+    with op.batch_alter_table("layers") as batch_op:
+        batch_op.create_foreign_key(
+            "layers_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"], ondelete="CASCADE"
+        )
+
+    with op.batch_alter_table("exports") as batch_op:
+        batch_op.create_foreign_key(
+            "exports_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"], ondelete="SET NULL"
+        )
+
+    with op.batch_alter_table("episode_scenes") as batch_op:
+        batch_op.create_foreign_key(
+            "episode_scenes_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"], ondelete="CASCADE"
+        )
 
     # artifacts -> images (nullable)
-    op.execute("ALTER TABLE images DROP CONSTRAINT IF EXISTS images_artifact_id_fkey")
-    op.execute(
-        "ALTER TABLE images ADD CONSTRAINT images_artifact_id_fkey FOREIGN KEY (artifact_id) REFERENCES artifacts(artifact_id) ON DELETE SET NULL"
-    )
-    op.execute("ALTER TABLE artifacts DROP CONSTRAINT IF EXISTS artifacts_parent_id_fkey")
-    op.execute(
-        "ALTER TABLE artifacts ADD CONSTRAINT artifacts_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES artifacts(artifact_id) ON DELETE SET NULL"
-    )
+    with op.batch_alter_table("images") as batch_op:
+        batch_op.create_foreign_key(
+            "images_artifact_id_fkey",
+            "artifacts",
+            ["artifact_id"],
+            ["artifact_id"],
+            ondelete="SET NULL",
+        )
+
+    with op.batch_alter_table("artifacts") as batch_op:
+        batch_op.create_foreign_key(
+            "artifacts_parent_id_fkey",
+            "artifacts",
+            ["parent_id"],
+            ["artifact_id"],
+            ondelete="SET NULL",
+        )
 
     # episodes -> episode_scenes/assets/exports
-    op.execute("ALTER TABLE episode_scenes DROP CONSTRAINT IF EXISTS episode_scenes_episode_id_fkey")
-    op.execute(
-        "ALTER TABLE episode_scenes ADD CONSTRAINT episode_scenes_episode_id_fkey FOREIGN KEY (episode_id) REFERENCES episodes(episode_id) ON DELETE CASCADE"
-    )
-    op.execute("ALTER TABLE episode_assets DROP CONSTRAINT IF EXISTS episode_assets_episode_id_fkey")
-    op.execute(
-        "ALTER TABLE episode_assets ADD CONSTRAINT episode_assets_episode_id_fkey FOREIGN KEY (episode_id) REFERENCES episodes(episode_id) ON DELETE CASCADE"
-    )
-    op.execute("ALTER TABLE exports DROP CONSTRAINT IF EXISTS exports_episode_id_fkey")
-    op.execute(
-        "ALTER TABLE exports ADD CONSTRAINT exports_episode_id_fkey FOREIGN KEY (episode_id) REFERENCES episodes(episode_id) ON DELETE SET NULL"
-    )
+    with op.batch_alter_table("episode_scenes") as batch_op:
+        batch_op.create_foreign_key(
+            "episode_scenes_episode_id_fkey", "episodes", ["episode_id"], ["episode_id"], ondelete="CASCADE"
+        )
+
+    with op.batch_alter_table("episode_assets") as batch_op:
+        batch_op.create_foreign_key(
+            "episode_assets_episode_id_fkey", "episodes", ["episode_id"], ["episode_id"], ondelete="CASCADE"
+        )
+
+    with op.batch_alter_table("exports") as batch_op:
+        batch_op.create_foreign_key(
+            "exports_episode_id_fkey", "episodes", ["episode_id"], ["episode_id"], ondelete="SET NULL"
+        )
 
 
 def downgrade() -> None:
-    # Keep downgrade minimal; restore to NO ACTION by dropping and recreating without ON DELETE.
-    op.execute("ALTER TABLE exports DROP CONSTRAINT IF EXISTS exports_episode_id_fkey")
-    op.execute("ALTER TABLE episode_assets DROP CONSTRAINT IF EXISTS episode_assets_episode_id_fkey")
-    op.execute("ALTER TABLE episode_scenes DROP CONSTRAINT IF EXISTS episode_scenes_episode_id_fkey")
-    op.execute("ALTER TABLE artifacts DROP CONSTRAINT IF EXISTS artifacts_parent_id_fkey")
-    op.execute("ALTER TABLE images DROP CONSTRAINT IF EXISTS images_artifact_id_fkey")
-    op.execute("ALTER TABLE episode_scenes DROP CONSTRAINT IF EXISTS episode_scenes_scene_id_fkey")
-    op.execute("ALTER TABLE exports DROP CONSTRAINT IF EXISTS exports_scene_id_fkey")
-    op.execute("ALTER TABLE layers DROP CONSTRAINT IF EXISTS layers_scene_id_fkey")
-    op.execute("ALTER TABLE dialogue_layers DROP CONSTRAINT IF EXISTS dialogue_layers_scene_id_fkey")
-    op.execute("ALTER TABLE artifacts DROP CONSTRAINT IF EXISTS artifacts_scene_id_fkey")
-    op.execute("ALTER TABLE character_reference_images DROP CONSTRAINT IF EXISTS character_reference_images_character_id_fkey")
-    op.execute("ALTER TABLE scenes DROP CONSTRAINT IF EXISTS scenes_environment_id_fkey")
-    op.execute("ALTER TABLE episodes DROP CONSTRAINT IF EXISTS episodes_story_id_fkey")
-    op.execute("ALTER TABLE characters DROP CONSTRAINT IF EXISTS characters_story_id_fkey")
-    op.execute("ALTER TABLE scenes DROP CONSTRAINT IF EXISTS scenes_story_id_fkey")
-    op.execute("ALTER TABLE stories DROP CONSTRAINT IF EXISTS stories_project_id_fkey")
+    # Keep downgrade minimal; restore to NO ACTION by dropping/recreating without ON DELETE.
+    # Note: drop_constraint removed for SQLite compatibility; we just overwrite.
+    with op.batch_alter_table("exports") as batch_op:
+        batch_op.create_foreign_key(
+            "exports_episode_id_fkey", "episodes", ["episode_id"], ["episode_id"]
+        )
 
-    op.execute(
-        "ALTER TABLE stories ADD CONSTRAINT stories_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(project_id)"
-    )
-    op.execute(
-        "ALTER TABLE scenes ADD CONSTRAINT scenes_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(story_id)"
-    )
-    op.execute(
-        "ALTER TABLE characters ADD CONSTRAINT characters_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(story_id)"
-    )
-    op.execute(
-        "ALTER TABLE episodes ADD CONSTRAINT episodes_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(story_id)"
-    )
-    op.execute(
-        "ALTER TABLE scenes ADD CONSTRAINT scenes_environment_id_fkey FOREIGN KEY (environment_id) REFERENCES environment_anchors(environment_id)"
-    )
-    op.execute(
-        "ALTER TABLE character_reference_images ADD CONSTRAINT character_reference_images_character_id_fkey FOREIGN KEY (character_id) REFERENCES characters(character_id)"
-    )
-    op.execute(
-        "ALTER TABLE artifacts ADD CONSTRAINT artifacts_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id)"
-    )
-    op.execute(
-        "ALTER TABLE dialogue_layers ADD CONSTRAINT dialogue_layers_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id)"
-    )
-    op.execute(
-        "ALTER TABLE layers ADD CONSTRAINT layers_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id)"
-    )
-    op.execute(
-        "ALTER TABLE exports ADD CONSTRAINT exports_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id)"
-    )
-    op.execute(
-        "ALTER TABLE episode_scenes ADD CONSTRAINT episode_scenes_scene_id_fkey FOREIGN KEY (scene_id) REFERENCES scenes(scene_id)"
-    )
-    op.execute(
-        "ALTER TABLE images ADD CONSTRAINT images_artifact_id_fkey FOREIGN KEY (artifact_id) REFERENCES artifacts(artifact_id)"
-    )
-    op.execute(
-        "ALTER TABLE artifacts ADD CONSTRAINT artifacts_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES artifacts(artifact_id)"
-    )
-    op.execute(
-        "ALTER TABLE episode_scenes ADD CONSTRAINT episode_scenes_episode_id_fkey FOREIGN KEY (episode_id) REFERENCES episodes(episode_id)"
-    )
-    op.execute(
-        "ALTER TABLE episode_assets ADD CONSTRAINT episode_assets_episode_id_fkey FOREIGN KEY (episode_id) REFERENCES episodes(episode_id)"
-    )
-    op.execute(
-        "ALTER TABLE exports ADD CONSTRAINT exports_episode_id_fkey FOREIGN KEY (episode_id) REFERENCES episodes(episode_id)"
-    )
+    with op.batch_alter_table("episode_assets") as batch_op:
+        batch_op.create_foreign_key(
+            "episode_assets_episode_id_fkey", "episodes", ["episode_id"], ["episode_id"]
+        )
+
+    with op.batch_alter_table("episode_scenes") as batch_op:
+        batch_op.create_foreign_key(
+            "episode_scenes_episode_id_fkey", "episodes", ["episode_id"], ["episode_id"]
+        )
+        batch_op.create_foreign_key(
+            "episode_scenes_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"]
+        )
+
+    with op.batch_alter_table("artifacts") as batch_op:
+        batch_op.create_foreign_key(
+            "artifacts_parent_id_fkey", "artifacts", ["parent_id"], ["artifact_id"]
+        )
+        batch_op.create_foreign_key(
+            "artifacts_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"]
+        )
+
+    with op.batch_alter_table("images") as batch_op:
+        batch_op.create_foreign_key(
+            "images_artifact_id_fkey", "artifacts", ["artifact_id"], ["artifact_id"]
+        )
+
+    with op.batch_alter_table("exports") as batch_op:
+        batch_op.create_foreign_key(
+            "exports_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"]
+        )
+
+    with op.batch_alter_table("layers") as batch_op:
+        batch_op.create_foreign_key(
+            "layers_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"]
+        )
+
+    with op.batch_alter_table("dialogue_layers") as batch_op:
+        batch_op.create_foreign_key(
+            "dialogue_layers_scene_id_fkey", "scenes", ["scene_id"], ["scene_id"]
+        )
+
+    with op.batch_alter_table("character_reference_images") as batch_op:
+        batch_op.create_foreign_key(
+            "character_reference_images_character_id_fkey", "characters", ["character_id"], ["character_id"]
+        )
+
+    with op.batch_alter_table("scenes") as batch_op:
+        batch_op.create_foreign_key(
+            "scenes_environment_id_fkey", "environment_anchors", ["environment_id"], ["environment_id"]
+        )
+        batch_op.create_foreign_key(
+            "scenes_story_id_fkey", "stories", ["story_id"], ["story_id"]
+        )
+
+    with op.batch_alter_table("episodes") as batch_op:
+        batch_op.create_foreign_key(
+            "episodes_story_id_fkey", "stories", ["story_id"], ["story_id"]
+        )
+
+    with op.batch_alter_table("characters") as batch_op:
+        batch_op.create_foreign_key(
+            "characters_story_id_fkey", "stories", ["story_id"], ["story_id"]
+        )
+
+    with op.batch_alter_table("stories") as batch_op:
+        batch_op.create_foreign_key(
+            "stories_project_id_fkey", "projects", ["project_id"], ["project_id"]
+        )

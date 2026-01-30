@@ -2,7 +2,8 @@ import Link from "next/link";
 
 const items = [
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Projects", href: "/projects" }
+  { label: "Projects", href: "/projects" },
+  { label: "Actor Library", href: "/casting" }
 ];
 
 const studioItems = [

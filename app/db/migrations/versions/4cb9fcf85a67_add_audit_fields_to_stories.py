@@ -51,85 +51,119 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['project_id'], ['projects.project_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('preset_id')
     )
-    op.add_column('artifacts', sa.Column('created_by', sa.String(length=64), nullable=True))
-    op.add_column('artifacts', sa.Column('updated_by', sa.String(length=64), nullable=True))
-    op.alter_column('artifacts', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_artifacts_scene_type_version'), table_name='artifacts')
-    op.alter_column('character_reference_images', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('character_variant_suggestions', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_variant_suggestions_story_character'), table_name='character_variant_suggestions')
-    op.alter_column('character_variants', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_character_variants_story_character'), table_name='character_variants')
-    op.alter_column('characters', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('dialogue_layers', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('environment_anchors', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_episode_assets_episode_id'), table_name='episode_assets')
-    op.drop_index(op.f('ix_episode_scenes_episode_id'), table_name='episode_scenes')
-    op.drop_index(op.f('ix_episode_scenes_scene_id'), table_name='episode_scenes')
-    op.alter_column('episodes', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('exports', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_exports_episode_id'), table_name='exports')
-    op.drop_index(op.f('ix_exports_scene_id'), table_name='exports')
-    op.drop_constraint(op.f('fk_exports_episode_id'), 'exports', type_='foreignkey')
-    op.alter_column('images', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('layers', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_layers_scene_id'), table_name='layers')
-    op.alter_column('projects', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.add_column('scenes', sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False))
-    op.add_column('scenes', sa.Column('created_by', sa.String(length=64), nullable=True))
-    op.add_column('scenes', sa.Column('updated_by', sa.String(length=64), nullable=True))
-    op.alter_column('scenes', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_constraint(op.f('fk_scenes_environment_id'), 'scenes', type_='foreignkey')
-    op.add_column('stories', sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False))
-    op.add_column('stories', sa.Column('created_by', sa.String(length=64), nullable=True))
-    op.add_column('stories', sa.Column('updated_by', sa.String(length=64), nullable=True))
-    op.alter_column('stories', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('story_characters', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
+    
+    with op.batch_alter_table('artifacts') as batch_op:
+        batch_op.add_column(sa.Column('created_by', sa.String(length=64), nullable=True))
+        batch_op.add_column(sa.Column('updated_by', sa.String(length=64), nullable=True))
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+        batch_op.drop_index('ix_artifacts_scene_type_version')
+
+    with op.batch_alter_table('character_reference_images') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+
+    with op.batch_alter_table('character_variant_suggestions') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+        batch_op.drop_index('ix_variant_suggestions_story_character')
+
+    with op.batch_alter_table('character_variants') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+        batch_op.drop_index('ix_character_variants_story_character')
+
+    with op.batch_alter_table('characters') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+
+    with op.batch_alter_table('dialogue_layers') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+
+    with op.batch_alter_table('environment_anchors') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+
+    with op.batch_alter_table('episode_assets') as batch_op:
+        batch_op.drop_index('ix_episode_assets_episode_id')
+
+    with op.batch_alter_table('episode_scenes') as batch_op:
+        batch_op.drop_index('ix_episode_scenes_episode_id')
+        batch_op.drop_index('ix_episode_scenes_scene_id')
+
+    with op.batch_alter_table('episodes') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+
+    with op.batch_alter_table('exports') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+        batch_op.drop_index('ix_exports_episode_id')
+        batch_op.drop_index('ix_exports_scene_id')
+        # batch_op.drop_constraint('fk_exports_episode_id', type_='foreignkey')  # Likely auto-handled or not needed in batch
+
+    with op.batch_alter_table('images') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+
+    with op.batch_alter_table('layers') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+        batch_op.drop_index('ix_layers_scene_id')
+
+    with op.batch_alter_table('projects') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+
+    with op.batch_alter_table('scenes') as batch_op:
+        batch_op.add_column(sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False))
+        batch_op.add_column(sa.Column('created_by', sa.String(length=64), nullable=True))
+        batch_op.add_column(sa.Column('updated_by', sa.String(length=64), nullable=True))
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+        # batch_op.drop_constraint('fk_scenes_environment_id', type_='foreignkey')
+
+    with op.batch_alter_table('stories') as batch_op:
+        batch_op.add_column(sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False))
+        batch_op.add_column(sa.Column('created_by', sa.String(length=64), nullable=True))
+        batch_op.add_column(sa.Column('updated_by', sa.String(length=64), nullable=True))
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
+
+    with op.batch_alter_table('story_characters') as batch_op:
+        batch_op.alter_column('created_at',
+                existing_type=postgresql.TIMESTAMP(timezone=True),
+                nullable=False,
+                existing_server_default=sa.text('now()'))
     # ### end Alembic commands ###
 
 

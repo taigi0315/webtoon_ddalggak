@@ -19,10 +19,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.alter_column("characters", "hair_description", existing_type=sa.String(length=128), type_=sa.Text())
-    op.alter_column("characters", "base_outfit", existing_type=sa.String(length=255), type_=sa.Text())
+    with op.batch_alter_table("characters") as batch_op:
+        batch_op.alter_column("hair_description", existing_type=sa.String(length=128), type_=sa.Text())
+        batch_op.alter_column("base_outfit", existing_type=sa.String(length=255), type_=sa.Text())
 
 
 def downgrade() -> None:
-    op.alter_column("characters", "base_outfit", existing_type=sa.Text(), type_=sa.String(length=255))
-    op.alter_column("characters", "hair_description", existing_type=sa.Text(), type_=sa.String(length=128))
+    with op.batch_alter_table("characters") as batch_op:
+        batch_op.alter_column("base_outfit", existing_type=sa.Text(), type_=sa.String(length=255))
+        batch_op.alter_column("hair_description", existing_type=sa.Text(), type_=sa.String(length=128))

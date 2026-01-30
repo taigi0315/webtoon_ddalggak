@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("story_id", sa.Uuid(as_uuid=True), nullable=False),
         sa.Column("character_id", sa.Uuid(as_uuid=True), nullable=False),
         sa.Column("variant_type", sa.String(length=32), nullable=False, server_default="outfit_change"),
-        sa.Column("override_attributes", sa.JSON(), nullable=False, server_default=sa.text("'{}'::json")),
+        sa.Column("override_attributes", sa.JSON(), nullable=False, server_default=sa.text("'{}'")),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True),
         sa.ForeignKeyConstraint(["story_id"], ["stories.story_id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["character_id"], ["characters.character_id"], ondelete="CASCADE"),
