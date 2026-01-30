@@ -19,23 +19,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "exports",
-        sa.Column("episode_id", sa.Uuid(as_uuid=True), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_exports_episode_id",
-        "exports",
-        "episodes",
-        ["episode_id"],
-        ["episode_id"],
-    )
-    op.alter_column("exports", "scene_id", existing_type=sa.Uuid(as_uuid=True), nullable=True)
-    op.create_index("ix_exports_episode_id", "exports", ["episode_id"], unique=False)
+    with op.batch_alter_table("exports") as batch_op:
+        batch_op.add_column(sa.Column("episode_id", sa.Uuid(as_uuid=True), nullable=True))
+        batch_op.create_foreign_key(
+            "fk_exports_episode_id",
+            "episodes",
+            ["episode_id"],
+            ["episode_id"],
+        )
+        batch_op.alter_column("scene_id", existing_type=sa.Uuid(as_uuid=True), nullable=True)
+        batch_op.create_index("ix_exports_episode_id", ["episode_id"], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index("ix_exports_episode_id", table_name="exports")
-    op.alter_column("exports", "scene_id", existing_type=sa.Uuid(as_uuid=True), nullable=False)
-    op.drop_constraint("fk_exports_episode_id", "exports", type_="foreignkey")
-    op.drop_column("exports", "episode_id")
+    with op.batch_alter_table("exports") as batch_op:
+        batch_op.drop_index("ix_exports_episode_id")
+        batch_op.alter_column("scene_id", existing_type=sa.Uuid(as_uuid=True), nullable=False)
+        batch_op.drop_constraint("fk_exports_episode_id", type_="foreignkey")
+        batch_op.drop_column("episode_id")

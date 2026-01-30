@@ -596,3 +596,105 @@ class GenerateWithReferenceResponse(BaseModel):
     reference_image_id: uuid.UUID | None
     status: str
     message: str
+
+
+# ============================================================================
+# Actor/Casting System Schemas
+# ============================================================================
+
+
+class CharacterTraitsInput(BaseModel):
+    """Input traits for character generation in Actor system."""
+
+    gender: str | None = Field(default=None, description="male, female, non-binary")
+    age_range: str | None = Field(default=None, description="child, teen, young_adult, middle_aged, elderly")
+    face_traits: str | None = Field(default=None, description="Sharp jawline, soft features, etc.")
+    hair_traits: str | None = Field(default=None, description="Long black hair, short blonde, etc.")
+    mood: str | None = Field(default=None, description="Confident, shy, mysterious, etc.")
+    custom_prompt: str | None = Field(default=None, description="Additional custom description")
+
+
+class GenerateActorRequest(BaseModel):
+    """Request to generate a new character profile sheet."""
+
+    story_style_id: str = Field(description="Story style for generation")
+    image_style_id: str = Field(description="Image style for generation")
+    traits: CharacterTraitsInput
+
+
+class GenerateActorResponse(BaseModel):
+    """Response after generating character profile sheet."""
+
+    character_id: uuid.UUID | None = None  # None until saved
+    image_url: str
+    image_id: uuid.UUID
+    traits_used: dict
+    status: str
+
+
+class SaveActorToLibraryRequest(BaseModel):
+    """Request to save generated character to library."""
+
+    image_id: uuid.UUID = Field(description="ID of the generated profile sheet image")
+    display_name: str = Field(min_length=1, max_length=128)
+    description: str | None = None
+    traits: CharacterTraitsInput
+    story_style_id: str
+    image_style_id: str
+
+
+class ActorVariantRead(BaseModel):
+    """Variant read model for actor system."""
+
+    variant_id: uuid.UUID
+    character_id: uuid.UUID
+    variant_name: str | None
+    variant_type: str
+    image_style_id: str | None
+    story_style_id: str | None
+    traits: dict
+    is_default: bool
+    reference_image_url: str | None = None
+    generated_image_urls: list[str] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ActorCharacterRead(BaseModel):
+    """Actor character with variants for library display."""
+
+    character_id: uuid.UUID
+    project_id: uuid.UUID | None  # None for global actors
+    display_name: str | None
+    name: str
+    description: str | None
+    gender: str | None
+    age_range: str | None
+    default_story_style_id: str | None
+    default_image_style_id: str | None
+    is_library_saved: bool
+    variants: list[ActorVariantRead] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
+
+
+class GenerateActorVariantRequest(BaseModel):
+    """Request to generate a variant from existing character."""
+
+    base_variant_id: uuid.UUID = Field(description="Variant to use as reference")
+    variant_name: str | None = Field(default=None, max_length=128)
+    story_style_id: str | None = None  # Override style
+    image_style_id: str | None = None  # Override style
+    trait_changes: CharacterTraitsInput  # What to change
+
+
+class ImportActorRequest(BaseModel):
+    """Request to import character from uploaded image."""
+
+    image_url: str = Field(description="URL of uploaded image")
+    display_name: str = Field(min_length=1, max_length=128)
+    description: str | None = None
+    traits: CharacterTraitsInput | None = None
+    story_style_id: str | None = None
+    image_style_id: str | None = None

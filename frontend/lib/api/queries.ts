@@ -1,4 +1,4 @@
-import { fetchJson } from "@/lib/api/client";
+import { fetchJson, apiConfig, ApiError } from "@/lib/api/client";
 import {
   artifactIdSchema,
   artifactsSchema,
@@ -19,11 +19,24 @@ import {
   characterRefSchema,
   characterGenerateRefsResponseSchema,
   dialogueSuggestionsSchema,
+  dialogueLayerSchema,
+  episodesSchema,
+  episodeSchema,
+  exportSchema,
   characterVariantsSchema,
   characterVariantSchema,
   characterVariantSuggestionsSchema,
   characterVariantGenerationResultsSchema,
-  sceneEstimationResponseSchema
+  sceneEstimationResponseSchema,
+  libraryCharactersSchema,
+  // Actor/Casting System
+  actorCharacterReadSchema,
+  actorCharactersReadSchema,
+  actorVariantReadSchema,
+  generateActorResponseSchema,
+  deleteActorResponseSchema,
+  deleteVariantResponseSchema,
+  type CharacterTraitsInput
 } from "@/lib/api/types";
 
 export async function fetchHealth() {
@@ -495,7 +508,7 @@ export async function fetchDialogueSuggestions(sceneId: string) {
 
 export async function fetchEpisodes(storyId: string) {
   const payload = await fetchJson(`/v1/stories/${storyId}/episodes`);
-  return payload;
+  return episodesSchema.parse(payload);
 }
 
 export async function createEpisode(params: {
@@ -512,7 +525,7 @@ export async function createEpisode(params: {
       default_image_style: params.defaultImageStyle
     })
   });
-  return payload;
+  return episodeSchema.parse(payload);
 }
 
 export async function setEpisodeScenes(params: { episodeId: string; sceneIds: string[] }) {
@@ -527,32 +540,32 @@ export async function createEpisodeExport(episodeId: string) {
   const payload = await fetchJson(`/v1/episodes/${episodeId}/export`, {
     method: "POST"
   });
-  return payload;
+  return exportSchema.parse(payload);
 }
 
 export async function finalizeExport(exportId: string) {
   const payload = await fetchJson(`/v1/exports/${exportId}/finalize`, {
     method: "POST"
   });
-  return payload;
+  return exportSchema.parse(payload);
 }
 
 export async function generateVideoExport(exportId: string) {
   const payload = await fetchJson(`/v1/exports/${exportId}/generate-video`, {
     method: "POST"
   });
-  return payload;
+  return exportSchema.parse(payload);
 }
 
 export async function fetchExport(exportId: string) {
   const payload = await fetchJson(`/v1/exports/${exportId}`);
-  return payload;
+  return exportSchema.parse(payload);
 }
 
 export async function fetchDialogueLayer(sceneId: string) {
   try {
     const payload = await fetchJson(`/v1/scenes/${sceneId}/dialogue`);
-    return payload;
+    return dialogueLayerSchema.parse(payload);
   } catch (error) {
     if (error instanceof Error && "status" in error) {
       const status = (error as { status?: number }).status;
@@ -635,7 +648,7 @@ export async function removeFromLibrary(characterId: string) {
 
 export async function fetchLibraryCharacters(projectId: string) {
   const payload = await fetchJson(`/v1/projects/${projectId}/library/characters`);
-  return payload;
+  return libraryCharactersSchema.parse(payload);
 }
 
 export async function loadFromLibrary(params: {
@@ -666,4 +679,197 @@ export async function generateWithReference(params: {
     })
   });
   return payload;
+}
+
+// ============================================================================
+// Actor/Casting System APIs (Global Actors)
+// ============================================================================
+
+/**
+ * Generate a new character profile sheet (preview before saving).
+ * Uses global endpoint - actors are not tied to projects.
+ */
+export async function generateActor(params: {
+  storyStyleId: string;
+  imageStyleId: string;
+  traits: CharacterTraitsInput;
+}) {
+  const payload = await fetchJson(`/v1/casting/generate`, {
+    method: "POST",
+    body: JSON.stringify({
+      story_style_id: params.storyStyleId,
+      image_style_id: params.imageStyleId,
+      traits: params.traits
+    })
+  });
+  return generateActorResponseSchema.parse(payload);
+}
+
+/**
+ * Save a generated character to the global actor library.
+ */
+export async function saveActor(params: {
+  imageId: string;
+  displayName: string;
+  description?: string | null;
+  traits: CharacterTraitsInput;
+  storyStyleId: string;
+  imageStyleId: string;
+}) {
+  const payload = await fetchJson(`/v1/casting/save`, {
+    method: "POST",
+    body: JSON.stringify({
+      image_id: params.imageId,
+      display_name: params.displayName,
+      description: params.description ?? null,
+      traits: params.traits,
+      story_style_id: params.storyStyleId,
+      image_style_id: params.imageStyleId
+    })
+  });
+  return actorCharacterReadSchema.parse(payload);
+}
+
+/**
+ * List all actors in the global library.
+ * Optionally filter by project to include project-specific actors.
+ */
+export async function fetchActorLibrary(projectId?: string) {
+  const url = projectId
+    ? `/v1/casting/library?project_id=${projectId}`
+    : `/v1/casting/library`;
+  const payload = await fetchJson(url);
+  return actorCharactersReadSchema.parse(payload);
+}
+
+/**
+ * Get a character with all its global variants.
+ */
+export async function fetchActor(characterId: string) {
+  const payload = await fetchJson(`/v1/casting/characters/${characterId}`);
+  return actorCharacterReadSchema.parse(payload);
+}
+
+/**
+ * List all global variants for a character.
+ */
+export async function fetchActorVariants(characterId: string) {
+  const payload = await fetchJson(`/v1/casting/characters/${characterId}/variants`);
+  return actorVariantReadSchema.array().parse(payload);
+}
+
+/**
+ * Generate a new variant using an existing variant as reference.
+ */
+export async function generateActorVariant(params: {
+  characterId: string;
+  baseVariantId: string;
+  traitChanges: CharacterTraitsInput;
+  storyStyleId?: string | null;
+  imageStyleId?: string | null;
+  variantName?: string | null;
+}) {
+  const payload = await fetchJson(`/v1/casting/characters/${params.characterId}/variants/generate`, {
+    method: "POST",
+    body: JSON.stringify({
+      base_variant_id: params.baseVariantId,
+      trait_changes: params.traitChanges,
+      story_style_id: params.storyStyleId ?? null,
+      image_style_id: params.imageStyleId ?? null,
+      variant_name: params.variantName ?? null
+    })
+  });
+  return actorVariantReadSchema.parse(payload);
+}
+
+/**
+ * Import a character from an image URL or local file path.
+ * For local development, you can use file paths like "/path/to/image.png" or "~/images/char.png"
+ */
+export async function importActor(params: {
+  imageUrl: string;  // URL or local file path
+  displayName: string;
+  description?: string | null;
+  traits?: CharacterTraitsInput | null;
+  storyStyleId?: string | null;
+  imageStyleId?: string | null;
+}) {
+  const payload = await fetchJson(`/v1/casting/import`, {
+    method: "POST",
+    body: JSON.stringify({
+      image_url: params.imageUrl,
+      display_name: params.displayName,
+      description: params.description ?? null,
+      traits: params.traits ?? {},
+      story_style_id: params.storyStyleId ?? null,
+      image_style_id: params.imageStyleId ?? null
+    })
+  });
+  return actorCharacterReadSchema.parse(payload);
+}
+
+/**
+ * Import a character from a file upload.
+ */
+export async function importActorFromFile(params: {
+  file: File;
+  displayName: string;
+  description?: string | null;
+  traits?: CharacterTraitsInput | null;
+  storyStyleId?: string | null;
+  imageStyleId?: string | null;
+  projectId?: string | null;
+}) {
+  const formData = new FormData();
+  formData.append("file", params.file);
+  formData.append("display_name", params.displayName);
+  if (params.description) formData.append("description", params.description);
+  if (params.traits) formData.append("traits", JSON.stringify(params.traits));
+  if (params.storyStyleId) formData.append("story_style_id", params.storyStyleId);
+  if (params.imageStyleId) formData.append("image_style_id", params.imageStyleId);
+  if (params.projectId) formData.append("project_id", params.projectId);
+
+  const url = `${apiConfig.baseUrl}/v1/casting/import/file`;
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData,
+  });
+
+  let payload;
+  const text = await response.text();
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = text;
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof payload === "object" && payload && "detail" in payload
+        ? String((payload as any).detail)
+        : `Request failed (${response.status})`;
+    throw new ApiError(message, response.status, payload);
+  }
+
+  return actorCharacterReadSchema.parse(payload);
+}
+
+/**
+ * Delete a character variant (cannot delete default variant).
+ */
+export async function deleteActorVariant(variantId: string) {
+  const payload = await fetchJson(`/v1/casting/variants/${variantId}`, {
+    method: "DELETE"
+  });
+  return deleteVariantResponseSchema.parse(payload);
+}
+
+/**
+ * Remove a character from the library (soft delete).
+ */
+export async function deleteActor(characterId: string) {
+  const payload = await fetchJson(`/v1/casting/characters/${characterId}`, {
+    method: "DELETE"
+  });
+  return deleteActorResponseSchema.parse(payload);
 }

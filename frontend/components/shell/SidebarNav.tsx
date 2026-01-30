@@ -2,13 +2,15 @@ import Link from "next/link";
 
 const items = [
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Projects", href: "/projects" }
+  { label: "Projects", href: "/projects" },
+  { label: "Actor Library", href: "/casting" }
 ];
 
 const studioItems = [
   { label: "Style Select", href: "/studio/styles" },
   { label: "Story Editor", href: "/studio/story" },
   { label: "Character Editor", href: "/studio/characters" },
+  { label: "Casting Studio", href: "/studio/casting" },
   { label: "Scene Editor", href: "/studio/scenes" },
   { label: "Dialogue Editor", href: "/studio/dialogue" }
 ];

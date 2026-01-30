@@ -177,6 +177,55 @@ export type DialogueLine = z.infer<typeof dialogueLineSchema>;
 export type DialoguePanel = z.infer<typeof dialoguePanelSchema>;
 export type DialogueSuggestions = z.infer<typeof dialogueSuggestionsSchema>;
 
+export const dialogueBubbleSchema = z.object({
+  bubble_id: z.string(),
+  panel_id: z.number(),
+  text: z.string(),
+  position: z.object({ x: z.number(), y: z.number() }),
+  size: z.object({ w: z.number(), h: z.number() }),
+  tail: z.object({ x: z.number(), y: z.number() }).nullable().optional()
+});
+
+export const dialogueLayerSchema = z.object({
+  dialogue_id: z.string().uuid(),
+  scene_id: z.string().uuid(),
+  bubbles: z.array(dialogueBubbleSchema),
+  created_at: z.string().nullable().optional(),
+  updated_at: z.string().nullable().optional()
+});
+
+export type DialogueBubble = z.infer<typeof dialogueBubbleSchema>;
+export type DialogueLayer = z.infer<typeof dialogueLayerSchema>;
+
+export const episodeSchema = z.object({
+  episode_id: z.string().uuid(),
+  story_id: z.string().uuid(),
+  title: z.string(),
+  episode_number: z.number().nullable().optional(),
+  default_story_style: z.string().nullable().optional(),
+  default_image_style: z.string().nullable().optional(),
+  scene_ids_ordered: z.array(z.string().uuid()).default([]),
+  created_at: z.string().nullable().optional()
+});
+
+export const episodesSchema = z.array(episodeSchema);
+
+export type Episode = z.infer<typeof episodeSchema>;
+
+export const exportSchema = z.object({
+  export_id: z.string().uuid(),
+  episode_id: z.string().uuid().nullable().optional(),
+  story_id: z.string().uuid().nullable().optional(),
+  status: z.string().nullable().default(null),
+  video_url: z.string().nullable().default(null),
+  output_url: z.string().nullable().default(null),
+  metadata_: z.record(z.any()).nullable().optional(),
+  created_at: z.string().nullable().optional(),
+  updated_at: z.string().nullable().optional()
+});
+
+export type Export = z.infer<typeof exportSchema>;
+
 export const characterVariantSuggestionSchema = z.object({
   suggestion_id: z.string().uuid(),
   story_id: z.string().uuid(),
@@ -270,9 +319,77 @@ export const generateWithReferenceResponseSchema = z.object({
   message: z.string()
 });
 
+export const libraryCharactersSchema = z.array(libraryCharacterSchema);
+
 export type LibraryCharacter = z.infer<typeof libraryCharacterSchema>;
 export type SaveToLibraryResponse = z.infer<typeof saveToLibraryResponseSchema>;
 export type LoadFromLibraryResponse = z.infer<typeof loadFromLibraryResponseSchema>;
 export type GenerateWithReferenceResponse = z.infer<typeof generateWithReferenceResponseSchema>;
 
+// ============================================================================
+// Actor/Casting System Schemas
+// ============================================================================
+
+export const characterTraitsInputSchema = z.object({
+  gender: z.string().nullable().optional(),
+  age_range: z.string().nullable().optional(),
+  face_traits: z.string().nullable().optional(),
+  hair_traits: z.string().nullable().optional(),
+  mood: z.string().nullable().optional(),
+  custom_prompt: z.string().nullable().optional()
+});
+
+export const actorVariantReadSchema = z.object({
+  variant_id: z.string().uuid(),
+  character_id: z.string().uuid(),
+  variant_name: z.string().nullable(),
+  variant_type: z.string(),
+  image_style_id: z.string().nullable(),
+  story_style_id: z.string().nullable(),
+  traits: z.record(z.any()),
+  is_default: z.boolean(),
+  reference_image_url: z.string().nullable().optional(),
+  generated_image_urls: z.array(z.string()).default([]),
+  created_at: z.string().nullable().optional()
+});
+
+export const actorCharacterReadSchema = z.object({
+  character_id: z.string().uuid(),
+  project_id: z.string().uuid().nullable(),  // null for global actors
+  display_name: z.string().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  gender: z.string().nullable().optional(),
+  age_range: z.string().nullable().optional(),
+  default_story_style_id: z.string().nullable().optional(),
+  default_image_style_id: z.string().nullable().optional(),
+  is_library_saved: z.boolean().optional(),
+  variants: z.array(actorVariantReadSchema).default([])
+});
+
+export const actorCharactersReadSchema = z.array(actorCharacterReadSchema);
+
+export const generateActorResponseSchema = z.object({
+  character_id: z.string().uuid().nullable(),
+  image_url: z.string(),
+  image_id: z.string().uuid(),
+  traits_used: z.record(z.any()),
+  status: z.string()
+});
+
+export const deleteActorResponseSchema = z.object({
+  removed: z.boolean(),
+  character_id: z.string()
+});
+
+export const deleteVariantResponseSchema = z.object({
+  deleted: z.boolean()
+});
+
+export type CharacterTraitsInput = z.infer<typeof characterTraitsInputSchema>;
+export type ActorVariantRead = z.infer<typeof actorVariantReadSchema>;
+export type ActorCharacterRead = z.infer<typeof actorCharacterReadSchema>;
+export type GenerateActorResponse = z.infer<typeof generateActorResponseSchema>;
+export type DeleteActorResponse = z.infer<typeof deleteActorResponseSchema>;
+export type DeleteVariantResponse = z.infer<typeof deleteVariantResponseSchema>;
 

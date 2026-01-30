@@ -151,13 +151,14 @@ export default function DialogueEditorPage() {
         throw new Error("No scenes found for this story");
       }
       const selectedEpisode = episodesQuery.data?.find(
-        (episode: any) => episode.episode_id === selectedEpisodeId
+        (episode) => episode.episode_id === selectedEpisodeId
       );
+      const episodeSceneIds = selectedEpisode?.scene_ids_ordered ?? [];
       const sceneIds =
-        selectedEpisode?.scene_ids_ordered?.length > 0
-          ? selectedEpisode.scene_ids_ordered
+        episodeSceneIds.length > 0
+          ? episodeSceneIds
           : scenesQuery.data.map((scene) => scene.scene_id);
-      if (!selectedEpisode?.scene_ids_ordered?.length) {
+      if (episodeSceneIds.length === 0) {
         await setEpisodeScenes({ episodeId: selectedEpisodeId, sceneIds });
         await queryClient.invalidateQueries({ queryKey: ["episodes", storyId] });
       }

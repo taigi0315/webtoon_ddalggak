@@ -85,8 +85,9 @@ class Character(Base):
     __tablename__ = "characters"
 
     character_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False
+    # Nullable for global actors (Actor system) - actors can exist without a project
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=True
     )
     canonical_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -99,11 +100,15 @@ class Character(Base):
     base_outfit: Mapped[str | None] = mapped_column(Text, nullable=True)
     identity_line: Mapped[str | None] = mapped_column(Text, nullable=True)
     generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Actor system fields
+    display_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    default_story_style_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    default_image_style_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_library_saved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     approved: Mapped[bool] = mapped_column(nullable=False, default=False)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    project: Mapped[Project] = relationship()
+    project: Mapped[Project | None] = relationship()
     story_links: Mapped[list["StoryCharacter"]] = relationship(
         back_populates="character", cascade="all, delete-orphan"
     )
@@ -155,25 +160,39 @@ class CharacterReferenceImage(Base):
 
 
 class CharacterVariant(Base):
+    """Character variant representing a specific look/style.
+
+    Variants can be:
+    - Story-scoped (story_id set): Used within a specific story context
+    - Global (story_id=None): Part of the Actor library, reusable across stories
+    """
+
     __tablename__ = "character_variants"
 
     variant_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     character_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("characters.character_id", ondelete="CASCADE"), nullable=False
     )
-    story_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("stories.story_id", ondelete="CASCADE"), nullable=False
+    # Nullable for global/library variants (Actor system)
+    story_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("stories.story_id", ondelete="CASCADE"), nullable=True
     )
-    variant_type: Mapped[str] = mapped_column(String(32), nullable=False, default="outfit_change")
+    variant_type: Mapped[str] = mapped_column(String(32), nullable=False, default="base")
+    variant_name: Mapped[str | None] = mapped_column(String(128), nullable=True)  # "Summer Look", "Battle Mode"
+    image_style_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    story_style_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    traits: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # {face, hair, mood, outfit}
     override_attributes: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     reference_image_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("character_reference_images.reference_image_id", ondelete="SET NULL"), nullable=True
     )
+    generated_image_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # List of Image UUIDs
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active_for_story: Mapped[bool] = mapped_column(nullable=False, default=False)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     character: Mapped[Character] = relationship(back_populates="variants")
-    story: Mapped[Story] = relationship(back_populates="character_variants")
+    story: Mapped[Story | None] = relationship(back_populates="character_variants")
     reference_image: Mapped[CharacterReferenceImage | None] = relationship()
 
 

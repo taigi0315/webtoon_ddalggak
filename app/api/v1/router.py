@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     artifacts,
+    casting,
     character_variants,
     characters,
     config,
@@ -46,3 +47,4 @@ api_router.include_router(episode_planning.router)
 api_router.include_router(layers.router)
 api_router.include_router(config.router)
 api_router.include_router(style_presets.router)
+api_router.include_router(casting.router)
