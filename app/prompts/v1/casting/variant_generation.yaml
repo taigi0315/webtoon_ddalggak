@@ -1,0 +1,77 @@
+# Variant Generation Prompt (Reference-First)
+# Version: 1.0
+# Domain: casting
+# Description: Generate character variant using base reference for identity preservation
+# Required Variables: base_traits, story_style, image_style
+# Optional Variables: hair_changes, mood_changes, outfit_changes, custom_changes
+
+prompt_variant_generation: |
+  You are generating a CHARACTER VARIANT using the provided reference image as the PRIMARY IDENTITY ANCHOR.
+
+  ===============================================
+  REFERENCE IMAGE AUTHORITY (CRITICAL - READ FIRST)
+  ===============================================
+
+  The provided reference image is the ABSOLUTE AUTHORITY for this character's identity.
+  You MUST preserve these elements EXACTLY as shown in the reference:
+
+  - Face structure, shape, and proportions
+  - Eye shape, size, and color
+  - Nose shape
+  - Skin tone and complexion
+  - Body proportions and height
+  - Overall facial features and distinctive traits
+
+  The person in your output MUST be recognizably the SAME PERSON as in the reference.
+  If someone looked at both images, they should immediately say "That's the same character."
+
+  ===============================================
+  STYLE CONTEXT
+  ===============================================
+  - Story Style: {{ story_style }}
+  - Image Style: {{ image_style }}
+
+  ===============================================
+  BASE CHARACTER TRAITS (from reference)
+  ===============================================
+  {% if base_traits %}
+  {{ base_traits | tojson(indent=2) }}
+  {% endif %}
+
+  ===============================================
+  CHANGES TO APPLY (ONLY these should differ from reference)
+  ===============================================
+  {% if hair_changes %}- HAIR CHANGE: {{ hair_changes }}{% endif %}
+  {% if mood_changes %}- MOOD/EXPRESSION CHANGE: {{ mood_changes }}{% endif %}
+  {% if outfit_changes %}- OUTFIT CHANGE: {{ outfit_changes }}{% endif %}
+  {% if custom_changes %}- ADDITIONAL CHANGES: {{ custom_changes }}{% endif %}
+
+  ===============================================
+  OUTPUT REQUIREMENTS
+  ===============================================
+
+  1. ASPECT RATIO: 9:16 VERTICAL (portrait orientation)
+
+  2. LAYOUT: Same as a character profile sheet
+     - Full-body front view (head-to-toe), centered
+     - 2-3 expression inset boxes in corners
+     - Neutral standing pose
+
+  3. IDENTITY: MUST match reference image face/body EXACTLY
+     - Same face structure
+     - Same eye shape and color
+     - Same skin tone
+     - Same body proportions
+
+  4. CHANGES: Apply ONLY the specified changes above
+     - Everything else remains identical to reference
+
+  5. BACKGROUND: Clean solid color or simple gradient
+
+  6. FORBIDDEN:
+     - NO text
+     - NO speech bubbles
+     - NO watermarks
+     - NO panel borders
+
+  Generate the character variant now, preserving identity while applying the specified changes.

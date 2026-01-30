@@ -50,6 +50,7 @@ _DOMAIN_DIRS = [
     "evaluation",
     "dialogue",
     "utility",
+    "casting",
 ]
 
 

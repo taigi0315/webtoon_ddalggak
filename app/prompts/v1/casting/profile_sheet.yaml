@@ -1,0 +1,53 @@
+# Character Profile Sheet Generation Prompt
+# Version: 1.0
+# Domain: casting
+# Description: Generate character profile sheet with full body and expression insets
+# Required Variables: story_style, image_style
+# Optional Variables: gender, age_range, face_traits, hair_traits, mood, custom_prompt
+
+prompt_profile_sheet: |
+  You are generating a CHARACTER PROFILE SHEET for a Korean webtoon character.
+
+  STYLE CONTEXT:
+  - Story Style: {{ story_style }}
+  - Image Style: {{ image_style }}
+
+  CHARACTER TRAITS:
+  {% if gender %}- Gender: {{ gender }}{% endif %}
+  {% if age_range %}- Age Range: {{ age_range }}{% endif %}
+  {% if face_traits %}- Face: {{ face_traits }}{% endif %}
+  {% if hair_traits %}- Hair: {{ hair_traits }}{% endif %}
+  {% if mood %}- Mood/Expression: {{ mood }}{% endif %}
+  {% if custom_prompt %}- Additional Details: {{ custom_prompt }}{% endif %}
+
+  OUTPUT REQUIREMENTS (CRITICAL - MUST FOLLOW EXACTLY):
+
+  1. ASPECT RATIO: 9:16 VERTICAL (portrait orientation, taller than wide)
+
+  2. LAYOUT COMPOSITION:
+     - MAIN FIGURE: Full-body front view (head-to-toe), centered, occupying ~70% of frame height
+     - Standing pose: Neutral, relaxed arms, facing directly toward viewer
+     - INSET BOXES: 2-3 small headshot circles/squares in the corners showing:
+       * Neutral expression (calm)
+       * Happy/smiling expression
+       * Serious/determined expression (optional third)
+
+  3. BACKGROUND: Clean solid color or simple gradient
+     - Light colors preferred (white, cream, soft grey, pastel)
+     - NO complex backgrounds, NO scenes, NO props
+
+  4. ART STYLE: High-quality Korean manhwa/webtoon style
+     - Clean linework
+     - Vibrant but harmonious colors
+     - Attractive character design suitable for romance/drama webtoon
+
+  5. STRICTLY FORBIDDEN:
+     - NO text anywhere in the image
+     - NO speech bubbles
+     - NO watermarks or logos
+     - NO signatures
+     - NO panel borders (this is a single character sheet, not a comic page)
+
+  The output should look like a professional character design reference sheet that an artist would use to draw this character consistently across multiple webtoon panels.
+
+  Generate the character profile sheet image now.
