@@ -1,14 +1,16 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import select
 
 from app.api.deps import DbSessionDep
 from app.api.v1.schemas import (
+    JobStatusRead,
     SceneAutoChunkRequest,
     SceneRead,
     StoryCreate,
+    StoryProgress,
     StoryRead,
     StorySetStyleDefaultsRequest,
     StoryGenerateRequest,
@@ -21,6 +23,9 @@ from app.db.session import get_sessionmaker
 from app.db.models import Character, Project, Scene, Story, StoryCharacter
 from app.graphs import nodes
 from app.graphs.story_build import run_story_build_graph
+from app.services import job_queue
+from app.services.audit import log_audit_entry
+from app.core.request_context import get_request_id, reset_request_id, set_request_id
 from app.services.vertex_gemini import GeminiClient
 
 
@@ -54,15 +59,31 @@ def create_story(project_id: uuid.UUID, payload: StoryCreate, db=DbSessionDep):
     if not has_image_style(payload.default_image_style):
         raise HTTPException(status_code=400, detail="unknown default_image_style")
 
+    request_id = get_request_id()
     story = Story(
         project_id=project_id,
         title=payload.title,
         default_story_style=payload.default_story_style,
         default_image_style=payload.default_image_style,
+        created_by=request_id,
+        updated_by=request_id,
     )
+    story.updated_by = get_request_id()
     db.add(story)
     db.commit()
     db.refresh(story)
+    log_audit_entry(
+        db,
+        entity_type="story",
+        entity_id=story.story_id,
+        action="created",
+        new_value={
+            "project_id": str(story.project_id),
+            "title": story.title,
+            "default_story_style": story.default_story_style,
+            "default_image_style": story.default_image_style,
+        },
+    )
     return story
 
 
@@ -94,9 +115,15 @@ def auto_chunk_scenes(story_id: uuid.UUID, payload: SceneAutoChunkRequest, db=Db
     if not chunks:
         raise HTTPException(status_code=400, detail="auto-chunk produced no scenes")
 
+    request_id = get_request_id()
     scenes: list[Scene] = []
     for chunk in chunks:
-        scene = Scene(story_id=story_id, source_text=chunk)
+        scene = Scene(
+            story_id=story_id,
+            source_text=chunk,
+            created_by=request_id,
+            updated_by=request_id,
+        )
         db.add(scene)
         scenes.append(scene)
 
@@ -140,6 +167,7 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
             image_style=payload.style_id or story.default_image_style,
             gemini=gemini,
             planning_mode=planning_mode,
+            require_hero_single=payload.require_hero_single,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -163,13 +191,17 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
     return StoryGenerateResponse(scenes=scenes, characters=all_characters)
 
 
-def _run_story_build_job(story_id: uuid.UUID, payload: StoryGenerateRequest) -> None:
+def _handle_story_blueprint_job(job: job_queue.JobRecord) -> dict | None:
+    payload = StoryGenerateRequest(**job.payload["request"])
+    story_id = uuid.UUID(job.payload["story_id"])
+    token = set_request_id(job.request_id or str(job.job_id))
     SessionLocal = get_sessionmaker()
     db = SessionLocal()
     try:
         story = db.get(Story, story_id)
         if story is None:
-            return
+            raise ValueError("story not found")
+        previous_status = story.generation_status
         story.generation_status = "running"
         story.generation_error = None
         story.progress = {
@@ -181,6 +213,14 @@ def _run_story_build_job(story_id: uuid.UUID, payload: StoryGenerateRequest) -> 
         story.progress_updated_at = datetime.utcnow()
         db.add(story)
         db.commit()
+        log_audit_entry(
+            db,
+            entity_type="story",
+            entity_id=story.story_id,
+            action="generation_started",
+            old_value={"generation_status": previous_status},
+            new_value={"generation_status": "running"},
+        )
 
         gemini = _build_gemini_client()
         planning_mode = "characters_only"
@@ -196,32 +236,54 @@ def _run_story_build_job(story_id: uuid.UUID, payload: StoryGenerateRequest) -> 
             image_style=payload.style_id or story.default_image_style,
             gemini=gemini,
             planning_mode=planning_mode,
+            require_hero_single=payload.require_hero_single,
         )
 
         story = db.get(Story, story_id)
         if story is not None:
+            prev_status = story.generation_status
             story.generation_status = "succeeded"
             story.generation_error = None
             story.progress_updated_at = datetime.utcnow()
             db.add(story)
             db.commit()
+            log_audit_entry(
+                db,
+                entity_type="story",
+                entity_id=story.story_id,
+                action="generation_succeeded",
+                old_value={"generation_status": prev_status},
+                new_value={"generation_status": "succeeded"},
+            )
+        return {"story_id": str(story_id)}
     except Exception as exc:  # noqa: BLE001
         story = db.get(Story, story_id)
         if story is not None:
+            prev_status = story.generation_status
             story.generation_status = "failed"
             story.generation_error = str(exc)
             story.progress_updated_at = datetime.utcnow()
             db.add(story)
             db.commit()
+            log_audit_entry(
+                db,
+                entity_type="story",
+                entity_id=story.story_id,
+                action="generation_failed",
+                old_value={"generation_status": prev_status},
+                new_value={"generation_status": "failed"},
+            )
+        raise
     finally:
         db.close()
+        reset_request_id(token)
 
 
-@router.post("/stories/{story_id}/generate/blueprint_async", response_model=StoryProgressRead)
+@router.post("/stories/{story_id}/generate/blueprint_async", response_model=JobStatusRead)
 def generate_story_blueprint_async(
     story_id: uuid.UUID,
     payload: StoryGenerateRequest,
-    background_tasks: BackgroundTasks,
+    response: Response,
     db=DbSessionDep,
 ):
     story = db.get(Story, story_id)
@@ -238,7 +300,7 @@ def generate_story_blueprint_async(
     if payload.style_id and not has_image_style(payload.style_id):
         raise HTTPException(status_code=400, detail="unknown style_id")
 
-    story.generation_status = "running"
+    story.generation_status = "queued"
     story.generation_error = None
     story.progress = {
         "current_node": "Queued",
@@ -249,15 +311,31 @@ def generate_story_blueprint_async(
     story.progress_updated_at = datetime.utcnow()
     db.add(story)
     db.commit()
+    log_audit_entry(
+        db,
+        entity_type="story",
+        entity_id=story_id,
+        action="generation_queued",
+        new_value={"generation_status": "queued"},
+    )
 
-    background_tasks.add_task(_run_story_build_job, story_id, payload)
+    job = job_queue.enqueue_job(
+        "story_blueprint",
+        {"story_id": str(story_id), "request": payload.model_dump()},
+        _handle_story_blueprint_job,
+        request_id=get_request_id(),
+    )
+    response.status_code = 202
 
-    return StoryProgressRead(
-        story_id=story_id,
-        status=story.generation_status,
-        progress=story.progress,
-        error=story.generation_error,
-        updated_at=story.progress_updated_at,
+    return JobStatusRead(
+        job_id=job.job_id,
+        job_type=job.job_type,
+        status=job.status,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        progress=job.progress,
+        result=job.result,
+        error=job.error,
     )
 
 
@@ -266,10 +344,20 @@ def get_story_progress(story_id: uuid.UUID, db=DbSessionDep):
     story = db.get(Story, story_id)
     if story is None:
         raise HTTPException(status_code=404, detail="story not found")
+
+    # Convert dict to typed StoryProgress model if present
+    typed_progress = None
+    if story.progress and isinstance(story.progress, dict):
+        try:
+            typed_progress = StoryProgress.model_validate(story.progress)
+        except Exception:
+            # Fall back to None if the dict doesn't match the expected schema
+            typed_progress = None
+
     return StoryProgressRead(
         story_id=story_id,
         status=story.generation_status,
-        progress=story.progress,
+        progress=typed_progress,
         error=story.generation_error,
         updated_at=story.progress_updated_at,
     )

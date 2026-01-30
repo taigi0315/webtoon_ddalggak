@@ -89,6 +89,17 @@ export const storyProgressSchema = z.object({
   updated_at: z.string().nullable().optional()
 });
 
+export const jobStatusSchema = z.object({
+  job_id: z.string().uuid(),
+  job_type: z.string(),
+  status: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  progress: z.record(z.any()).nullable().optional(),
+  result: z.record(z.any()).nullable().optional(),
+  error: z.string().nullable().optional()
+});
+
 export const sceneGenerateFullSchema = z.object({
   scene_intent_artifact_id: z.string().uuid(),
   panel_plan_artifact_id: z.string().uuid(),

@@ -38,6 +38,7 @@ class StoryBuildState(TypedDict, total=False):
     planning_artifact_ids: list[dict]
     blind_test_report_ids: list[str]
     progress: dict
+    require_hero_single: bool
 
 
 def _total_steps(planning_mode: str | None) -> int:
@@ -295,31 +296,88 @@ def _node_per_scene_planning_loop(state: StoryBuildState, gemini: GeminiClient |
     planning_artifacts: list[dict] = []
     scene_ids = state.get("scene_ids", [])
     total = len(scene_ids)
+    # Episode-level guardrail state
+    recent_templates: list[str] = []
+    hero_count = 0
+
     with session_scope() as db:
         for idx, scene_id in enumerate(scene_ids, start=1):
             scene_uuid = uuid.UUID(scene_id)
+
+            # Run intent, panel plan, normalize
+            scene_intent_id = nodes.run_scene_intent_extractor(db, scene_uuid, gemini=gemini).artifact_id
+            panel_plan_id = nodes.run_panel_plan_generator(db, scene_uuid, panel_count=state.get("panel_count", 3), gemini=gemini).artifact_id
+            panel_plan_normalized_id = nodes.run_panel_plan_normalizer(db, scene_uuid).artifact_id
+
+            # Attempt to resolve a layout template; if it would create a 3rd identical in a row, exclude that template and try again
+            artifact = nodes.run_layout_template_resolver(db, scene_uuid)
+            template_id = artifact.payload.get("template_id")
+
+            if len(recent_templates) >= 2 and template_id == recent_templates[-1] == recent_templates[-2]:
+                # Exclude the repeated template and re-resolve
+                artifact = nodes.run_layout_template_resolver(db, scene_uuid, excluded_template_ids=[template_id])
+                template_id = artifact.payload.get("template_id")
+
+            if template_id == "9x16_1":
+                hero_count += 1
+
+            panel_semantics_id = nodes.run_panel_semantic_filler(db, scene_uuid, gemini=gemini).artifact_id
+            qc_report_id = nodes.run_qc_checker(db, scene_uuid).artifact_id
+            dialogue_suggestions_id = nodes.run_dialogue_extractor(db, scene_uuid).artifact_id
+
             planning_artifacts.append(
                 {
                     "scene_id": scene_id,
-                    "scene_intent": str(nodes.run_scene_intent_extractor(db, scene_uuid, gemini=gemini).artifact_id),
-                    "panel_plan": str(
-                        nodes.run_panel_plan_generator(
-                            db, scene_uuid, panel_count=state.get("panel_count", 3), gemini=gemini
-                        ).artifact_id
-                    ),
-                    "panel_plan_normalized": str(nodes.run_panel_plan_normalizer(db, scene_uuid).artifact_id),
-                    "layout_template": str(nodes.run_layout_template_resolver(db, scene_uuid).artifact_id),
-                    "panel_semantics": str(nodes.run_panel_semantic_filler(db, scene_uuid, gemini=gemini).artifact_id),
-                    "qc_report": str(nodes.run_qc_checker(db, scene_uuid).artifact_id),
-                    "dialogue_suggestions": str(nodes.run_dialogue_extractor(db, scene_uuid).artifact_id),
+                    "scene_intent": str(scene_intent_id),
+                    "panel_plan": str(panel_plan_id),
+                    "panel_plan_normalized": str(panel_plan_normalized_id),
+                    "layout_template": str(artifact.artifact_id),
+                    "panel_semantics": str(panel_semantics_id),
+                    "qc_report": str(qc_report_id),
+                    "dialogue_suggestions": str(dialogue_suggestions_id),
                 }
             )
+
+            recent_templates.append(template_id)
+
+            # Keep only last 3 for simplicity
+            if len(recent_templates) > 3:
+                recent_templates.pop(0)
+
             state["progress"] = {
                 "current_node": "PerScenePlanningLoop",
                 "message": f"Planning scene {idx}/{total}...",
                 "step": 7,
             }
             _persist_progress(state, state["progress"])
+
+    # After loop: enforce at least one hero single-panel scene if requested
+    if state.get("require_hero_single"):
+        if hero_count == 0:
+            # Prefer a cliffhanger scene to convert; else choose the last scene
+            chosen_scene_id = None
+            with session_scope() as db:
+                svc = ArtifactService(db)
+                for sid in reversed(scene_ids):
+                    vis_art = svc.get_latest_artifact(uuid.UUID(sid), nodes.ARTIFACT_VISUAL_PLAN)
+                    if vis_art and isinstance(vis_art.payload, dict):
+                        scene_importance = vis_art.payload.get("scene_importance")
+                        if scene_importance == "cliffhanger":
+                            chosen_scene_id = sid
+                            break
+                if chosen_scene_id is None:
+                    chosen_scene_id = scene_ids[-1]
+
+            # Re-run the scene with a single-panel plan
+            scene_uuid = uuid.UUID(chosen_scene_id)
+            nodes.run_panel_plan_generator(db, scene_uuid, panel_count=1, gemini=gemini)
+            nodes.run_panel_plan_normalizer(db, scene_uuid)
+            nodes.run_layout_template_resolver(db, scene_uuid)
+            nodes.run_panel_semantic_filler(db, scene_uuid, gemini=gemini)
+            nodes.run_qc_checker(db, scene_uuid)
+
+            # Note: For simplicity we don't retroactively update the stored planning_artifacts list;
+            # the guardrail ensures an output single-panel scene exists in the persisted artifacts.
 
     return {"planning_artifact_ids": planning_artifacts}
 
@@ -385,6 +443,7 @@ def run_story_build_graph(
     image_style: str | None = None,
     gemini: GeminiClient | None = None,
     planning_mode: str = "full",
+    require_hero_single: bool = False,
 ) -> StoryBuildState:
     if gemini is None:
         raise ValueError("Gemini client is required for story generation")
@@ -402,5 +461,6 @@ def run_story_build_graph(
             "story_style": story_style,
             "image_style": image_style,
             "planning_mode": planning_mode,
+            "require_hero_single": require_hero_single,
         }
         return app.invoke(state)

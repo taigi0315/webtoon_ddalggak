@@ -1,0 +1,123 @@
+# Panel Semantics Prompt
+# Version: 1.0
+# Description: Fill detailed visual semantics for each panel
+# Required Variables: char_section, plan_section, layout_text, scene_text, intent_block (optional), genre_block (optional)
+# Output Schema: { panels: [{ panel_index, grammar_id, camera, character_frame_percentage, focus_on, description, characters, dialogue, environment, lighting, atmosphere_keywords }] }
+
+prompt_panel_semantics: |
+  {{ global_constraints }}
+
+  Fill in DETAILED visual semantics for each panel. Each description must be 100-150 words minimum.
+  This will be used for AI image generation - be SPECIFIC, VISUAL, and COMPLETE.
+  {% if intent_block %}
+  {{ intent_block }}
+  {% endif %}
+  {% if genre_block %}
+  {{ genre_block }}
+  {% endif %}
+  CHARACTERS (use these identity_lines for consistency):
+  {{ char_section }}
+
+  PANEL PLAN:
+  {{ plan_section }}
+
+  Layout: {{ layout_text }}
+
+  **VISUAL PROMPT FORMULA (use this structure for each description):**
+  [shot_type], vertical 9:16 webtoon panel, [composition with character % of frame],
+  [environment with 5+ specific details: architecture, furniture, props, weather, background activity],
+  [lighting conditions: source, quality, color temperature, shadows],
+  [character placement: position in frame, posture, action, expression],
+  [atmosphere keywords], Korean manhwa style
+
+  **GRAMMAR-SPECIFIC REQUIREMENTS:**
+  - establishing: Wide shot, characters 20-30% of frame, 5+ environment details, show the WORLD
+  - dialogue_medium: Medium shot, characters 40-45%, space for speech bubbles, show relationship
+  - emotion_closeup: Extreme close-up, character 50%+, single face, SPECIFIC emotion with physical tells
+  - action: Dynamic angle (low/high/dutch), motion blur hint, action verb, 35-40% character
+  - reaction: Focus on reacting character, clear emotion in eyes/expression, medium shot
+  - object_focus: Macro or close-up, object centered, minimal background, symbolic lighting
+  - reveal: High contrast, dramatic single-source lighting, subject entering or being unveiled
+  - impact_silence: Minimal elements, 70%+ negative space, frozen moment, stark composition
+
+  **ENVIRONMENT DETAILS MUST INCLUDE (5+ per panel):**
+  1. Architecture/space (walls, windows, ceiling, floor material)
+  2. Furniture/major objects (tables, chairs, counters)
+  3. Small props (cups, phones, books, bags)
+  4. Lighting source (natural light, lamps, overhead, neon)
+  5. Background activity (other people, movement, weather visible through windows)
+  6. Atmosphere indicators (steam, dust motes, rain, shadows)
+
+  **DIALOGUE REQUIREMENTS (CRITICAL - This carries the story):**
+  Minimum dialogue per panel type:
+  - Establishing shots: 0-2 lines (can be silent)
+  - Normal dialogue panels: 5-8 lines MINIMUM (not just 1-2!)
+  - Key emotional panels: 8-12 lines with reactions and subtext
+  - Action panels: 2-4 lines for context
+
+  **Why rich dialogue matters:**
+  - Without enough dialogue, the story feels incomplete
+  - Dialogue shows character dynamics, not just plot points
+  - Each line must reveal character OR advance plot OR create emotion
+
+  **CONVERSATION BUILDING PATTERNS:**
+  1. Opening Exchange (3-4 lines):
+     "Question" -> "Response" -> "Follow-up" -> "Reaction"
+
+  2. Building Tension (5-6 lines):
+     "Statement" -> "Challenge" -> "Explanation" -> "Disbelief" -> "Confirmation"
+
+  3. Emotional Peak (7-8 lines):
+     "Confession" -> "Shock" -> "Clarification" -> "Emotional response" -> "Deeper reveal" -> "Processing"
+
+  4. Include: pauses, hesitation, interruptions for realism
+  5. Last line of dialogue should have impact or create anticipation
+  6. Show distinct character voices (how they speak differently)
+
+  VALID CAMERA VALUES: extreme_closeup, closeup, medium_closeup, medium, medium_full, full, wide, establishing
+  VALID GAZE VALUES: at_other, at_object, down, away, toward_path, camera
+
+  OUTPUT SCHEMA:
+  {
+    "panels": [
+      {
+        "panel_index": 1,
+        "grammar_id": "establishing",
+        "camera": "wide",
+        "character_frame_percentage": 25,
+        "focus_on": "environment with characters",
+        "description": "150+ word detailed visual description following the formula above",
+        "characters": [
+          {
+            "name": "Character Name",
+            "position": "left|center|right|background",
+            "frame_position": "lower_third|center|upper_third",
+            "gaze": "at_other|at_object|down|away|toward_path|camera",
+            "expression": "specific emotion with physical description",
+            "action": "specific action verb + body language"
+          }
+        ],
+        "dialogue": [
+          {"character": "Name", "text": "Dialogue line", "order": 1},
+          {"character": "Name", "text": "Response", "order": 2}
+        ],
+        "environment": {
+          "location": "specific place name",
+          "architecture": "walls, windows, ceiling details",
+          "furniture": "major objects in space",
+          "props": ["list of visible small objects"],
+          "background_activity": "what's happening in background"
+        },
+        "lighting": {
+          "source": "natural/artificial/mixed",
+          "quality": "soft/harsh/dramatic",
+          "color_temperature": "warm/cool/neutral",
+          "shadows": "description of shadow patterns"
+        },
+        "atmosphere_keywords": ["list", "of", "mood", "words"]
+      }
+    ]
+  }
+
+  Scene text:
+  {{ scene_text }}

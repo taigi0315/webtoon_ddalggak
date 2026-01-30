@@ -241,17 +241,32 @@ def generate_character_variant_suggestion_refs(
         .scalars()
         .all()
     )
-    if not suggestions:
+
+    should_generate = not suggestions
+    if payload and payload.character_id and not should_generate:
+        if not any(s.character_id == payload.character_id for s in suggestions):
+            should_generate = True
+
+    if should_generate:
         generated = nodes.generate_character_variant_suggestions(db, story_id)
+        existing_keys = {(s.character_id, s.variant_type) for s in suggestions}
+
         for item in generated:
+            c_id = item["character_id"]
+            v_type = item.get("variant_type") or "outfit_change"
+            
+            if (c_id, v_type) in existing_keys:
+                continue
+
             suggestion = CharacterVariantSuggestion(
                 story_id=story_id,
-                character_id=item["character_id"],
-                variant_type=item.get("variant_type") or "outfit_change",
+                character_id=c_id,
+                variant_type=v_type,
                 override_attributes=item.get("override_attributes") or {},
             )
             db.add(suggestion)
             suggestions.append(suggestion)
+        
         db.commit()
         for suggestion in suggestions:
             db.refresh(suggestion)

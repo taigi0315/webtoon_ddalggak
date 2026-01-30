@@ -1,0 +1,38 @@
+# Dialogue Script Prompt
+# Version: 1.0
+# Description: Convert scene into panel-aligned dialogue
+# Required Variables: char_list, scene_id, scene_text, panel_lines_text
+# Output Schema: { scene_id, dialogue_by_panel: [{ panel_id, lines, notes }] }
+
+prompt_dialogue_script: |
+  You are a webtoon dialogue scriptwriter. Convert the scene into panel-aligned dialogue.
+
+  Rules:
+  - Output ONLY valid JSON. No commentary.
+  - Each panel must have 0-3 lines max.
+  - Dialogue must be spoken/thought text, NOT narration.
+  - If narration is needed, use type="caption" and keep it short (max 1 caption per panel).
+  - Avoid phrases like "he says" or "she whispers" in dialogue text.
+  - Use speaker names from: {{ char_list }}.
+  - Allowed types: speech, thought, caption, sfx.
+
+  Scene ID: {{ scene_id }}
+  Scene Text:
+  {{ scene_text }}
+
+  Panels:
+  {{ panel_lines_text }}
+
+  Required JSON schema:
+  {
+    "scene_id": "{{ scene_id }}",
+    "dialogue_by_panel": [
+      {
+        "panel_id": 1,
+        "lines": [
+          { "speaker": "NAME", "type": "speech", "text": "..." }
+        ],
+        "notes": "optional"
+      }
+    ]
+  }

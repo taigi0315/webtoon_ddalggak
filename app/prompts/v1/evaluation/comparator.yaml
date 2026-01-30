@@ -1,0 +1,38 @@
+# Comparator Prompt
+# Version: 1.0
+# Description: Compare blind reader's reconstruction to original story (for blind test stage 2)
+# Required Variables: original_text, reconstructed_story, identified_characters, plot_points, unclear_elements
+# Output Schema: { scores, weighted_score, comparison, failure_points, repair_suggestions }
+
+prompt_comparator: |
+  {{ system_prompt_json }}
+
+  Compare the blind reader's reconstruction to the original story.
+
+  ORIGINAL STORY:
+  {{ original_text }}
+
+  BLIND READER'S RECONSTRUCTION:
+  {{ reconstructed_story }}
+
+  IDENTIFIED CHARACTERS: {{ identified_characters }}
+  PLOT POINTS UNDERSTOOD: {{ plot_points }}
+  UNCLEAR ELEMENTS: {{ unclear_elements }}
+
+  SCORING RUBRIC:
+  - plot_recall (40%): Did the reader understand the main events?
+  - emotional_alignment (30%): Did the reader feel the intended emotions?
+  - character_identifiability (30%): Could the reader identify who is who?
+
+  OUTPUT SCHEMA:
+  {
+    "scores": {
+      "plot_recall": 0.0-1.0,
+      "emotional_alignment": 0.0-1.0,
+      "character_identifiability": 0.0-1.0
+    },
+    "weighted_score": 0.0-1.0,
+    "comparison": "Brief comparison of original vs reconstruction",
+    "failure_points": ["List specific panels or elements that failed to communicate"],
+    "repair_suggestions": ["Specific actionable fixes for failed panels"]
+  }

@@ -1,0 +1,89 @@
+{
+  "$schema": "genre_guidelines_schema_v1",
+  "version": "1.0",
+  "description": "Visual guidelines for different webtoon genres",
+  "genres": {
+    "romance": {
+      "shot_preferences": "Medium close-ups (40-45% character), two-shots, over-shoulder",
+      "composition": "Characters occupy 40-45% frame, intimate framing",
+      "camera": "Eye-level for intimacy, slight low-angle for vulnerability",
+      "lighting": "warm ambient, soft glow, golden hour, intimate atmosphere, soft diffused natural light",
+      "props": "Coffee cups, phones with messages, tissues, meaningful objects, flowers",
+      "atmosphere": "ethereal, dreamy, soft bokeh, light-filled, gentle, pastel-tinted",
+      "color_palette": "warm peachy tones, soft blues and lavenders, creamy neutrals"
+    },
+    "drama": {
+      "shot_preferences": "Medium close-ups (40-45% character), emotional focus shots",
+      "composition": "Characters 40-45%, room for emotional expression",
+      "camera": "Eye-level, occasional low-angle for vulnerability moments",
+      "lighting": "dramatic but natural, contrast for emotional beats, rim lighting",
+      "props": "Personal items, letters, photos, meaningful objects that tell story",
+      "atmosphere": "tense, emotional, atmospheric, moody, contemplative",
+      "color_palette": "muted tones with emotional accents, natural colors"
+    },
+    "thriller": {
+      "shot_preferences": "Wide shots (25-30% character), Dutch angles, high angles for paranoia",
+      "composition": "Characters 25-35%, environment dominates and tells story",
+      "camera": "Off-kilter angles, overhead for vulnerability, low-angle for threat",
+      "lighting": "harsh shadows, dim lighting, single light source, ominous glow",
+      "props": "Hidden details, suspicious background elements, foreshadowing objects",
+      "atmosphere": "tense, ominous, foreboding, isolating, unsettling, dark",
+      "color_palette": "desaturated, cold blue tones, muted with dark accents"
+    },
+    "comedy": {
+      "shot_preferences": "Medium full shots (body language), reaction close-ups",
+      "composition": "Characters 35-40%, room for visual gags in environment",
+      "camera": "Slight exaggeration in angles, reaction-focused framing",
+      "lighting": "bright clear lighting, vibrant, energetic, even illumination",
+      "props": "Comedy props (spilled items, tangled objects, mishap aftermath)",
+      "atmosphere": "playful, bright, energetic, exaggerated, fun",
+      "color_palette": "saturated bright colors, cheerful tones"
+    },
+    "slice_of_life": {
+      "shot_preferences": "Wide establishing shots (20-30% character), medium shots",
+      "composition": "Characters 20-35%, world and environment is the story",
+      "camera": "Observational, pulled back, natural everyday angles",
+      "lighting": "natural daylight, realistic ambient, ordinary comfortable",
+      "props": "Everyday items (grocery bags, transit cards, textbooks, meals)",
+      "atmosphere": "calm, peaceful, mundane beauty, contemplative, cozy",
+      "color_palette": "natural realistic colors, warm everyday tones"
+    },
+    "fantasy": {
+      "shot_preferences": "Mix of wide (show magical world) and dramatic close-ups",
+      "composition": "Balanced 30-40% character, space for magical effects",
+      "camera": "Dynamic dramatic angles, awe-inspiring perspectives",
+      "lighting": "magical glow, ethereal light, mystical illumination, enchanted",
+      "props": "Fantasy elements, glowing objects, supernatural manifestations",
+      "atmosphere": "mystical, enchanted, magical, otherworldly, wondrous",
+      "color_palette": "jewel tones, ethereal pastels, magical highlights"
+    },
+    "action": {
+      "shot_preferences": "Dynamic wide shots, impact close-ups, speed lines",
+      "composition": "Characters 30-40%, space for movement and effects",
+      "camera": "Low angles for power, dynamic tilts, motion blur",
+      "lighting": "high contrast, dramatic shadows, impact lighting",
+      "props": "Action effects, debris, speed lines, impact markers",
+      "atmosphere": "intense, kinetic, powerful, explosive, urgent",
+      "color_palette": "bold saturated colors, high contrast"
+    },
+    "horror": {
+      "shot_preferences": "Extreme close-ups for fear, wide shots for isolation",
+      "composition": "Characters 20-35%, negative space for dread",
+      "camera": "Canted angles, POV shots, lurking perspectives",
+      "lighting": "deep shadows, single harsh light, flickering, silhouettes",
+      "props": "Unsettling details, shadows, partially visible threats",
+      "atmosphere": "dread, isolation, fear, oppressive, claustrophobic",
+      "color_palette": "desaturated, sickly greens, deep reds, black"
+    }
+  },
+  "shot_distribution": {
+    "romance": {"establishing": 2, "medium": "5-6", "closeup": "2-3", "dynamic": "1-2"},
+    "drama": {"establishing": 2, "medium": "5-6", "closeup": "2-3", "dynamic": "1-2"},
+    "thriller": {"establishing": "3-4", "medium": "3-4", "closeup": "1-2", "dynamic": "2-3"},
+    "comedy": {"establishing": 2, "medium": "4-5", "closeup": "2-3", "dynamic": "1-2"},
+    "slice_of_life": {"establishing": "3-4", "medium": "4-5", "closeup": "0-1", "dynamic": "1-2"},
+    "fantasy": {"establishing": "2-3", "medium": "4-5", "closeup": "1-2", "dynamic": "2-3"},
+    "action": {"establishing": "1-2", "medium": "3-4", "closeup": "2-3", "dynamic": "4-5"},
+    "horror": {"establishing": "2-3", "medium": "3-4", "closeup": "3-4", "dynamic": "1-2"}
+  }
+}

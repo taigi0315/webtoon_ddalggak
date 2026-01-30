@@ -1,0 +1,75 @@
+# Character Normalization Prompt
+# Version: 1.0
+# Description: Enrich character profiles with detailed visual descriptions
+# Required Variables: characters_json, story_context
+# Output Schema: { characters: [{ name, role, description, gender, age_range, appearance, outfit, identity_line }] }
+
+prompt_character_normalization: |
+  {{ system_prompt_json }}
+  {{ global_constraints }}
+
+  Enrich the following character profiles with DETAILED visual descriptions for Korean webtoon/manhwa rendering.
+  Use context clues from the story to infer appearance. Apply Korean manhwa aesthetic standards.
+
+  **CRITICAL: These descriptions will be used for AI image generation. Be SPECIFIC and VISUAL.**
+
+  Current characters:
+  {{ characters_json }}
+
+  Story context:
+  {{ story_context }}
+
+  **AGE-BASED VISUAL STANDARDS (Korean Manhwa Style):**
+
+  MALE CHARACTERS:
+  - child (under 12): Chibi proportions 1:3, round cherubic face, large expressive eyes, playful posture
+  - teen (13-19): Soft angular face, slender graceful build, flower-boy aesthetic, 170-178cm, school uniform or streetwear
+  - young_adult (20-35): Korean male lead aesthetic, refined jawline, tall slender 180-188cm, willowy model proportions, soft side-part hair
+  - middle_aged (40-55): Distinguished refined features, subtle grey at temples, 178-185cm, professional attire
+  - elderly (60+): Gentle wisdom lines, silver/white hair, 170-175cm, dignified cardigan or hanbok
+
+  FEMALE CHARACTERS:
+  - child (under 12): Chibi proportions 1:3, oversized sparkly eyes, rosy plump cheeks, cute pigtails/bob
+  - teen (13-19): Large doe eyes, slender figure, 160-170cm, graceful youthful posture
+  - young_adult (20-35): Statuesque figure over 165cm, long legs exceeding torso, hourglass silhouette, flawless skin
+  - middle_aged (40-55): Refined beauty with subtle lines, elegant bob/waves, 160-170cm, professional or sophisticated fashion
+  - elderly (60+): Smile lines showing wisdom, grey elegant updo, 155-165cm, traditional hanbok or cardigan sets
+
+  For each character, provide:
+  - gender: male|female|unknown
+  - age_range: child|teen|young_adult|adult|middle_aged|elderly
+  - appearance:
+    - hair: color, style, length (be specific: "soft side-swept black bangs" not just "black hair")
+    - face: features, expression tendency (e.g., "gentle angular jawline, warm expressive eyes")
+    - build: body type, height, proportions (e.g., "slender elegant build, 180cm, willowy silhouette")
+  - outfit: typical clothing with detail (e.g., "casual cream sweater, fitted dark jeans, clean white sneakers")
+  - identity_line: Single comprehensive line for artist (150+ characters)
+
+  **IDENTITY LINE FORMAT:**
+  "[age_range] [ethnicity] [gender], [hair description], [face/expression], [build/height], [typical outfit], [manhwa style note]"
+
+  **GOOD EXAMPLE:**
+  "early_20s Korean female, long flowing black hair with soft waves, large expressive doe eyes with delicate lashes, tall statuesque figure 168cm with elegant long legs, cream knit sweater and high-waisted jeans, authentic webtoon romance female lead aesthetic"
+
+  **BAD EXAMPLE (too vague):**
+  "young woman with dark hair, normal build, casual clothes"
+
+  OUTPUT SCHEMA:
+  {
+    "characters": [
+      {
+        "name": "Character name",
+        "role": "main|secondary",
+        "description": "Brief personality/role description",
+        "gender": "male|female|unknown",
+        "age_range": "young_adult",
+        "appearance": {
+          "hair": "detailed hair description with color, style, length",
+          "face": "facial features and typical expression",
+          "build": "body type, height in cm, proportions"
+        },
+        "outfit": "detailed typical outfit description",
+        "identity_line": "Complete 150+ character identity line for artist reference"
+      }
+    ]
+  }

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.graphs import nodes
 from app.db.models import Scene, Story
 from app.db.session import session_scope
+from app.core.metrics import track_graph_node
 from app.core.telemetry import trace_span
 from app.services.artifacts import ArtifactService
 from app.services.vertex_gemini import GeminiClient
@@ -202,8 +203,9 @@ def run_scene_planning(
     genre: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> PlanningState:
-    with trace_span("graph.scene_planning", scene_id=str(scene_id)):
-        scene = db.get(Scene, scene_id)
+    with track_graph_node("scene_planning", "run_scene_planning"):
+        with trace_span("graph.scene_planning", scene_id=str(scene_id)):
+            scene = db.get(Scene, scene_id)
         if scene is not None and scene.planning_locked:
             svc = ArtifactService(db)
             required = {
@@ -250,15 +252,16 @@ def run_scene_render(
     prompt_override: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> RenderState:
-    with trace_span("graph.scene_render", scene_id=str(scene_id), style_id=style_id):
-        app = build_scene_render_graph(gemini=gemini)
-        state: RenderState = {
-            "scene_id": scene_id,
-            "style_id": style_id,
-            "prompt_override": prompt_override,
-            "enforce_qc": enforce_qc,
-        }
-        return app.invoke(state)
+    with track_graph_node("scene_render", "run_scene_render"):
+        with trace_span("graph.scene_render", scene_id=str(scene_id), style_id=style_id):
+            app = build_scene_render_graph(gemini=gemini)
+            state: RenderState = {
+                "scene_id": scene_id,
+                "style_id": style_id,
+                "prompt_override": prompt_override,
+                "enforce_qc": enforce_qc,
+            }
+            return app.invoke(state)
 
 
 def run_full_pipeline(
@@ -270,37 +273,38 @@ def run_full_pipeline(
     prompt_override: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> PipelineState:
-    with trace_span("graph.full_pipeline", scene_id=str(scene_id), style_id=style_id):
-        if not style_id:
-            scene = db.get(Scene, scene_id)
-            if scene is not None:
-                story = db.get(Story, scene.story_id)
-                style_id = scene.image_style_override or (story.default_image_style if story else None)
-        if not style_id:
-            raise ValueError("style_id is required for full generation")
+    with track_graph_node("full_pipeline", "run_full_pipeline"):
+        with trace_span("graph.full_pipeline", scene_id=str(scene_id), style_id=style_id):
+            if not style_id:
+                scene = db.get(Scene, scene_id)
+                if scene is not None:
+                    story = db.get(Story, scene.story_id)
+                    style_id = scene.image_style_override or (story.default_image_style if story else None)
+            if not style_id:
+                raise ValueError("style_id is required for full generation")
 
-        planning_state = run_scene_planning(
-            db=db,
-            scene_id=scene_id,
-            panel_count=panel_count,
-            genre=genre,
-            gemini=gemini,
-        )
+            planning_state = run_scene_planning(
+                db=db,
+                scene_id=scene_id,
+                panel_count=panel_count,
+                genre=genre,
+                gemini=gemini,
+            )
 
-        blind = nodes.run_blind_test_evaluator(db=db, scene_id=scene_id, gemini=gemini)
+            blind = nodes.run_blind_test_evaluator(db=db, scene_id=scene_id, gemini=gemini)
 
-        render_state = run_scene_render(
-            db=db,
-            scene_id=scene_id,
-            style_id=style_id,
-            enforce_qc=False,
-            prompt_override=prompt_override,
-            gemini=gemini,
-        )
+            render_state = run_scene_render(
+                db=db,
+                scene_id=scene_id,
+                style_id=style_id,
+                enforce_qc=False,
+                prompt_override=prompt_override,
+                gemini=gemini,
+            )
 
-        out: PipelineState = {
-            **planning_state,
-            **render_state,
-            "blind_test_report_artifact_id": str(blind.artifact_id),
-        }
-        return out
+            out: PipelineState = {
+                **planning_state,
+                **render_state,
+                "blind_test_report_artifact_id": str(blind.artifact_id),
+            }
+            return out

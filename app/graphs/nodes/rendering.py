@@ -1,6 +1,15 @@
 from __future__ import annotations
 
+import hashlib
+import mimetypes
+
 from .utils import *
+from app.core.metrics import track_graph_node
+from app.core.request_context import log_context
+from app.graphs.nodes.helpers.character import _active_variants_by_character
+from app.graphs.nodes.helpers.media import _load_character_reference_images
+from app.graphs.nodes.helpers.scene import _get_scene, _list_characters
+from app.graphs.nodes.utils import _character_ids_with_reference_images, _render_image_from_prompt
 
 
 def compute_prompt_compiler(
@@ -33,46 +42,48 @@ def run_prompt_compiler(
     style_id: str,
     prompt_override: str | None = None,
 ):
-    with trace_span("graph.prompt_compiler", scene_id=str(scene_id), style_id=style_id):
-        svc = ArtifactService(db)
-        panel_semantics = svc.get_latest_artifact(scene_id, ARTIFACT_PANEL_SEMANTICS)
-        layout = svc.get_latest_artifact(scene_id, ARTIFACT_LAYOUT_TEMPLATE)
-        if panel_semantics is None or layout is None:
-            raise ValueError("panel_semantics and layout_template artifacts are required")
+    with track_graph_node("scene_render", "prompt_compiler"):
+        with log_context(node_name="prompt_compiler", scene_id=scene_id):
+            with trace_span("graph.prompt_compiler", scene_id=str(scene_id), style_id=style_id):
+                svc = ArtifactService(db)
+                panel_semantics = svc.get_latest_artifact(scene_id, ARTIFACT_PANEL_SEMANTICS)
+                layout = svc.get_latest_artifact(scene_id, ARTIFACT_LAYOUT_TEMPLATE)
+                if panel_semantics is None or layout is None:
+                    raise ValueError("panel_semantics and layout_template artifacts are required")
 
-        scene = _get_scene(db, scene_id)
-        story = db.get(Story, scene.story_id)
-        characters = _list_characters(db, scene.story_id)
-        reference_char_ids = _character_ids_with_reference_images(db, scene.story_id)
-        variants_by_character = _active_variants_by_character(db, scene.story_id)
-        panel_count = _panel_count(panel_semantics.payload)
-        layout_panels = layout.payload.get("panels")
-        layout_count = len(layout_panels) if isinstance(layout_panels, list) else None
-        if layout_count is not None and panel_count != layout_count:
-            raise ValueError(
-                f"Layout/template panel count mismatch: panel_semantics={panel_count} layout={layout_count}"
-            )
+                scene = _get_scene(db, scene_id)
+                story = db.get(Story, scene.story_id)
+                characters = _list_characters(db, scene.story_id)
+                reference_char_ids = _character_ids_with_reference_images(db, scene.story_id)
+                variants_by_character = _active_variants_by_character(db, scene.story_id)
+                panel_count = _panel_count(panel_semantics.payload)
+                layout_panels = layout.payload.get("panels")
+                layout_count = len(layout_panels) if isinstance(layout_panels, list) else None
+                if layout_count is not None and panel_count != layout_count:
+                    raise ValueError(
+                        f"Layout/template panel count mismatch: panel_semantics={panel_count} layout={layout_count}"
+                    )
 
-        prompt = prompt_override
-        if not prompt:
-            prompt = _compile_prompt(
-                panel_semantics=panel_semantics.payload,
-                layout_template=layout.payload,
-                style_id=style_id,
-                characters=characters,
-                reference_char_ids=reference_char_ids,
-                variants_by_character=variants_by_character,
-                story_style=(story.default_story_style if story else None),
-            )
+                prompt = prompt_override
+                if not prompt:
+                    prompt = _compile_prompt(
+                        panel_semantics=panel_semantics.payload,
+                        layout_template=layout.payload,
+                        style_id=style_id,
+                        characters=characters,
+                        reference_char_ids=reference_char_ids,
+                        variants_by_character=variants_by_character,
+                        story_style=(story.default_story_style if story else None),
+                    )
 
-        payload = {
-            "prompt": prompt,
-            "style_id": style_id,
-            "layout_template_id": layout.payload.get("template_id"),
-            "panel_count": panel_count,
-            "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-        }
-        return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_SPEC, payload=payload)
+                payload = {
+                    "prompt": prompt,
+                    "style_id": style_id,
+                    "layout_template_id": layout.payload.get("template_id"),
+                    "panel_count": panel_count,
+                    "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+                }
+                return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_SPEC, payload=payload)
 
 def generate_character_reference_image(
     db: Session,
@@ -309,46 +320,48 @@ def run_image_renderer(
     gemini: GeminiClient | None = None,
     reason: str | None = None,
 ):
-    with trace_span("graph.image_renderer", scene_id=str(scene_id), reason=reason):
-        svc = ArtifactService(db)
-        render_spec = svc.get_latest_artifact(scene_id, ARTIFACT_RENDER_SPEC)
-        if render_spec is None:
-            raise ValueError("render_spec artifact not found")
+    with track_graph_node("scene_render", "image_renderer"):
+        with log_context(node_name="image_renderer", scene_id=scene_id):
+            with trace_span("graph.image_renderer", scene_id=str(scene_id), reason=reason):
+                svc = ArtifactService(db)
+                render_spec = svc.get_latest_artifact(scene_id, ARTIFACT_RENDER_SPEC)
+                if render_spec is None:
+                    raise ValueError("render_spec artifact not found")
 
-        prompt = render_spec.payload.get("prompt")
-        if not prompt:
-            raise ValueError("render_spec is missing prompt")
+                prompt = render_spec.payload.get("prompt")
+                if not prompt:
+                    raise ValueError("render_spec is missing prompt")
 
-        reference_images = None
-        if gemini is not None:
-            scene = _get_scene(db, scene_id)
-            reference_images = _load_character_reference_images(db, scene.story_id)
+                reference_images = None
+                if gemini is not None:
+                    scene = _get_scene(db, scene_id)
+                    reference_images = _load_character_reference_images(db, scene.story_id)
 
-        image_bytes, mime_type, metadata = _render_image_from_prompt(
-            prompt,
-            gemini=gemini,
-            reference_images=reference_images,
-        )
+                image_bytes, mime_type, metadata = _render_image_from_prompt(
+                    prompt,
+                    gemini=gemini,
+                    reference_images=reference_images,
+                )
 
-        store = LocalMediaStore(root_dir=settings.media_root, url_prefix=settings.media_url_prefix)
-        _, url = store.save_image_bytes(image_bytes=image_bytes, mime_type=mime_type)
+                store = LocalMediaStore(root_dir=settings.media_root, url_prefix=settings.media_url_prefix)
+                _, url = store.save_image_bytes(image_bytes=image_bytes, mime_type=mime_type)
 
-        image = ImageService(db).create_image(
-            image_url=url,
-            artifact_id=None,
-            metadata=metadata,
-        )
+                image = ImageService(db).create_image(
+                    image_url=url,
+                    artifact_id=None,
+                    metadata=metadata,
+                )
 
-        payload = {
-            "image_id": str(image.image_id),
-            "image_url": image.image_url,
-            "mime_type": mime_type,
-            "model": metadata.get("model"),
-            "request_id": metadata.get("request_id"),
-            "usage": metadata.get("usage"),
-            "prompt_sha256": render_spec.payload.get("prompt_sha256"),
-            "prompt": prompt,
-            "approved": False,
-            "reason": reason,
-        }
-        return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_RESULT, payload=payload)
+                payload = {
+                    "image_id": str(image.image_id),
+                    "image_url": image.image_url,
+                    "mime_type": mime_type,
+                    "model": metadata.get("model"),
+                    "request_id": metadata.get("request_id"),
+                    "usage": metadata.get("usage"),
+                    "prompt_sha256": render_spec.payload.get("prompt_sha256"),
+                    "prompt": prompt,
+                    "approved": False,
+                    "reason": reason,
+                }
+                return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_RESULT, payload=payload)

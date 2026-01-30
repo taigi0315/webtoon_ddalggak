@@ -1,0 +1,20 @@
+# Visual Prompt Construction Formula
+# Version: 1.0
+# Description: Standard formula for constructing AI image generation prompts
+
+visual_prompt_formula: |
+  Visual Prompt Construction Formula (150-250 words):
+
+  {shot_type}, vertical 9:16 webtoon panel, {composition_note},
+  {environment_with_5+_specific_details} + {style_lighting_description},
+  {character_placement} + {action_and_expression},
+  {atmosphere_keywords},
+  {genre} manhwa style, {rendering_notes}
+
+  REQUIRED ELEMENTS:
+  1. Shot type (establishing/medium/closeup/etc.)
+  2. 5+ specific environment details (architecture, props, lighting, weather)
+  3. Character positioning with percentage (e.g., "occupies 40% of frame")
+  4. Lighting conditions specific to style
+  5. Atmosphere/mood keywords
+  6. Color palette notes
