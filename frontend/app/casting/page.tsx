@@ -13,6 +13,7 @@ import {
     saveActor,
     generateActorVariant,
     importActor,
+    importActorFromFile,
     deleteActor,
     deleteActorVariant,
     fetchStoryStyles,
@@ -882,6 +883,8 @@ function ImportTab({
     onImported: () => void;
 }) {
     const [imageUrl, setImageUrl] = useState("");
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState("");
     const [displayName, setDisplayName] = useState("");
     const [description, setDescription] = useState("");
     const [storyStyleId, setStoryStyleId] = useState("default");
@@ -889,37 +892,87 @@ function ImportTab({
     const [gender, setGender] = useState("");
     const [ageRange, setAgeRange] = useState("");
 
-    const importMutation = useMutation({
+    const importUrlMutation = useMutation({
         mutationFn: importActor,
         onSuccess: () => {
             onImported();
-            setImageUrl("");
-            setDisplayName("");
-            setDescription("");
+            resetForm();
         }
     });
+
+    const importFileMutation = useMutation({
+        mutationFn: importActorFromFile,
+        onSuccess: () => {
+            onImported();
+            resetForm();
+        }
+    });
+
+    const resetForm = () => {
+        setImageUrl("");
+        setSelectedFile(null);
+        setPreviewUrl("");
+        setDisplayName("");
+        setDescription("");
+        setGender("");
+        setAgeRange("");
+    };
 
     const handleImport = () => {
         const traits: CharacterTraitsInput = {};
         if (gender) traits.gender = gender;
         if (ageRange) traits.age_range = ageRange;
 
-        importMutation.mutate({
-            imageUrl,
-            displayName,
-            description: description || null,
-            traits,
-            storyStyleId: storyStyleId !== "default" ? storyStyleId : null,
-            imageStyleId: imageStyleId !== "default" ? imageStyleId : null
-        });
+        if (selectedFile) {
+            importFileMutation.mutate({
+                file: selectedFile,
+                displayName,
+                description: description || null,
+                traits,
+                storyStyleId: storyStyleId !== "default" ? storyStyleId : null,
+                imageStyleId: imageStyleId !== "default" ? imageStyleId : null
+            });
+        } else {
+            importUrlMutation.mutate({
+                imageUrl,
+                displayName,
+                description: description || null,
+                traits,
+                storyStyleId: storyStyleId !== "default" ? storyStyleId : null,
+                imageStyleId: imageStyleId !== "default" ? imageStyleId : null
+            });
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setSelectedFile(file);
+            setImageUrl(""); // Clear URL input
+            const objectUrl = URL.createObjectURL(file);
+            setPreviewUrl(objectUrl);
+        }
+    };
+
+    const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const url = e.target.value;
+        setImageUrl(url);
+        setSelectedFile(null); // Clear file selection
+        setPreviewUrl(url);
     };
 
     const getImageUrl = (url: string) => {
+        if (!url) return "";
+        if (url.startsWith("blob:")) return url;
         if (url.startsWith("/media/")) {
             return `http://localhost:8000${url}`;
         }
         return url;
     };
+
+    const isPending = importUrlMutation.isPending || importFileMutation.isPending;
+    const isError = importUrlMutation.isError || importFileMutation.isError;
+    const errorMessage = importUrlMutation.error?.message || importFileMutation.error?.message;
 
     return (
         <div className="grid gap-6 lg:grid-cols-[1fr,360px]">
@@ -927,14 +980,14 @@ function ImportTab({
             <div className="card">
                 <h3 className="text-lg font-semibold text-ink">Image Preview</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                    Paste an image URL to preview before importing.
+                    Upload an image or paste a URL to preview.
                 </p>
 
                 <div className="mt-6 rounded-2xl bg-white/80 p-4 shadow-soft">
-                    {imageUrl ? (
+                    {previewUrl ? (
                         <div className="relative h-[480px] w-full overflow-hidden rounded-xl bg-slate-100">
                             <img
-                                src={getImageUrl(imageUrl)}
+                                src={getImageUrl(previewUrl)}
                                 alt="Import preview"
                                 className="mx-auto h-full object-contain"
                                 onError={(e) => {
@@ -945,7 +998,7 @@ function ImportTab({
                         </div>
                     ) : (
                         <div className="flex h-[360px] w-full items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-                            Enter an image URL to preview.
+                            No image selected.
                         </div>
                     )}
                 </div>
@@ -957,13 +1010,49 @@ function ImportTab({
 
                 <div className="mt-4 space-y-4">
                     <div>
-                        <label className="text-xs font-semibold text-slate-500">Image URL *</label>
+                        <label className="text-xs font-semibold text-slate-500">Image Source</label>
+                        
+                        {/* File Upload Button */}
+                        <div className="mt-2">
+                             <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileSelect}
+                                className="hidden"
+                                id="file-upload"
+                            />
+                            <label 
+                                htmlFor="file-upload"
+                                className={`btn-secondary w-full text-xs flex items-center justify-center cursor-pointer ${selectedFile ? 'text-indigo-600 bg-indigo-50 border-indigo-200' : ''}`}
+                            >
+                                {selectedFile ? `File: ${selectedFile.name}` : "Upload from Computer"}
+                            </label>
+                        </div>
+                        
+                        <div className="relative flex py-2 items-center">
+                            <div className="flex-grow border-t border-slate-200"></div>
+                            <span className="flex-shrink mx-2 text-[10px] text-slate-400 font-medium">OR URL</span>
+                            <div className="flex-grow border-t border-slate-200"></div>
+                        </div>
+
                         <input
-                            className="input mt-1 w-full text-sm"
+                            className="input w-full text-sm"
                             placeholder="https://example.com/image.png"
                             value={imageUrl}
-                            onChange={(e) => setImageUrl(e.target.value)}
+                            onChange={handleUrlChange}
+                            disabled={!!selectedFile}
                         />
+                         {selectedFile && (
+                            <button 
+                                className="text-[10px] text-slate-500 mt-1 underline"
+                                onClick={() => {
+                                    setSelectedFile(null);
+                                    setPreviewUrl("");
+                                }}
+                            >
+                                Clear file to use URL
+                            </button>
+                        )}
                     </div>
 
                     <div>
@@ -1051,16 +1140,14 @@ function ImportTab({
                     <button
                         className="btn-primary w-full"
                         onClick={handleImport}
-                        disabled={importMutation.isPending || !imageUrl.trim() || !displayName.trim()}
+                        disabled={isPending || (!imageUrl.trim() && !selectedFile) || !displayName.trim()}
                     >
-                        {importMutation.isPending ? "Importing..." : "Import to Library"}
+                        {isPending ? "Importing..." : "Import to Library"}
                     </button>
 
-                    {importMutation.isError && (
+                    {isError && (
                         <p className="text-xs text-rose-500">
-                            {importMutation.error instanceof Error
-                                ? importMutation.error.message
-                                : "Failed to import character."}
+                             {errorMessage || "Failed to import character."}
                         </p>
                     )}
                 </div>

@@ -6,16 +6,26 @@ independent of project/story context. Actors are global and can be
 "cast" into any project or story.
 """
 
+import logging
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select
+import json
+import shutil
+import uuid
+import os
+from pathlib import Path
 
 from app.api.deps import DbSessionDep
+from app.core.settings import settings
 from app.api.v1.schemas import (
     ActorCharacterRead,
     ActorVariantRead,
+    CharacterTraitsInput,
     GenerateActorRequest,
     GenerateActorResponse,
     GenerateActorVariantRequest,
@@ -36,6 +46,7 @@ from app.services.casting import (
     import_actor_from_local_file,
     save_actor_to_library,
 )
+from app.services.storage import LocalMediaStore
 
 router = APIRouter(prefix="/casting", tags=["casting"])
 
@@ -216,6 +227,59 @@ def list_actor_library(
 
     characters = list(db.execute(stmt).scalars().all())
     return [_build_actor_character_read(c, db) for c in characters]
+
+
+@router.post("/import/file", response_model=ActorCharacterRead)
+async def import_actor_file(
+    display_name: str = Form(...),
+    description: str | None = Form(None),
+    traits: str | None = Form(None),  # JSON string
+    story_style_id: str | None = Form(None),
+    image_style_id: str | None = Form(None),
+    project_id: uuid.UUID | None = Form(None),
+    file: UploadFile = File(...),
+    db=DbSessionDep,
+):
+    """
+    Import a character from an uploaded file.
+    """
+    # Parse traits JSON
+    traits_dict = {}
+    if traits:
+        try:
+            traits_dict = json.loads(traits)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid traits JSON")
+
+    try:
+        # Save file to media directory
+        store = LocalMediaStore(
+            root_dir=settings.media_root,
+            url_prefix=settings.media_url_prefix,
+        )
+        file_bytes = await file.read()
+        mime_type = file.content_type or "application/octet-stream"
+        
+        # Save to media directory using helper
+        _, image_url = store.save_image_bytes(file_bytes, mime_type)
+        
+        # Import actor using the saved image URL
+        character = import_actor_from_image(
+            db=db,
+            project_id=project_id,
+            image_url=image_url,
+            display_name=display_name,
+            description=description,
+            traits=traits_dict,
+            story_style_id=story_style_id,
+            image_style_id=image_style_id,
+        )
+        
+        return _build_actor_character_read(character, db)
+
+    except Exception as e:
+        logger.error(f"Import file failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 
 @router.post("/import", response_model=ActorCharacterRead)

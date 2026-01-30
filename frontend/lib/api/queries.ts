@@ -1,4 +1,4 @@
-import { fetchJson } from "@/lib/api/client";
+import { fetchJson, apiConfig, ApiError } from "@/lib/api/client";
 import {
   artifactIdSchema,
   artifactsSchema,
@@ -805,6 +805,52 @@ export async function importActor(params: {
       image_style_id: params.imageStyleId ?? null
     })
   });
+  return actorCharacterReadSchema.parse(payload);
+}
+
+/**
+ * Import a character from a file upload.
+ */
+export async function importActorFromFile(params: {
+  file: File;
+  displayName: string;
+  description?: string | null;
+  traits?: CharacterTraitsInput | null;
+  storyStyleId?: string | null;
+  imageStyleId?: string | null;
+  projectId?: string | null;
+}) {
+  const formData = new FormData();
+  formData.append("file", params.file);
+  formData.append("display_name", params.displayName);
+  if (params.description) formData.append("description", params.description);
+  if (params.traits) formData.append("traits", JSON.stringify(params.traits));
+  if (params.storyStyleId) formData.append("story_style_id", params.storyStyleId);
+  if (params.imageStyleId) formData.append("image_style_id", params.imageStyleId);
+  if (params.projectId) formData.append("project_id", params.projectId);
+
+  const url = `${apiConfig.baseUrl}/v1/casting/import/file`;
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData,
+  });
+
+  let payload;
+  const text = await response.text();
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = text;
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof payload === "object" && payload && "detail" in payload
+        ? String((payload as any).detail)
+        : `Request failed (${response.status})`;
+    throw new ApiError(message, response.status, payload);
+  }
+
   return actorCharacterReadSchema.parse(payload);
 }
 
