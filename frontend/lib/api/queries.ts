@@ -22,7 +22,8 @@ import {
   characterVariantsSchema,
   characterVariantSchema,
   characterVariantSuggestionsSchema,
-  characterVariantGenerationResultsSchema
+  characterVariantGenerationResultsSchema,
+  sceneEstimationResponseSchema
 } from "@/lib/api/types";
 
 export async function fetchHealth() {
@@ -233,6 +234,28 @@ export async function autoChunkScenes(params: {
   });
   return scenesSchema.parse(payload);
 }
+
+
+
+export async function estimateSceneCount(params: {
+  storyId?: string;
+  sourceText?: string;
+  useLlm?: boolean;
+}) {
+  const url = params.storyId 
+    ? `/v1/stories/${params.storyId}/estimate-scenes`
+    : "/v1/utils/estimate-scenes";
+    
+  const payload = await fetchJson(url, {
+    method: "POST",
+    body: JSON.stringify({
+      source_text: params.sourceText ?? null,
+      use_llm: params.useLlm ?? true
+    })
+  });
+  return sceneEstimationResponseSchema.parse(payload);
+}
+
 
 export async function generateStoryBlueprint(params: {
   storyId: string;
@@ -571,6 +594,76 @@ export async function updateDialogueLayer(params: {
   const payload = await fetchJson(`/v1/dialogue/${params.dialogueId}`, {
     method: "PUT",
     body: JSON.stringify({ bubbles: params.bubbles })
+  });
+  return payload;
+}
+
+// Character Library APIs
+
+export async function saveToLibrary(params: {
+  characterId: string;
+  generationPrompt?: string;
+}) {
+  const payload = await fetchJson(`/v1/characters/${params.characterId}/save-to-library`, {
+    method: "POST",
+    body: JSON.stringify({
+      generation_prompt: params.generationPrompt ?? null
+    })
+  });
+  return payload;
+}
+
+export async function importReferenceFromLibrary(params: {
+  characterId: string;
+  libraryCharacterId: string;
+}) {
+  const payload = await fetchJson(`/v1/characters/${params.characterId}/import-from-library`, {
+    method: "POST",
+    body: JSON.stringify({
+      library_character_id: params.libraryCharacterId
+    })
+  });
+  return payload;
+}
+
+export async function removeFromLibrary(characterId: string) {
+  const payload = await fetchJson(`/v1/characters/${characterId}/remove-from-library`, {
+    method: "POST"
+  });
+  return payload;
+}
+
+export async function fetchLibraryCharacters(projectId: string) {
+  const payload = await fetchJson(`/v1/projects/${projectId}/library/characters`);
+  return payload;
+}
+
+export async function loadFromLibrary(params: {
+  storyId: string;
+  libraryCharacterId: string;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/characters/load-from-library`, {
+    method: "POST",
+    body: JSON.stringify({
+      library_character_id: params.libraryCharacterId
+    })
+  });
+  return payload;
+}
+
+export async function generateWithReference(params: {
+  storyId: string;
+  libraryCharacterId: string;
+  variantDescription?: string;
+  variantType?: string;
+}) {
+  const payload = await fetchJson(`/v1/stories/${params.storyId}/characters/generate-with-reference`, {
+    method: "POST",
+    body: JSON.stringify({
+      library_character_id: params.libraryCharacterId,
+      variant_description: params.variantDescription ?? null,
+      variant_type: params.variantType ?? "story_context"
+    })
   });
   return payload;
 }

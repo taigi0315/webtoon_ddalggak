@@ -7,8 +7,8 @@
 prompt_panel_semantics: |
   {{ global_constraints }}
 
-  Fill in DETAILED visual semantics for each panel. Each description must be 100-150 words minimum.
-  This will be used for AI image generation - be SPECIFIC, VISUAL, and COMPLETE.
+  Fill in DETAILED visual semantics for each panel. Each description must be 50-75 words minimum.
+  This will be used for AI image generation - be SPECIFIC and VISUAL.
   {% if intent_block %}
   {{ intent_block }}
   {% endif %}
@@ -48,32 +48,6 @@ prompt_panel_semantics: |
   5. Background activity (other people, movement, weather visible through windows)
   6. Atmosphere indicators (steam, dust motes, rain, shadows)
 
-  **DIALOGUE REQUIREMENTS (CRITICAL - This carries the story):**
-  Minimum dialogue per panel type:
-  - Establishing shots: 0-2 lines (can be silent)
-  - Normal dialogue panels: 5-8 lines MINIMUM (not just 1-2!)
-  - Key emotional panels: 8-12 lines with reactions and subtext
-  - Action panels: 2-4 lines for context
-
-  **Why rich dialogue matters:**
-  - Without enough dialogue, the story feels incomplete
-  - Dialogue shows character dynamics, not just plot points
-  - Each line must reveal character OR advance plot OR create emotion
-
-  **CONVERSATION BUILDING PATTERNS:**
-  1. Opening Exchange (3-4 lines):
-     "Question" -> "Response" -> "Follow-up" -> "Reaction"
-
-  2. Building Tension (5-6 lines):
-     "Statement" -> "Challenge" -> "Explanation" -> "Disbelief" -> "Confirmation"
-
-  3. Emotional Peak (7-8 lines):
-     "Confession" -> "Shock" -> "Clarification" -> "Emotional response" -> "Deeper reveal" -> "Processing"
-
-  4. Include: pauses, hesitation, interruptions for realism
-  5. Last line of dialogue should have impact or create anticipation
-  6. Show distinct character voices (how they speak differently)
-
   VALID CAMERA VALUES: extreme_closeup, closeup, medium_closeup, medium, medium_full, full, wide, establishing
   VALID GAZE VALUES: at_other, at_object, down, away, toward_path, camera
 
@@ -86,7 +60,7 @@ prompt_panel_semantics: |
         "camera": "wide",
         "character_frame_percentage": 25,
         "focus_on": "environment with characters",
-        "description": "150+ word detailed visual description following the formula above",
+        "description": "50-75 word concise visual description following the formula above",
         "characters": [
           {
             "name": "Character Name",
@@ -96,10 +70,6 @@ prompt_panel_semantics: |
             "expression": "specific emotion with physical description",
             "action": "specific action verb + body language"
           }
-        ],
-        "dialogue": [
-          {"character": "Name", "text": "Dialogue line", "order": 1},
-          {"character": "Name", "text": "Response", "order": 2}
         ],
         "environment": {
           "location": "specific place name",

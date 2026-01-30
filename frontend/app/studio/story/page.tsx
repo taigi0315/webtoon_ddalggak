@@ -13,7 +13,8 @@ import {
   fetchProjects,
   fetchScenes,
   fetchStories,
-  fetchStoryProgress
+  fetchStoryProgress,
+  estimateSceneCount
 } from "@/lib/api/queries";
 import type { Character, Scene } from "@/lib/api/types";
 
@@ -66,6 +67,14 @@ export default function StoryEditorPage() {
   const [generatedScenes, setGeneratedScenes] = useState<Scene[]>([]);
   const [generatedCharacters, setGeneratedCharacters] = useState<Character[]>([]);
   const [generationError, setGenerationError] = useState("");
+
+  // Scene Estimation
+  const [isEstimating, setIsEstimating] = useState(false);
+  const [estimationResult, setEstimationResult] = useState<{
+    status: string;
+    message: string;
+    recommended?: number;
+  } | null>(null);
 
   // Queries
   const projectsQuery = useQuery({
@@ -230,6 +239,37 @@ export default function StoryEditorPage() {
       window.localStorage.setItem(draftKey, storyText);
     }
   }, [storyId, storyText, storyTextTouched]);
+
+
+
+  const handleEstimateScenes = async () => {
+    if (!storyText.trim()) return;
+    setIsEstimating(true);
+    setEstimationResult(null);
+    try {
+      const result = await estimateSceneCount({
+        storyId: storyId || undefined,
+        sourceText: storyText.trim(),
+        useLlm: true
+      });
+      setEstimationResult({
+        status: result.status,
+        message: result.message,
+        recommended: result.recommended_count
+      });
+      if (result.recommended_count) {
+        setMaxScenes(result.recommended_count);
+      }
+    } catch (error) {
+      setEstimationResult({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to estimate scene count."
+      });
+    } finally {
+      setIsEstimating(false);
+    }
+  };
+
 
   // Handle Generate Story - creates project/story if needed, then generates
   const handleGenerateStory = async () => {
@@ -493,7 +533,26 @@ export default function StoryEditorPage() {
           {/* Max Scenes */}
           <div className="mt-6">
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-ink">Maximum Scenes</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-ink">Maximum Scenes</label>
+                {storyText.trim().length > 10 && (
+                  <button
+                    onClick={handleEstimateScenes}
+                    disabled={isEstimating}
+                    type="button"
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-50 flex items-center gap-1 transition-colors"
+                  >
+                    {isEstimating ? (
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
+                        Estimating...
+                      </span>
+                    ) : (
+                      "✨ Recommend scenes"
+                    )}
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-4">
                 <input
                   type="range"
@@ -515,6 +574,18 @@ export default function StoryEditorPage() {
                   }}
                 />
               </div>
+              {estimationResult && (
+                <div
+                  className={`mt-2 text-xs p-3 rounded border ${
+                    estimationResult.status === "ok"
+                      ? "bg-green-50 border-green-100 text-green-700"
+                      : "bg-amber-50 border-amber-100 text-amber-700"
+                  }`}
+                >
+                  <strong className="block mb-1">AI Recommendation: {estimationResult.recommended} scenes</strong>
+                  {estimationResult.message}
+                </div>
+              )}
               <p className="text-xs text-slate-500">
                 The AI will split your story into up to {maxScenes} scenes. Recommended: 4-6 for a typical episode.
               </p>

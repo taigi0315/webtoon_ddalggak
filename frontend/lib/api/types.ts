@@ -47,6 +47,8 @@ export const characterSchema = z.object({
   hair_description: z.string().nullable(),
   base_outfit: z.string().nullable(),
   identity_line: z.string().nullable(),
+  generation_prompt: z.string().nullable().optional(),
+  is_library_saved: z.boolean().optional().default(false),
   approved: z.boolean()
 });
 
@@ -206,3 +208,71 @@ export const characterVariantGenerationResultsSchema = z.array(
 export type CharacterVariantGenerationResult = z.infer<
   typeof characterVariantGenerationResultSchema
 >;
+
+
+export const sceneAnalysisSchema = z.object({
+  narrative_beats: z.number().nullable().optional(),
+  estimated_duration_seconds: z.number().nullable().optional(),
+  pacing: z.string().nullable().optional(),
+  complexity: z.string().nullable().optional(),
+  dialogue_density: z.string().nullable().optional(),
+  key_moments: z.array(z.string()).nullable().optional()
+});
+
+
+export const sceneEstimationResponseSchema = z.object({
+  recommended_count: z.number(),
+  status: z.string(),
+  message: z.string(),
+  analysis: sceneAnalysisSchema.nullable().optional()
+});
+
+export type SceneAnalysis = z.infer<typeof sceneAnalysisSchema>;
+export type SceneEstimationResponse = z.infer<typeof sceneEstimationResponseSchema>;
+
+export const libraryCharacterSchema = z.object({
+  character_id: z.string().uuid(),
+  project_id: z.string().uuid(),
+  canonical_code: z.string().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  role: z.string(),
+  gender: z.string().nullable(),
+  age_range: z.string().nullable(),
+  appearance: z.record(z.any()).nullable(),
+  hair_description: z.string().nullable(),
+  base_outfit: z.string().nullable(),
+  identity_line: z.string().nullable(),
+  generation_prompt: z.string().nullable(),
+  approved: z.boolean(),
+  primary_reference_image: characterRefSchema.nullable().optional()
+});
+
+export const saveToLibraryResponseSchema = z.object({
+  character_id: z.string().uuid(),
+  is_library_saved: z.boolean(),
+  message: z.string()
+});
+
+export const loadFromLibraryResponseSchema = z.object({
+  character_id: z.string().uuid(),
+  story_id: z.string().uuid(),
+  already_linked: z.boolean(),
+  message: z.string()
+});
+
+export const generateWithReferenceResponseSchema = z.object({
+  character_id: z.string().uuid(),
+  story_id: z.string().uuid(),
+  variant_id: z.string().uuid().nullable(),
+  reference_image_id: z.string().uuid().nullable(),
+  status: z.string(),
+  message: z.string()
+});
+
+export type LibraryCharacter = z.infer<typeof libraryCharacterSchema>;
+export type SaveToLibraryResponse = z.infer<typeof saveToLibraryResponseSchema>;
+export type LoadFromLibraryResponse = z.infer<typeof loadFromLibraryResponseSchema>;
+export type GenerateWithReferenceResponse = z.infer<typeof generateWithReferenceResponseSchema>;
+
+

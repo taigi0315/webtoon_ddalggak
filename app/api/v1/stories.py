@@ -7,7 +7,10 @@ from sqlalchemy import select
 from app.api.deps import DbSessionDep
 from app.api.v1.schemas import (
     JobStatusRead,
+    SceneAnalysisRead,
     SceneAutoChunkRequest,
+    SceneEstimationRequest,
+    SceneEstimationResponse,
     SceneRead,
     StoryCreate,
     StoryProgress,
@@ -25,6 +28,10 @@ from app.graphs import nodes
 from app.graphs.story_build import run_story_build_graph
 from app.services import job_queue
 from app.services.audit import log_audit_entry
+from app.services.story_analysis import (
+    estimate_scene_count_heuristic,
+    estimate_scene_count_llm,
+)
 from app.core.request_context import get_request_id, reset_request_id, set_request_id
 from app.services.vertex_gemini import GeminiClient
 
@@ -380,3 +387,115 @@ def set_story_style_defaults(story_id: uuid.UUID, payload: StorySetStyleDefaults
     db.commit()
     db.refresh(story)
     return story
+
+
+@router.post("/stories/{story_id}/estimate-scenes", response_model=SceneEstimationResponse)
+async def estimate_scene_count(
+    story_id: uuid.UUID,
+    payload: SceneEstimationRequest,
+    db=DbSessionDep,
+):
+    """
+    Recommend the optimal number of scenes for a story.
+
+    Analyzes the story text to recommend a scene count targeting a webtoon video
+    duration of 60-90 seconds (approximately 80 seconds ideal).
+
+    - **Ideal range**: 7-15 scenes
+    - **too_short**: Story has minimal content, minimum 5 scenes recommended
+    - **too_long**: Story is complex, consider splitting into episodes
+    - **ok**: Story fits well within target duration
+
+    If source_text is not provided, the endpoint will concatenate existing scenes'
+    source_text from the story.
+    """
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="story not found")
+
+    # Get source text from request or from existing scenes
+    source_text = payload.source_text
+    if not source_text:
+        # Concatenate existing scenes' source_text
+        scenes = db.scalars(
+            select(Scene)
+            .where(Scene.story_id == story_id)
+            .order_by(Scene.created_at)
+        ).all()
+        if scenes:
+            source_text = "\n\n".join(s.source_text for s in scenes if s.source_text)
+
+    if not source_text:
+        raise HTTPException(
+            status_code=400,
+            detail="No source text provided and story has no existing scenes",
+        )
+
+    # Perform estimation
+    if payload.use_llm:
+        try:
+            gemini_client = _build_gemini_client()
+            estimation = await estimate_scene_count_llm(source_text, gemini_client)
+        except HTTPException:
+            # Gemini not configured, fall back to heuristic
+            estimation = estimate_scene_count_heuristic(source_text)
+    else:
+        estimation = estimate_scene_count_heuristic(source_text)
+
+    # Build response
+    analysis = None
+    if estimation.analysis:
+        analysis = SceneAnalysisRead(
+            narrative_beats=estimation.analysis.narrative_beats,
+            estimated_duration_seconds=estimation.analysis.estimated_duration_seconds,
+            pacing=estimation.analysis.pacing.value,
+            complexity=estimation.analysis.complexity.value,
+            dialogue_density=estimation.analysis.dialogue_density.value,
+            key_moments=estimation.analysis.key_moments,
+        )
+
+
+@router.post("/utils/estimate-scenes", response_model=SceneEstimationResponse)
+async def estimate_scene_count_stateless(
+    payload: SceneEstimationRequest,
+):
+    """
+    Stateless version of scene estimation.
+    Does not require a story_id. Takes source_text directly.
+    """
+    source_text = payload.source_text
+    if not source_text:
+        raise HTTPException(
+            status_code=400,
+            detail="source_text is required for stateless estimation",
+        )
+
+    # Perform estimation
+    if payload.use_llm:
+        try:
+            gemini_client = _build_gemini_client()
+            estimation = await estimate_scene_count_llm(source_text, gemini_client)
+        except HTTPException:
+            # Gemini not configured, fall back to heuristic
+            estimation = estimate_scene_count_heuristic(source_text)
+    else:
+        estimation = estimate_scene_count_heuristic(source_text)
+
+    # Build response
+    analysis = None
+    if estimation.analysis:
+        analysis = SceneAnalysisRead(
+            narrative_beats=estimation.analysis.narrative_beats,
+            estimated_duration_seconds=estimation.analysis.estimated_duration_seconds,
+            pacing=estimation.analysis.pacing.value,
+            complexity=estimation.analysis.complexity.value,
+            dialogue_density=estimation.analysis.dialogue_density.value,
+            key_moments=estimation.analysis.key_moments,
+        )
+
+    return SceneEstimationResponse(
+        recommended_count=estimation.recommended_count,
+        status=estimation.status.value,
+        message=estimation.message,
+        analysis=analysis,
+    )

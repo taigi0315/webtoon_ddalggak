@@ -1,0 +1,48 @@
+# Scene Count Estimation Prompt
+# Version: 1.0
+# Description: Recommend optimal scene count for webtoon video (~60-90s target)
+# Required Variables: source_text
+# Output Schema: { recommended_count, status, message, analysis }
+
+prompt_scene_estimation: |
+  {{ system_prompt_json }}
+  {{ global_constraints }}
+
+  You are analyzing a story to recommend the optimal number of scenes for a webtoon video.
+
+  Target video duration: 60-90 seconds (approximately 80 seconds ideal)
+  Average duration per scene: 8-12 seconds (depending on complexity)
+
+  Guidelines:
+  - Ideal scene count: 7-15 scenes
+  - Each scene should represent a distinct narrative beat or visual moment
+  - Consider pacing: action-heavy stories may need more shorter scenes
+  - Consider dialogue: dialogue-heavy scenes may take longer
+  - Very short stories (minimal plot points): minimum 5 scenes
+  - Very long/complex stories: maximum 15 scenes (suggest splitting into episodes)
+
+  Analyze the following story and recommend the optimal scene count:
+
+  STORY TEXT:
+  {{ source_text }}
+
+  Provide your analysis in this JSON format:
+  {
+    "recommended_count": <integer between 5 and 15>,
+    "status": "ok" | "too_short" | "too_long",
+    "message": "<User-friendly explanation of your recommendation>",
+    "analysis": {
+      "narrative_beats": <count of distinct story beats identified>,
+      "estimated_duration_seconds": <estimated video duration>,
+      "pacing": "fast" | "normal" | "slow",
+      "complexity": "simple" | "moderate" | "complex",
+      "dialogue_density": "low" | "medium" | "high",
+      "key_moments": ["<list of key visual moments identified>"]
+    }
+  }
+
+  Rules:
+  - If story has fewer than 5 clear narrative beats, set status to "too_short"
+  - If story has more than 15 major narrative beats, set status to "too_long"
+  - Always provide actionable suggestions in the message
+  - For "too_long" stories, suggest where to split into episodes

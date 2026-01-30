@@ -19,9 +19,21 @@ import {
   setPrimaryCharacterRef,
   deleteCharacterRef,
   updateCharacter,
-  approveCharacter
+  approveCharacter,
+  saveToLibrary,
+  removeFromLibrary,
+  fetchLibraryCharacters,
+  loadFromLibrary,
+  generateWithReference,
+  importReferenceFromLibrary
 } from "@/lib/api/queries";
-import type { Character, CharacterRef, CharacterVariant, CharacterVariantSuggestion } from "@/lib/api/types";
+import type {
+  Character,
+  CharacterRef,
+  CharacterVariant,
+  CharacterVariantSuggestion,
+  LibraryCharacter
+} from "@/lib/api/types";
 
 export default function CharacterStudioPage() {
   const queryClient = useQueryClient();
@@ -207,6 +219,14 @@ export default function CharacterStudioPage() {
                 </p>
               </button>
             ))}
+            
+            <div className="pt-4 mt-4 border-t border-slate-200">
+               <LoadCharacterFromLibrary 
+                  projectId={projectId} 
+                  storyId={storyId} 
+                  onCharacterLoaded={() => { queryClient.invalidateQueries({ queryKey: ["characters", storyId] }) }} 
+               />
+            </div>
           </aside>
 
           <div>
@@ -444,6 +464,17 @@ function CharacterDetail({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <LoadCharacterFromLibrary 
+               projectId={character.project_id} 
+               storyId={storyId} 
+               targetCharacterId={character.character_id}
+               onCharacterLoaded={() => {
+                  queryClient.invalidateQueries({ queryKey: ["characterRefs", character.character_id] });
+                  queryClient.invalidateQueries({ queryKey: ["characters"] });
+               }}
+               buttonLabel="Import from Library"
+               buttonStyle="btn-secondary text-xs px-3 py-2"
+            />
             <button
               className="btn-ghost text-sm"
               onClick={() => approveCharacterMutation.mutate(character.character_id)}
@@ -627,6 +658,18 @@ function CharacterDetail({
           )}
         </div>
 
+        {/* Character Library Section */}
+        <div className="mt-6 border-t border-slate-200 pt-4">
+          <h4 className="text-sm font-semibold text-ink">Character Library</h4>
+          <p className="mt-1 text-xs text-slate-500">
+            Save this character to the project library for reuse in other stories.
+          </p>
+          <div className="mt-3">
+             <SaveCharacterToLibraryButton character={character} />
+          </div>
+        </div>
+
+
         <div className="mt-6 border-t border-slate-200 pt-4">
           <h4 className="text-sm font-semibold text-ink">Manual Story Variant</h4>
           <p className="mt-1 text-xs text-slate-500">
@@ -661,8 +704,15 @@ function CharacterDetail({
                 <option value="outfit_change">Outfit change</option>
                 <option value="hair_change">Hair change</option>
                 <option value="time_skip">Time skip</option>
+                <option value="story_context">Story Context (Gen with Ref)</option>
               </select>
             </div>
+            {variantType === "story_context" ? (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-xs text-indigo-800">
+                 <p className="font-semibold mb-1">Generate with Reference</p>
+                 <p>Creates a variant using the selected reference image as a strong visual anchor, adapting it to the story context.</p>
+              </div>
+            ) : null}
             <div>
               <label className="text-xs font-semibold text-slate-500">Outfit / Appearance</label>
               <input
@@ -762,3 +812,294 @@ function CharacterDetail({
     </div>
   );
 }
+
+function SaveCharacterToLibraryButton({ character }: { character: Character }) {
+  const queryClient = useQueryClient();
+  const saveMutation = useMutation({
+    mutationFn: (vars: { characterId: string; generationPrompt?: string }) =>
+      saveToLibrary(vars),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["characters"] });
+    }
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (characterId: string) => removeFromLibrary(characterId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["characters"] });
+    }
+  });
+
+  if (character.is_library_saved) {
+    return (
+      <button
+        className="btn-success w-full text-xs group relative overflow-hidden"
+        onClick={() => removeMutation.mutate(character.character_id)}
+        disabled={removeMutation.isPending}
+        title="Click to remove from library"
+      >
+        <span className="group-hover:hidden flex items-center justify-center gap-1">
+          <span>✓</span> Saved to Library
+        </span>
+        <span className="hidden group-hover:flex items-center justify-center gap-1 bg-rose-600 text-white absolute inset-0 transition-all">
+          Remove from Library
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      className="btn-secondary w-full text-xs"
+      onClick={() => saveMutation.mutate({ characterId: character.character_id })}
+      disabled={saveMutation.isPending || !character.approved}
+      title={!character.approved ? "Character must be approved first" : ""}
+    >
+      {saveMutation.isPending ? "Saving..." : "Save to Library"}
+    </button>
+  );
+}
+
+
+function LoadCharacterFromLibrary({
+  projectId,
+  storyId,
+  targetCharacterId,
+  onCharacterLoaded,
+  buttonLabel = "+ Add from Library",
+  buttonStyle = "btn-secondary w-full justify-center text-sm py-3"
+}: {
+  projectId: string;
+  storyId: string;
+  targetCharacterId?: string; // Optional: If set, we are importing to this character
+  onCharacterLoaded: () => void;
+  buttonLabel?: string;
+  buttonStyle?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedLibChar, setSelectedLibChar] = useState<LibraryCharacter | null>(null);
+  const [mode, setMode] = useState<"load" | "generate">("load");
+  const [variantDesc, setVariantDesc] = useState("");
+
+  const libraryQuery = useQuery({
+    queryKey: ["libraryCharacters", projectId],
+    queryFn: () => fetchLibraryCharacters(projectId),
+    enabled: isOpen && !!projectId
+  });
+
+  const loadMutation = useMutation({
+    mutationFn: loadFromLibrary,
+    onSuccess: () => {
+      setIsOpen(false);
+      onCharacterLoaded();
+    }
+  });
+
+  const importMutation = useMutation({
+    mutationFn: importReferenceFromLibrary,
+    onSuccess: () => {
+      setIsOpen(false);
+      onCharacterLoaded();
+    }
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: generateWithReference,
+    onSuccess: () => {
+      setIsOpen(false);
+      onCharacterLoaded();
+    }
+  });
+
+  if (!storyId) return null;
+  
+  const isImportMode = !!targetCharacterId;
+
+  return (
+    <>
+      <button
+        className={buttonStyle}
+        onClick={() => setIsOpen(true)}
+      >
+        {buttonLabel}
+      </button>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-xl max-h-[85vh] flex gap-6">
+            
+            {/* Left: List */}
+            <div className="w-1/2 flex flex-col">
+              <h2 className="text-lg font-bold text-ink mb-4">Project Library</h2>
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-3 pr-2 border-r border-slate-100">
+                {libraryQuery.isLoading ? (
+                  <div className="text-center py-8 text-slate-500">Loading library...</div>
+                ) : libraryQuery.data?.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    No saved characters found.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {libraryQuery.data?.map((char) => (
+                      <button
+                        key={char.character_id}
+                        className={`text-left rounded-lg border p-2 transition-all ${
+                          selectedLibChar?.character_id === char.character_id
+                            ? "border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50"
+                            : "border-slate-200 hover:border-indigo-300"
+                        }`}
+                        onClick={() => setSelectedLibChar((char as unknown) as LibraryCharacter)}
+                      >
+                        <div className="aspect-square bg-slate-100 rounded mb-2 overflow-hidden">
+                          {char.primary_reference_image ? (
+                             <img 
+                               src={char.primary_reference_image.image_url.startsWith("/media/") ? `http://localhost:8000${char.primary_reference_image.image_url}` : char.primary_reference_image.image_url} 
+                               alt={char.name} 
+                               className="w-full h-full object-cover" 
+                             />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+                              No Image
+                            </div>
+                          )}
+                        </div>
+                        <div className="font-semibold text-xs truncate">{char.name}</div>
+                        <div className="text-[10px] text-slate-500 capitalize">{char.role}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Actions */}
+            <div className="w-1/2 flex flex-col">
+              <div className="flex justify-between items-start">
+                  <h3 className="text-lg font-semibold text-ink">
+                    {selectedLibChar ? selectedLibChar.name : "Select a Character"}
+                  </h3>
+                  <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600">
+                    &times;
+                  </button>
+              </div>
+
+              {selectedLibChar ? (
+                <div className="mt-4 flex-1 flex flex-col">
+                   <div className="bg-slate-50 p-3 rounded-lg text-xs text-slate-600 mb-6">
+                      {selectedLibChar.description || "No description."}
+                   </div>
+
+                   <div className="space-y-6">
+                     {/* Option 1: Direct Load / Import */}
+                     <div className={`p-4 rounded-xl border transition-all ${mode === 'load' ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-200 hover:border-indigo-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <input 
+                            type="radio" 
+                            name="mode" 
+                            checked={mode === 'load'} 
+                            onChange={() => setMode('load')}
+                            className="w-4 h-4 text-indigo-600"
+                          />
+                          <div>
+                            <span className="font-semibold text-sm block text-ink">
+                               {isImportMode ? "Import Look" : "Direct Load"}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                               {isImportMode 
+                                 ? "Apply this character's appearance to your current character." 
+                                 : "Add this character to your story as-is."}
+                            </span>
+                          </div>
+                        </div>
+                     </div>
+
+                     {/* Option 2: Generate Variant */}
+                     {!isImportMode && (
+                     <div className={`p-4 rounded-xl border transition-all ${mode === 'generate' ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-200 hover:border-indigo-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <input 
+                            type="radio" 
+                            name="mode" 
+                            checked={mode === 'generate'} 
+                            onChange={() => setMode('generate')}
+                            className="w-4 h-4 text-indigo-600"
+                          />
+                          <div>
+                            <span className="font-semibold text-sm block text-ink">Generate Variant</span>
+                            <span className="text-xs text-slate-500">Create a new look based on story context.</span>
+                          </div>
+                        </div>
+                        
+                        {mode === 'generate' && (
+                          <div className="mt-3 pl-7">
+                             <label className="text-xs font-semibold text-slate-500 block mb-1">Variant Prompt (Optional)</label>
+                             <input 
+                               className="input w-full text-sm" 
+                               placeholder="e.g. Wearing a space suit, injured..."
+                               value={variantDesc}
+                               onChange={(e) => setVariantDesc(e.target.value)}
+                             />
+                          </div>
+                        )}
+                     </div>
+                     )}
+                   </div>
+
+                   <div className="mt-auto pt-6 flex justify-end gap-3">
+                      <button className="btn-ghost text-sm" onClick={() => setIsOpen(false)}>Cancel</button>
+                      <button 
+                        className="btn-primary text-sm min-w-[120px]"
+                        onClick={() => {
+                          if (mode === 'load') {
+                            if (isImportMode && targetCharacterId) {
+                                importMutation.mutate({
+                                    characterId: targetCharacterId,
+                                    libraryCharacterId: selectedLibChar.character_id
+                                });
+                            } else {
+                                loadMutation.mutate({
+                                    storyId,
+                                    libraryCharacterId: selectedLibChar.character_id
+                                });
+                            }
+                          } else {
+                            generateMutation.mutate({
+                              storyId,
+                              libraryCharacterId: selectedLibChar.character_id,
+                              variantDescription: variantDesc,
+                              variantType: "story_context"
+                            });
+                          }
+                        }}
+                        disabled={loadMutation.isPending || generateMutation.isPending || importMutation.isPending}
+                      >
+                        {(loadMutation.isPending || generateMutation.isPending || importMutation.isPending) 
+                           ? "Processing..." 
+                           : (mode === 'load' 
+                               ? (isImportMode ? "Import Image" : "Load Character") 
+                               : "Generate Variant")}
+                      </button>
+                   </div>
+                   
+                   {(loadMutation.isError || generateMutation.isError || importMutation.isError) && (
+                      <p className="mt-2 text-xs text-rose-500 text-right">
+                        {(loadMutation.error as Error)?.message || (generateMutation.error as Error)?.message || (importMutation.error as Error)?.message || "Action failed"}
+                      </p>
+                   )}
+
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                  Select a character from the list to see options.
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+

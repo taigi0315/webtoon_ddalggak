@@ -98,6 +98,8 @@ class Character(Base):
     hair_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_outfit: Mapped[str | None] = mapped_column(Text, nullable=True)
     identity_line: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_library_saved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     approved: Mapped[bool] = mapped_column(nullable=False, default=False)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -176,6 +176,8 @@ class CharacterRead(BaseModel):
     hair_description: str | None
     base_outfit: str | None
     identity_line: str | None
+    generation_prompt: str | None = None
+    is_library_saved: bool = False
     approved: bool
 
     model_config = {"from_attributes": True}
@@ -473,3 +475,124 @@ class LayerRead(BaseModel):
     objects: list[LayerObject]
 
     model_config = {"from_attributes": True}
+
+
+# Scene Estimation Schemas
+class SceneAnalysisRead(BaseModel):
+    """Detailed analysis of story for scene estimation."""
+
+    narrative_beats: int = Field(description="Number of distinct story beats identified")
+    estimated_duration_seconds: int = Field(description="Estimated video duration in seconds")
+    pacing: str = Field(description="Story pacing: fast, normal, or slow")
+    complexity: str = Field(description="Story complexity: simple, moderate, or complex")
+    dialogue_density: str = Field(description="Dialogue density: low, medium, or high")
+    key_moments: list[str] = Field(default_factory=list, description="Key visual moments identified")
+
+
+class SceneEstimationRequest(BaseModel):
+    """Request model for scene count estimation."""
+
+    source_text: str | None = Field(
+        default=None,
+        description="Story text to analyze. If not provided, uses existing scenes' source_text.",
+    )
+    use_llm: bool = Field(
+        default=True,
+        description="Use LLM for more accurate analysis (slower) or heuristics only (faster)",
+    )
+
+
+class SceneEstimationResponse(BaseModel):
+    """Response model for scene count estimation."""
+
+    recommended_count: int = Field(ge=5, le=15, description="Recommended number of scenes")
+    status: str = Field(description="Status: ok, too_short, or too_long")
+    message: str = Field(description="User-friendly explanation of the recommendation")
+    analysis: SceneAnalysisRead | None = Field(
+        default=None,
+        description="Detailed analysis of the story structure",
+    )
+
+
+# Character Library Schemas
+class LibraryCharacterRead(BaseModel):
+    """Character from the project library with primary reference image."""
+
+    character_id: uuid.UUID
+    project_id: uuid.UUID
+    canonical_code: str | None
+    name: str
+    description: str | None
+    role: str
+    gender: str | None
+    age_range: str | None
+    appearance: dict | None
+    hair_description: str | None
+    base_outfit: str | None
+    identity_line: str | None
+    generation_prompt: str | None
+    approved: bool
+    primary_reference_image: "CharacterRefRead | None" = None
+
+    model_config = {"from_attributes": True}
+
+
+class SaveToLibraryRequest(BaseModel):
+    """Request to save a character to the project library."""
+
+    generation_prompt: str | None = Field(
+        default=None,
+        description="Original text prompt used for generation (optional, for documentation)",
+    )
+
+
+class SaveToLibraryResponse(BaseModel):
+    """Response after saving a character to library."""
+
+    character_id: uuid.UUID
+    is_library_saved: bool
+    message: str
+
+
+class LoadFromLibraryRequest(BaseModel):
+    """Request to load a character from library into a story."""
+
+    library_character_id: uuid.UUID = Field(
+        description="ID of the character to load from the project library",
+    )
+
+
+class LoadFromLibraryResponse(BaseModel):
+    """Response after loading a character from library."""
+
+    character_id: uuid.UUID
+    story_id: uuid.UUID
+    already_linked: bool
+    message: str
+
+
+class GenerateWithReferenceRequest(BaseModel):
+    """Request to generate a character variant using a library character's reference."""
+
+    library_character_id: uuid.UUID = Field(
+        description="ID of the library character whose reference image to use",
+    )
+    variant_description: str | None = Field(
+        default=None,
+        description="Optional description for the variant (e.g., 'wearing a spacesuit')",
+    )
+    variant_type: str = Field(
+        default="story_context",
+        description="Type of variant: outfit_change, age_progression, expression, story_context",
+    )
+
+
+class GenerateWithReferenceResponse(BaseModel):
+    """Response after generating a character with reference."""
+
+    character_id: uuid.UUID
+    story_id: uuid.UUID
+    variant_id: uuid.UUID | None
+    reference_image_id: uuid.UUID | None
+    status: str
+    message: str

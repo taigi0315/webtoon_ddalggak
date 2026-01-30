@@ -2,6 +2,7 @@
 Prompt loader with versioning and domain organization support.
 
 This loader supports both the legacy single-file prompts.yaml and the new
+# Updated for prompt optimization
 versioned directory structure:
 
     v1/
