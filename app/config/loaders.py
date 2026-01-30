@@ -84,6 +84,34 @@ class StyleLibraryV1(BaseModel):
     styles: list[StyleItem]
 
 
+class GenreGuideline(BaseModel):
+    shot_preferences: str
+    composition: str
+    camera: str
+    lighting: str
+    props: str
+    atmosphere: str
+    color_palette: str
+
+
+class ShotDistribution(BaseModel):
+    establishing: int | str
+    medium: int | str
+    closeup: int | str
+    dynamic: int | str
+
+
+class GenreGuidelinesV1(BaseModel):
+    version: str
+    description: str = ""
+    genres: dict[str, GenreGuideline]
+    shot_distribution: dict[str, ShotDistribution]
+
+
+# Config cache version tracking for hot-reload
+_config_version: int = 0
+
+
 def _config_dir() -> Path:
     return Path(__file__).resolve().parent
 
@@ -139,6 +167,50 @@ def load_story_styles_v1() -> StyleLibraryV1:
 def load_image_styles_v1() -> StyleLibraryV1:
     data = _read_json(_config_dir() / "image_styles.json")
     return StyleLibraryV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_genre_guidelines_v1() -> GenreGuidelinesV1:
+    """Load genre visual guidelines from JSON config."""
+    data = _read_json(_config_dir() / "genre_guidelines_v1.json")
+    return GenreGuidelinesV1.model_validate(data)
+
+
+def get_genre_guideline(genre: str) -> GenreGuideline | None:
+    """Get visual guidelines for a specific genre."""
+    guidelines = load_genre_guidelines_v1()
+    return guidelines.genres.get(genre)
+
+
+def get_shot_distribution(genre: str) -> ShotDistribution | None:
+    """Get shot distribution for a specific genre."""
+    guidelines = load_genre_guidelines_v1()
+    return guidelines.shot_distribution.get(genre)
+
+
+def list_genres() -> list[str]:
+    """List all available genre names."""
+    return list(load_genre_guidelines_v1().genres.keys())
+
+
+def clear_config_cache() -> None:
+    """Clear all cached config data. Call this to force config reload."""
+    global _config_version
+    _config_version += 1
+    load_grammar_library_v1.cache_clear()
+    load_layout_templates_9x16_v1.cache_clear()
+    load_layout_selection_rules_v1.cache_clear()
+    load_grammar_to_prompt_mapping_v1.cache_clear()
+    load_continuity_rules_v1.cache_clear()
+    load_qc_rules_v1.cache_clear()
+    load_story_styles_v1.cache_clear()
+    load_image_styles_v1.cache_clear()
+    load_genre_guidelines_v1.cache_clear()
+
+
+def get_config_version() -> int:
+    """Get current config version (incremented on each cache clear)."""
+    return _config_version
 
 
 def get_grammar(grammar_id: str) -> GrammarItem:

@@ -12,7 +12,13 @@ _SessionLocal = None
 def init_engine(database_url: str) -> None:
     global _engine, _SessionLocal
     _engine = create_engine(database_url, pool_pre_ping=True)
-    _SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, future=True)
+    _SessionLocal = sessionmaker(
+        bind=_engine,
+        autoflush=False,
+        autocommit=False,
+        future=True,
+        expire_on_commit=False,
+    )
 
 
 def get_engine():

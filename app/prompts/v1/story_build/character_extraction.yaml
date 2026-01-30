@@ -1,0 +1,35 @@
+# Character Extraction Prompt
+# Version: 1.0
+# Description: Extract important characters from story text
+# Required Variables: max_characters, source_text
+# Output Schema: { characters: [{ name, role, evidence_quotes, implied, relationship_to_main }] }
+
+prompt_character_extraction: |
+  {{ system_prompt_json }}
+  {{ global_constraints }}
+
+  Extract only the IMPORTANT characters from the following story text.
+  Include explicitly named characters and implied characters ONLY if they are plot-relevant or recurring.
+  Do NOT include incidental background roles (e.g., movers, clerks, passersby) unless they directly affect the plot.
+
+  Rules:
+  - Extract up to {{ max_characters }} characters
+  - Include evidence quotes showing where each character appears
+  - Assign roles: "main" for central characters (max 2), "secondary" for others
+  - For implied characters, create a descriptive name (e.g., "Jina's Mother" not just "mom")
+
+  OUTPUT SCHEMA:
+  {
+    "characters": [
+      {
+        "name": "Character name",
+        "role": "main|secondary",
+        "evidence_quotes": ["Quote from text showing this character"],
+        "implied": false,
+        "relationship_to_main": "relationship if applicable or null"
+      }
+    ]
+  }
+
+  Story text:
+  {{ source_text }}

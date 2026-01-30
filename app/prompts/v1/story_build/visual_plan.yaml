@@ -1,0 +1,61 @@
+# Visual Plan Prompt
+# Version: 1.0
+# Description: Convert scenes into visual beats for webtoon adaptation
+# Required Variables: story_style, character_identities, scenes_block
+# Output Schema: { global_environment_anchors: [...], scene_plans: [...] }
+
+prompt_visual_plan: |
+  {{ system_prompt_json }}
+  {{ global_constraints }}
+
+  Convert the following scenes into visual beats for webtoon adaptation.
+  Each scene should have 2-6 visual beats depending on complexity.
+
+  Story style: {{ story_style }}
+
+  Characters:
+  {{ character_identities }}
+
+  Scenes:
+  {{ scenes_block }}
+
+  For each scene, identify:
+  1. Visual beats (discrete visual moments that can be drawn)
+  2. Characters involved in each beat
+  3. Environment/setting for each beat
+  4. Key objects that must be shown
+  5. Emotional tone of each beat
+  6. Draft dialogue if applicable
+  7. Scene importance tag (setup|build|climax|release|cliffhanger)
+
+  Also extract global_environment_anchors: recurring locations or visual elements for consistency.
+
+  OUTPUT SCHEMA:
+  {
+    "global_environment_anchors": [
+      {
+        "name": "location name",
+        "description": "visual description for consistency",
+        "appears_in_scenes": [1, 2]
+      }
+    ],
+    "scene_plans": [
+      {
+        "scene_index": 1,
+        "summary": "scene summary",
+        "scene_importance": "setup|build|climax|release|cliffhanger",
+        "beats": [
+          {
+            "beat_index": 1,
+            "what_happens": "description of the visual moment",
+            "characters_involved": ["Character Name"],
+            "environment": "where this happens",
+            "key_objects": ["important objects to show"],
+            "emotional_tone": "emotion of this beat",
+            "dialogue_draft": ["draft dialogue if any"]
+          }
+        ],
+        "must_show": ["critical visual elements for this scene"]
+      }
+    ]
+  }

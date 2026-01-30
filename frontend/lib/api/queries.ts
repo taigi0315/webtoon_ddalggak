@@ -13,6 +13,7 @@ import {
   charactersSchema,
   storyGenerateResponseSchema,
   storyProgressSchema,
+  jobStatusSchema,
   sceneGenerateFullSchema,
   characterRefsSchema,
   characterRefSchema,
@@ -280,7 +281,7 @@ export async function generateStoryBlueprintAsync(params: {
       allow_append: params.allowAppend ?? false
     })
   });
-  return storyProgressSchema.parse(payload);
+  return jobStatusSchema.parse(payload);
 }
 
 export async function generateSceneIntent(sceneId: string) {

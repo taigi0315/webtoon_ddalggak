@@ -1,0 +1,14 @@
+# Repair JSON Prompt
+# Version: 1.0
+# Description: Fix malformed JSON from LLM outputs
+# Required Variables: malformed_text, schema_hint (optional)
+# Output: Corrected JSON only
+
+prompt_repair_json: |
+  {{ system_prompt_json }}
+
+  The following text was supposed to be valid JSON but failed to parse.
+  Fix it and return ONLY the corrected JSON. No explanations.{{ schema_hint }}
+
+  Malformed text:
+  {{ malformed_text }}

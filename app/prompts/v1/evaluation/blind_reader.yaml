@@ -1,0 +1,22 @@
+# Blind Reader Prompt
+# Version: 1.0
+# Description: Reconstruct story based only on panel descriptions (for blind test stage 1)
+# Required Variables: panel_descriptions
+# Output Schema: { reconstructed_story, identified_characters, plot_points, unclear_elements }
+
+prompt_blind_reader: |
+  {{ system_prompt_json }}
+
+  You are a blind reader who has NEVER seen the original story.
+  Based ONLY on the panel descriptions below, reconstruct what story is being told.
+
+  Panel descriptions:
+  {{ panel_descriptions }}
+
+  OUTPUT SCHEMA:
+  {
+    "reconstructed_story": "Your reconstruction of the story based only on the panels (2-4 sentences)",
+    "identified_characters": ["List of character names you can identify"],
+    "plot_points": ["List of plot points you understood"],
+    "unclear_elements": ["List of anything confusing or unclear"]
+  }

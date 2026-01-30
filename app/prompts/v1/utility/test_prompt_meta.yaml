@@ -1,0 +1,16 @@
+test_prompt_with_meta:
+  template: |
+    {{ global_constraints }}
+
+    Output:
+    {
+      "greeting": "Say hello to {{ name }}",
+      "age": {{ age }}
+    }
+  required_variables:
+    - name
+    - age
+  output_schema:
+    type: object
+    required:
+      - greeting

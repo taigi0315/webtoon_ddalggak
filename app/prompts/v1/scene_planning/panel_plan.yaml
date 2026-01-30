@@ -1,0 +1,58 @@
+# Panel Plan Prompt
+# Version: 1.0
+# Description: Create panel plan for webtoon sequence
+# Required Variables: panel_count, char_list, scene_text, intent_block (optional), importance_block (optional), qc_block (optional)
+# Output Schema: { panels: [{ panel_index, grammar_id, story_function, panel_role, panel_purpose, has_dialogue, utility_score, beat_summary }] }
+
+prompt_panel_plan: |
+  {{ global_constraints }}
+
+  Create a panel plan for a {{ panel_count }}-panel webtoon sequence.
+  {% if intent_block %}
+  {{ intent_block }}
+  {% endif %}
+  {% if importance_block %}
+  {{ importance_block }}
+  {% endif %}
+  Characters: {{ char_list }}
+  {% if qc_block %}
+  {{ qc_block }}
+  {% endif %}
+  VALID GRAMMAR IDs (use ONLY these):
+  1. establishing - Wide shot showing environment and context (REQUIRED for panel 1)
+  2. dialogue_medium - Two-shot or medium shot for conversation
+  3. emotion_closeup - Close-up on face for emotional impact (use sparingly)
+  4. action - Dynamic movement or physical action
+  5. reaction - Character responding to prior event
+  6. object_focus - Important object or detail in focus
+  7. reveal - Dramatic reveal of character, object, or information
+  8. impact_silence - Dramatic pause with minimal elements, powerful negative space
+
+  STORY FUNCTION OPTIONS:
+  - setup: establishes context or situation
+  - dialogue: conversation or verbal exchange
+  - emotion: emotional beat or reaction
+  - action: physical action or movement
+  - reaction: response to prior event
+  - focus: draws attention to important element
+  - climax: peak dramatic moment
+  - transition: bridges between scenes or beats
+
+  OUTPUT SCHEMA:
+  {
+    "panels": [
+      {
+        "panel_index": 1,
+        "grammar_id": "establishing",
+        "story_function": "setup",
+        "panel_role": "main|inset",
+        "panel_purpose": "dialogue|reaction|reveal|action|establishing|silent_beat",
+        "has_dialogue": true,
+        "utility_score": 0.0,
+        "beat_summary": "Brief description of what happens in this panel"
+      }
+    ]
+  }
+
+  Scene text:
+  {{ scene_text }}

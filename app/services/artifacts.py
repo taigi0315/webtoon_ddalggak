@@ -4,7 +4,10 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.metrics import record_artifact_creation
+from app.core.request_context import get_request_id
 from app.db.models import Artifact
+from app.services.audit import log_audit_entry
 
 
 class ArtifactService:
@@ -33,12 +36,18 @@ class ArtifactService:
                 if next_parent_id is None:
                     next_parent_id = latest.artifact_id
 
+            request_id = get_request_id()
+            payload_with_request = dict(payload)
+            if request_id:
+                payload_with_request.setdefault("request_id", request_id)
             artifact = Artifact(
                 scene_id=scene_id,
                 type=type,
                 version=next_version,
                 parent_id=next_parent_id,
-                payload=payload,
+                payload=payload_with_request,
+                created_by=request_id,
+                updated_by=request_id,
             )
             self.db.add(artifact)
             try:
@@ -47,6 +56,18 @@ class ArtifactService:
                 self.db.rollback()
                 continue
             self.db.refresh(artifact)
+            log_audit_entry(
+                self.db,
+                entity_type="artifact",
+                entity_id=artifact.artifact_id,
+                action="created",
+                new_value={
+                    "scene_id": str(scene_id),
+                    "type": type,
+                    "version": artifact.version,
+                },
+            )
+            record_artifact_creation(type)
             return artifact
 
         raise IntegrityError(

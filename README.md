@@ -103,6 +103,8 @@ The API will be available at `http://localhost:8000`.
 
 ## API Usage
 
+For a complete workflow guide and endpoint reference, see `docs/api.md`.
+
 ### Create a Project
 
 ```bash
@@ -111,23 +113,37 @@ curl -X POST http://localhost:8000/v1/projects \
   -d '{"name": "My Webtoon"}'
 ```
 
-### Generate Story
+### Create a Story (in a Project)
 
 ```bash
-curl -X POST http://localhost:8000/v1/stories/{story_id}/generate \
+curl -X POST http://localhost:8000/v1/projects/{project_id}/stories \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "My Story",
+    "default_story_style": "default",
+    "default_image_style": "default"
+  }'
+```
+
+### Generate a Story Blueprint (scenes + characters)
+
+```bash
+curl -X POST http://localhost:8000/v1/stories/{story_id}/generate/blueprint_async \
   -H "Content-Type: application/json" \
   -d '{
     "source_text": "Your story text here...",
     "max_scenes": 6,
-    "panel_count": 4,
-    "max_characters": 4
+    "panel_count": 3,
+    "max_characters": 6
   }'
 ```
 
-### Generate Scene Image
+### Generate Full Scene Pipeline (planning + render)
 
 ```bash
-curl -X POST http://localhost:8000/v1/generation/scenes/{scene_id}/generate/full
+curl -X POST http://localhost:8000/v1/scenes/{scene_id}/generate/full_async \
+  -H "Content-Type: application/json" \
+  -d '{"panel_count":3,"style_id":"default"}'
 ```
 
 For full API documentation, visit `http://localhost:8000/docs` after starting the server.

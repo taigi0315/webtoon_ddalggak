@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     media_root: str = Field(default="./storage/media", validation_alias="MEDIA_ROOT")
     media_url_prefix: str = Field(default="/media", validation_alias="MEDIA_URL_PREFIX")
+    log_file: str | None = Field(default=None, validation_alias="LOG_FILE")
 
     @property
     def DATABASE_URL(self) -> str:  # pragma: no cover

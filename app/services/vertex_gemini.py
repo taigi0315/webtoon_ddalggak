@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
+from app.core.metrics import track_gemini_call
 from google import genai
 from google.genai import types
 
@@ -268,7 +269,8 @@ class GeminiClient:
 
         while attempt < max_attempts:
             try:
-                response = func()
+                with track_gemini_call(request_type):
+                    response = func()
                 self.last_request_id = response.response_id or request_id
                 self.last_model = model_name
                 self.last_error_type = None

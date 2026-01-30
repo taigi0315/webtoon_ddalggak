@@ -33,12 +33,74 @@ class StoryRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class StoryProgress(BaseModel):
+    """Typed model for Story.progress JSON field.
+
+    Tracks the current state of story generation workflow.
+    """
+
+    current_node: str = Field(description="Name of the current processing node/step")
+    message: str = Field(description="Human-readable status message")
+    step: int = Field(ge=0, description="Current step number (0-indexed)")
+    total_steps: int = Field(ge=1, description="Total number of steps in the workflow")
+
+    @property
+    def percent_complete(self) -> float:
+        """Calculate completion percentage."""
+        if self.total_steps <= 0:
+            return 0.0
+        return (self.step / self.total_steps) * 100.0
+
+    @property
+    def is_complete(self) -> bool:
+        """Check if all steps are done."""
+        return self.step >= self.total_steps
+
+    @classmethod
+    def create(
+        cls,
+        current_node: str,
+        message: str,
+        step: int,
+        total_steps: int,
+    ) -> dict:
+        """Create a progress dict for storing in Story.progress JSON field.
+
+        Returns a dict suitable for direct assignment to Story.progress.
+
+        Example:
+            story.progress = StoryProgress.create(
+                current_node="Queued",
+                message="Queued for generation...",
+                step=0,
+                total_steps=5,
+            )
+        """
+        return cls(
+            current_node=current_node,
+            message=message,
+            step=step,
+            total_steps=total_steps,
+        ).model_dump()
+
+
 class StoryProgressRead(BaseModel):
     story_id: uuid.UUID
     status: str
-    progress: dict | None = None
+    progress: StoryProgress | None = None
     error: str | None = None
     updated_at: datetime | None = None
+
+
+class JobStatusRead(BaseModel):
+    job_id: uuid.UUID
+    job_type: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    progress: dict | None = None
+    result: dict | None = None
+    error: str | None = None
 
 
 class SceneCreate(BaseModel):

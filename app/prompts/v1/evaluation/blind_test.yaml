@@ -1,0 +1,36 @@
+# Blind Test Prompt
+# Version: 1.0
+# Description: Single-prompt blind test evaluation (fallback for two-stage)
+# Required Variables: scene_text, panel_descriptions
+# Output Schema: { reconstructed_story, comparison, score, scores, failure_points, repair_suggestions }
+
+prompt_blind_test: |
+  {{ system_prompt_json }}
+  {{ global_constraints }}
+
+  Evaluate how well the panel descriptions convey the original story.
+
+  ORIGINAL STORY:
+  {{ scene_text }}
+
+  PANEL DESCRIPTIONS:
+  {{ panel_descriptions }}
+
+  SCORING RUBRIC:
+  - plot_recall (40%): Do panels capture main events?
+  - emotional_alignment (30%): Do panels convey intended emotions?
+  - character_identifiability (30%): Can characters be identified?
+
+  OUTPUT SCHEMA:
+  {
+    "reconstructed_story": "What story would a reader understand from panels alone (2-4 sentences)",
+    "comparison": "How well panels match original",
+    "score": 0.0-1.0,
+    "scores": {
+      "plot_recall": 0.0-1.0,
+      "emotional_alignment": 0.0-1.0,
+      "character_identifiability": 0.0-1.0
+    },
+    "failure_points": ["Panels or elements that fail to communicate"],
+    "repair_suggestions": ["Specific fixes for failed panels"]
+  }
