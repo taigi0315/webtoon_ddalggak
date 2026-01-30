@@ -23,6 +23,12 @@ Implement the `StudioDirector` node in the `story_build` graph.
 - [ ] **The "Director's Cut"**: If the budget is impossible to meet without breaking style purity, send a `Condense` request back to the `ScriptWriter`.
 - [ ] **Critic Integration**: Accept feedback from the `BlindTestRunner` to re-balance the weights if the story flow feels broken.
 
+### 3. Narrative Orchestration
+
+- [ ] **Emotional Context Injection**: Provide a specific `scene_emotion` and `dramatic_intent` for each scene to guide the Cinematographer and Art Director.
+- [ ] **Genre Wisdom Injection**: Replace the deprecated `genre_guidelines.json` by providing high-level genre-specific directing tips directly in the planning state.
+- [ ] **Authority Management**: Ensure the Director's narrative weight decisions are passed down to the `BlindTestRunner` for validation.
+
 ## Acceptance Criteria
 
 - [ ] A story with 10 gags and 10 serious moments is successfully condensed into 15 scenes without "style bleeding" inside a single 9:16 image.
