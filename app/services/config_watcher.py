@@ -59,7 +59,6 @@ async def _watch_loop(poll_interval: float = 2.0) -> None:
     global _should_stop
 
     from app.config.loaders import clear_config_cache
-    from app.graphs.nodes.genre_guidelines import reload_guidelines
     from app.prompts.loader import clear_cache as clear_prompt_cache
 
     files = _get_config_files()
@@ -85,7 +84,6 @@ async def _watch_loop(poll_interval: float = 2.0) -> None:
             logger.info("Reloading configuration...")
             try:
                 clear_config_cache()
-                reload_guidelines()
                 clear_prompt_cache()
 
                 # Run registered callbacks

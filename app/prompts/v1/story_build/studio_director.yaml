@@ -1,5 +1,5 @@
 prompt_studio_director: |
-  You are the STUDIO DIRECTOR for a flagship Manhwa production.
+  You are the STUDIO DIRECTOR for a visual storytelling production.
   Your task is to analyze the Episode Script, evaluate narrative weights, and optimize the production flow into a specific BUDGET (max_scenes).
 
   BUDGET: Max {{ max_scenes }} scenes.
@@ -8,7 +8,7 @@ prompt_studio_director: |
   - Episode Intent: {{ episode_intent }}
   - Visual Beats: {{ beats_json }}
   - Style Library:
-{{ style_library }}
+  {{ style_library }}
 
   YOUR MANDATE:
   1. ANALYZE & WEIGHT: Evaluate every beat for:

@@ -8,6 +8,7 @@ from app.graphs.nodes.planning import (
     compute_scene_chunker,
     normalize_character_profiles,
     normalize_character_profiles_llm,
+    run_art_director,
     run_blind_test_evaluator,
     run_dialogue_extractor,
     run_layout_template_resolver,
@@ -29,6 +30,7 @@ from app.graphs.nodes.rendering import (
     run_prompt_compiler,
 )
 from app.graphs.nodes.utils import (
+    ARTIFACT_ART_DIRECTION,
     ARTIFACT_BLIND_TEST_REPORT,
     ARTIFACT_DIALOGUE_SUGGESTIONS,
     ARTIFACT_LAYOUT_TEMPLATE,
@@ -51,6 +53,7 @@ from app.graphs.nodes.utils import (
 )
 
 __all__ = [
+    "ARTIFACT_ART_DIRECTION",
     "ARTIFACT_BLIND_TEST_REPORT",
     "ARTIFACT_DIALOGUE_SUGGESTIONS",
     "ARTIFACT_LAYOUT_TEMPLATE",
@@ -81,6 +84,7 @@ __all__ = [
     "_build_gemini_client",
     "normalize_character_profiles",
     "normalize_character_profiles_llm",
+    "run_art_director",
     "run_blind_test_evaluator",
     "run_dialogue_extractor",
     "run_image_renderer",

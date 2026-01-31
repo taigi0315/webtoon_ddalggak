@@ -74,8 +74,6 @@ trending fantasy manhwa aesthetic, 4k quality webtoon art
         "visual_elements": ["Magical ambient glow", "Sharp cel-shading", "Sparkle particles", "Vibrant but soft palette"],
         "emotional_range": "High fantasy adventure, magical wonder, epic encounters, mystic romance"
     },
-
-    },
     "DRAMATIC_HISTORICAL_WEBTOON": {
         "prompt": """
 [MEDIUM: Digital Webtoon - Rich Cel-Shading]
@@ -167,8 +165,6 @@ professional fantasy webtoon illustration
         "visual_elements": ["Ethereal glow", "Champagne and gold tones", "Decorative ornaments", "Floating sparkles"],
         "emotional_range": "Isekai romance, noble life, magical destiny, elegant fantasy"
     },
-
-    },
     "DARK_SENSUAL_WEBTOON": {
         "prompt": """
 [MEDIUM: Digital Webtoon - Detailed Cel-Shading]
@@ -259,8 +255,6 @@ high-end illustration standard
         "aesthetic_vibe": "Artistic Semi-Painterly Style with Visible Brushstrokes",
         "visual_elements": ["Artistic texture", "Visible brushwork", "Mood-driven lighting", "Varied line weight"],
         "emotional_range": "Introspective moments, artistic themes, high emotional stakes, unique visual storytelling"
-    },
-
     },
     "EMOTIVE_LUXURY_WEBTOON": {
         "prompt": """
@@ -359,6 +353,7 @@ backgrounds simplified with depth haze, polished high-resolution finish
         "aesthetic_vibe": "Semi-Realistic Modern Manhwa with Cinematic Interior Lighting",
         "visual_elements": ["Muted rose accents", "Feathered shadows", "Semi-realistic anatomy", "Fashion-forward styling"],
         "emotional_range": "Modern romance drama, stylish daily life, cinematic storytelling"
+    },
     "CUTE_CHIBI_SCHOOL_ROMANCE_MANHWA": {
         "prompt": """
 cute chibi school romance manhwa style, bright playful pastel color palette, dominant soft pinks, mint greens, light blues, warm beiges, cherry blossom accents, bubbly speech bubbles with polka dots and stars, low saturation for gentle feel with selective vibrant pops on cheeks, eyes, and effects, high contrast only on emotional focal points like blushes and sparkles,

@@ -27,7 +27,7 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 
 ### Episode Planning & Optimization (Story Build)
 
-- **prompt_character_normalization**: Adds visual details and narrative descriptions to extracted characters using manhwa aesthetics.
+- **prompt_character_normalization**: Adds visual details and narrative descriptions to extracted characters using style-agnostic morphological standards (no hardcoded style keywords).
 - **prompt_script_writer**: Translates raw story text into a visual multi-beat script.
 - **prompt_tone_auditor**: Detects mood shifts (Action, Gag, Emotional) and assigns importance weights to narrative beats.
 - **prompt_scene_optimizer**: Merges low-weight beats into high-weight scenes to stay within budget (`max_scenes`) while assigning appropriate image styles.
@@ -54,19 +54,21 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 
 ## Character Style Map
 
-**Purpose**: Age and gender-based styling templates for Korean manhwa aesthetic standards
+**Purpose**: Age and gender-based styling templates for style-agnostic morphological standards
 
 **Structure**: Nested dictionary with `gender` → `age_range` → `style_template`
 
 **Age Ranges**:
 
 - `child` / `kid` - Chibi proportions (1:3), round cherubic face, large expressive eyes
-- `teen` - Slender graceful build, flower-boy aesthetic (male), large doe eyes (female)
-- `young_adult` / `adult` - Korean male lead aesthetic (180-188cm, willowy proportions), statuesque figure (female, 165cm+)
+- `teen` - Slender graceful build, large doe eyes
+- `young_adult` / `adult` - Tall proportions (180-188cm male, 165cm+ female), slender build
 - `middle_aged` - Distinguished refined features, professional attire
 - `elderly` - Gentle wisdom lines, silver/white hair, dignified presence
 
-**Usage**: Applied during character normalization to ensure consistent visual style
+**Important Note**: As of migration `83f5330535c1_sanitize_character_style_keywords`, all style-specific keywords (manhwa, webtoon, aesthetic, flower-boy, K-drama, etc.) have been removed from character descriptions to ensure style neutrality. Character normalization now focuses on objective morphological descriptions only.
+
+**Usage**: Applied during character normalization to ensure consistent visual descriptions without imposing specific art styles
 
 **Location**: `app/prompts/prompts.yaml` under `character_style_map` key
 
@@ -86,12 +88,14 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 **Format Template**:
 
 ```
-{shot_type}, vertical 9:16 webtoon panel, {composition_note},
+{shot_type}, vertical 9:16 format for vertical scrolling, {composition_note},
 {environment_with_5+_specific_details} + {style_lighting_description},
 {character_placement} + {action_and_expression},
 {atmosphere_keywords},
-{genre} manhwa style, {rendering_notes}
+{rendering_notes}
 ```
+
+**Important Note**: As of Task 2 (Hardcoded Anchor Removal), all hardcoded style anchors like "Korean webtoon/manhwa art style" and "Naver webtoon quality" have been removed from prompt compilation. Image style is now dynamically referenced from the user-selected `image_style_id` parameter.
 
 **Grammar-Specific Requirements**:
 
@@ -112,6 +116,22 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 2. Gather runtime context (scene text, character list, genre, etc.)
 3. Render template with Jinja2 using context variables
 4. Send compiled prompt to Gemini API
+
+**Prompt Layering Hierarchy** (as of Task 3 - Visual Responsibility Split):
+
+The `_compile_prompt()` function now uses a 9-layer hierarchy to ensure proper separation of concerns:
+
+1. **Image Style** (highest priority) - User-selected style from `image_style_id`
+2. **Art Direction** (optional) - Mood & atmosphere from Art Director node
+3. **Format & Composition** - Technical format requirements (9:16 vertical)
+4. **Reference Image Authority** - Character consistency rules
+5. **Panel Composition** - Cinematographer's layout rules
+6. **Characters** - Morphology-only descriptions (style-neutral)
+7. **Panels** - Scene-specific visual descriptions
+8. **Technical Requirements** - Style-agnostic quality standards
+9. **Negative Prompt** (lowest priority) - What to avoid
+
+This layering ensures that user-selected image styles are never overridden by hardcoded anchors or conflicting instructions.
 
 **Common Context Variables**:
 
@@ -169,9 +189,14 @@ prompt = render_prompt(
 - `app/prompts/prompts.yaml` - All prompt templates and character style map
 - `app/prompts/loader.py` - Prompt loading and Jinja2 compilation
 - `app/graphs/nodes/prompts/builders.py` - Prompt compilation functions for each node
+- `app/graphs/nodes/prompts/compile.py` - Main prompt compiler with 9-layer hierarchy and style-neutral formatting
 - `app/graphs/nodes/json_parser.py` - JSON repair mechanism
 - `app/graphs/nodes/constants.py` - Shared prompt constants (SYSTEM_PROMPT_JSON, GLOBAL_CONSTRAINTS)
 - `app/core/character_styles.py` - Character style examples (reference only)
+- `app/core/image_styles.py` - Image style profiles with prompts and metadata
+- `app/db/migrations/versions/83f5330535c1_sanitize_character_style_keywords.py` - Character style sanitization migration
+- `tests/test_hardcoded_anchor_removal.py` - Property tests for hardcoded anchor removal
+- `tests/test_prompt_layering.py` - Property tests for prompt layering hierarchy
 
 ## Debugging Direction
 

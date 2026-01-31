@@ -17,6 +17,9 @@ def test_no_more_than_two_consecutive_templates(monkeypatch, tmp_path):
     def fake_run_scene_intent_extractor(db, scene_uuid, gemini=None):
         return FakeArtifact(uuid.uuid4(), {})
 
+    def fake_run_art_director(db, scene_uuid, image_style_id, gemini=None):
+        return FakeArtifact(uuid.uuid4(), {})
+
     def fake_run_panel_plan_generator(db, scene_uuid, panel_count=3, gemini=None):
         return FakeArtifact(uuid.uuid4(), {"panels": [{}, {}]})
 
@@ -39,6 +42,7 @@ def test_no_more_than_two_consecutive_templates(monkeypatch, tmp_path):
         return FakeArtifact(uuid.uuid4(), {})
 
     monkeypatch.setattr(nodes, "run_scene_intent_extractor", fake_run_scene_intent_extractor)
+    monkeypatch.setattr(nodes, "run_art_director", fake_run_art_director)
     monkeypatch.setattr(nodes, "run_panel_plan_generator", fake_run_panel_plan_generator)
     monkeypatch.setattr(nodes, "run_panel_plan_normalizer", fake_run_panel_plan_normalizer)
     monkeypatch.setattr(nodes, "run_layout_template_resolver", fake_run_layout_template_resolver)

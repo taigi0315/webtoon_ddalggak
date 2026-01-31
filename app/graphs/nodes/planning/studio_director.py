@@ -13,6 +13,21 @@ from ..utils import (
     render_prompt,
 )
 
+# Forbidden style-specific keywords that should not appear in Studio Director output
+FORBIDDEN_STUDIO_DIRECTOR_KEYWORDS = [
+    # Color palette keywords
+    "color palette", "color scheme", "vibrant colors", "muted colors", "pastel colors",
+    "warm colors", "cool colors", "monochrome", "black and white", "sepia",
+    # Lighting keywords
+    "lighting", "soft lighting", "harsh lighting", "dramatic lighting", "natural lighting",
+    "studio lighting", "ambient lighting", "backlighting", "rim lighting",
+    # Color temperature keywords
+    "warm tones", "cool tones", "golden hour", "blue hour", "color temperature",
+    # Atmospheric mood keywords (visual style-specific)
+    "noir atmosphere", "romantic atmosphere", "gritty atmosphere", "dreamy atmosphere",
+    "cinematic look", "film grain", "vintage look", "modern aesthetic",
+]
+
 class StudioScene(BaseModel):
     scene_index: int
     summary: str
@@ -39,6 +54,45 @@ class StudioDirectorResponse(BaseModel):
                     logger.warning(f"StudioDirector suggested unknown style '{scene.image_style_id}', falling back to default")
                     scene.image_style_id = "default"
         return scenes
+
+
+def _detect_style_keywords_in_studio_output(response: dict[str, Any]) -> list[str]:
+    """
+    Detect forbidden style-specific keywords in Studio Director output.
+    
+    Studio Director should focus on semantic emotional descriptions (scene_emotion, dramatic_intent)
+    and NOT specify visual style characteristics like color palette or lighting.
+    
+    Args:
+        response: Studio Director response dictionary
+        
+    Returns:
+        List of detected forbidden keywords (empty if clean)
+    """
+    detected_keywords = []
+    
+    # Check scenes for style keywords
+    scenes = response.get("scenes", [])
+    for scene in scenes:
+        # Check scene_emotion field
+        scene_emotion = scene.get("scene_emotion", "").lower()
+        for keyword in FORBIDDEN_STUDIO_DIRECTOR_KEYWORDS:
+            if keyword.lower() in scene_emotion:
+                detected_keywords.append(f"scene_emotion contains '{keyword}'")
+        
+        # Check dramatic_intent field
+        dramatic_intent = scene.get("dramatic_intent", "").lower()
+        for keyword in FORBIDDEN_STUDIO_DIRECTOR_KEYWORDS:
+            if keyword.lower() in dramatic_intent:
+                detected_keywords.append(f"dramatic_intent contains '{keyword}'")
+        
+        # Check summary field
+        summary = scene.get("summary", "").lower()
+        for keyword in FORBIDDEN_STUDIO_DIRECTOR_KEYWORDS:
+            if keyword.lower() in summary:
+                detected_keywords.append(f"summary contains '{keyword}'")
+    
+    return detected_keywords
 
 def run_studio_director(
     script: dict[str, Any] | None,
@@ -107,7 +161,17 @@ def run_studio_director(
     
     try:
         validated = StudioDirectorResponse.model_validate(raw_result)
-        return validated.model_dump()
+        result_dict = validated.model_dump()
+        
+        # Detect style keywords in output
+        detected_keywords = _detect_style_keywords_in_studio_output(result_dict)
+        if detected_keywords:
+            logger.warning(
+                f"StudioDirector output contains style-specific keywords (should be style-agnostic): "
+                f"{', '.join(set(detected_keywords))}"
+            )
+        
+        return result_dict
     except Exception as e:
         logger.error(f"StudioDirector validation error: {e}, raw_result={raw_result}")
         # Return what we can or empty

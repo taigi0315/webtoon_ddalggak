@@ -1,6 +1,6 @@
 # Character Normalization Prompt
-# Version: 1.0
-# Description: Enrich character profiles with detailed visual descriptions
+# Version: 2.0 (Style-Neutral)
+# Description: Enrich character profiles with detailed morphological descriptions (style-agnostic)
 # Required Variables: characters_json, story_context
 # Output Schema: { characters: [{ name, role, description, gender, age_range, appearance, outfit, identity_line }] }
 
@@ -8,10 +8,20 @@ prompt_character_normalization: |
   {{ system_prompt_json }}
   {{ global_constraints }}
 
-  Enrich the following character profiles with DETAILED visual descriptions for Korean webtoon/manhwa rendering.
-  Use context clues from the story to infer appearance. Apply Korean manhwa aesthetic standards.
+  Enrich the following character profiles with DETAILED morphological descriptions for image generation.
+  Use context clues from the story to infer appearance. Focus on OBJECTIVE PHYSICAL CHARACTERISTICS ONLY.
 
-  **CRITICAL: These descriptions will be used for AI image generation. Be SPECIFIC and VISUAL.**
+  **CRITICAL CONSTRAINT: Focus on objective morphological descriptions only. DO NOT include style-specific keywords.**
+
+  **FORBIDDEN KEYWORDS (do not use):**
+  - Style terms: manhwa, webtoon, aesthetic, K-drama, Korean male lead, romance female lead, Naver webtoon
+  - Subjective style terms: authentic, trending, flower-boy, statuesque, willowy
+
+  **ALLOWED: Objective morphological descriptions:**
+  - Physical measurements: height, build, proportions
+  - Hair: color, length, texture, style
+  - Face: shape, features, expression tendencies
+  - Body: build type, proportions, posture
 
   Current characters:
   {{ characters_json }}
@@ -19,21 +29,21 @@ prompt_character_normalization: |
   Story context:
   {{ story_context }}
 
-  **AGE-BASED VISUAL STANDARDS (Korean Manhwa Style):**
+  **AGE-BASED PHYSICAL STANDARDS (Style-Agnostic):**
 
   MALE CHARACTERS:
-  - child (under 12): Chibi proportions 1:3, round cherubic face, large expressive eyes, playful posture
-  - teen (13-19): Soft angular face, slender graceful build, flower-boy aesthetic, 170-178cm, school uniform or streetwear
-  - young_adult (20-35): Korean male lead aesthetic, refined jawline, tall slender 180-188cm, willowy model proportions, soft side-part hair
-  - middle_aged (40-55): Distinguished refined features, subtle grey at temples, 178-185cm, professional attire
-  - elderly (60+): Gentle wisdom lines, silver/white hair, 170-175cm, dignified cardigan or hanbok
+  - child (under 12): Small proportions 1:3 head-to-body ratio, round face, large eyes, playful posture
+  - teen (13-19): Soft angular face, slender build, 170-178cm, developing features
+  - young_adult (20-35): Defined jawline, tall slender 180-188cm, athletic or lean build
+  - middle_aged (40-55): Mature features, subtle grey at temples, 178-185cm, confident posture
+  - elderly (60+): Gentle lines, silver/white hair, 170-175cm, dignified bearing
 
   FEMALE CHARACTERS:
-  - child (under 12): Chibi proportions 1:3, oversized sparkly eyes, rosy plump cheeks, cute pigtails/bob
-  - teen (13-19): Large doe eyes, slender figure, 160-170cm, graceful youthful posture
-  - young_adult (20-35): Statuesque figure over 165cm, long legs exceeding torso, hourglass silhouette, flawless skin
-  - middle_aged (40-55): Refined beauty with subtle lines, elegant bob/waves, 160-170cm, professional or sophisticated fashion
-  - elderly (60+): Smile lines showing wisdom, grey elegant updo, 155-165cm, traditional hanbok or cardigan sets
+  - child (under 12): Small proportions 1:3 head-to-body ratio, large eyes, round cheeks, cute hairstyles
+  - teen (13-19): Large eyes, slender figure, 160-170cm, graceful posture
+  - young_adult (20-35): Tall figure 165cm+, long legs, defined proportions, smooth skin
+  - middle_aged (40-55): Mature features with subtle lines, 160-170cm, elegant bearing
+  - elderly (60+): Smile lines, grey hair, 155-165cm, gentle posture
 
   For each character, provide:
   - gender: male|female|unknown
@@ -41,15 +51,18 @@ prompt_character_normalization: |
   - appearance:
     - hair: color, style, length (be specific: "soft side-swept black bangs" not just "black hair")
     - face: features, expression tendency (e.g., "gentle angular jawline, warm expressive eyes")
-    - build: body type, height, proportions (e.g., "slender elegant build, 180cm, willowy silhouette")
+    - build: body type, height, proportions (e.g., "slender build, 180cm, lean proportions")
   - outfit: typical clothing with detail (e.g., "casual cream sweater, fitted dark jeans, clean white sneakers")
-  - identity_line: Single comprehensive line for artist (150+ characters)
+  - identity_line: Single comprehensive line for artist (150+ characters, NO STYLE KEYWORDS)
 
-  **IDENTITY LINE FORMAT:**
-  "[age_range] [ethnicity] [gender], [hair description], [face/expression], [build/height], [typical outfit], [manhwa style note]"
+  **IDENTITY LINE FORMAT (Style-Neutral):**
+  "[age_range] [ethnicity] [gender], [hair description], [face/expression], [build/height], [typical outfit]"
 
-  **GOOD EXAMPLE:**
-  "early_20s Korean female, long flowing black hair with soft waves, large expressive doe eyes with delicate lashes, tall statuesque figure 168cm with elegant long legs, cream knit sweater and high-waisted jeans, authentic webtoon romance female lead aesthetic"
+  **GOOD EXAMPLE (Style-Neutral):**
+  "early_20s Korean female, long flowing black hair with soft waves, large expressive eyes with delicate lashes, tall slender figure 168cm with long legs, cream knit sweater and high-waisted jeans"
+
+  **BAD EXAMPLE (contains style keywords):**
+  "early_20s Korean female, long flowing black hair, large doe eyes, statuesque figure 168cm, cream sweater, authentic webtoon romance female lead aesthetic"
 
   **BAD EXAMPLE (too vague):**
   "young woman with dark hair, normal build, casual clothes"
@@ -69,7 +82,7 @@ prompt_character_normalization: |
           "build": "body type, height in cm, proportions"
         },
         "outfit": "detailed typical outfit description",
-        "identity_line": "Complete 150+ character identity line for artist reference"
+        "identity_line": "Complete 150+ character morphological description (NO STYLE KEYWORDS)"
       }
     ]
   }

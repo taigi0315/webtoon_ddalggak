@@ -465,13 +465,17 @@ def _node_per_scene_planning_loop(state: StoryBuildState, gemini: GeminiClient |
     # Episode-level guardrail state
     recent_templates: list[str] = []
     hero_count = 0
+    
+    # Get image_style from state
+    image_style = state.get("image_style", "default")
 
     with session_scope() as db:
         for idx, scene_id in enumerate(scene_ids, start=1):
             scene_uuid = uuid.UUID(scene_id)
 
-            # Run intent, panel plan, normalize
+            # Run intent, art direction, panel plan, normalize
             scene_intent_id = nodes.run_scene_intent_extractor(db, scene_uuid, gemini=gemini).artifact_id
+            art_direction_id = nodes.run_art_director(db, scene_uuid, image_style_id=image_style, gemini=gemini).artifact_id
             panel_plan_id = nodes.run_panel_plan_generator(db, scene_uuid, panel_count=state.get("panel_count", 3), gemini=gemini).artifact_id
             panel_plan_normalized_id = nodes.run_panel_plan_normalizer(db, scene_uuid).artifact_id
 
@@ -495,6 +499,7 @@ def _node_per_scene_planning_loop(state: StoryBuildState, gemini: GeminiClient |
                 {
                     "scene_id": scene_id,
                     "scene_intent": str(scene_intent_id),
+                    "art_direction": str(art_direction_id),
                     "panel_plan": str(panel_plan_id),
                     "panel_plan_normalized": str(panel_plan_normalized_id),
                     "layout_template": str(artifact.artifact_id),

@@ -25,27 +25,32 @@ The character system extracts characters from story text, enriches them with vis
 
 ## Character Normalization
 
-**Purpose**: Add visual details for consistent image generation
+**Purpose**: Add visual details for consistent image generation using style-agnostic morphological descriptions
 
 **Process**:
 
 - LLM adds appearance details: hair, face, build, outfit
-- Applies Korean manhwa aesthetic standards via character style map
+- Applies style-agnostic morphological standards (no hardcoded style keywords)
 - Creates identity_line for use in image prompts
 - Falls back to basic normalization if LLM fails
 
 **Character Style Map**:
 
 - Age/gender-based styling templates (child, teen, young_adult, adult, middle_aged, elderly)
-- Korean manhwa proportions and aesthetics
+- Style-neutral morphological descriptions
 - Stored in `app/prompts/prompts.yaml` under `character_style_map`
+
+**Style Sanitization**: As of migration `83f5330535c1_sanitize_character_style_keywords`, all style-specific keywords have been removed:
+- **Removed keywords**: manhwa, webtoon, aesthetic, flower-boy, K-drama, Korean male lead, romance female lead, Naver webtoon, authentic, trending, statuesque, willowy
+- **Focus**: Objective morphological descriptions (height, build, hair color, facial features)
+- **Preserved**: Physical characteristics, age-appropriate proportions, basic styling
 
 **Visual Details Added**:
 
 - `gender` - male, female, unknown
 - `age_range` - child, teen, young_adult, adult, middle_aged, elderly
-- `appearance` - JSON with hair, face, build details
-- `hair_description` - Detailed hair styling
+- `appearance` - JSON with hair, face, build details (style-neutral)
+- `hair_description` - Detailed hair styling (color, length, texture)
 - `base_outfit` - Default clothing description
 - `identity_line` - Compiled description for prompts (e.g., "Alice: young adult female, long black hair, slender build, school uniform")
 
@@ -177,7 +182,9 @@ The character system extracts characters from story text, enriches them with vis
 - `app/api/v1/characters.py` - Character CRUD endpoints
 - `app/api/v1/character_variants.py` - Variant management endpoints
 - `app/db/models.py` - Character, StoryCharacter, CharacterVariant, CharacterReferenceImage models
+- `app/db/migrations/versions/83f5330535c1_sanitize_character_style_keywords.py` - Style sanitization migration
 - `app/prompts/prompts.yaml` - Character style map and normalization prompts
+- `tests/test_character_style_sanitization.py` - Property tests for style sanitization
 
 ## Debugging Direction
 
@@ -198,6 +205,7 @@ The character system extracts characters from story text, enriches them with vis
   - Review `Character.appearance` JSON for visual details
   - Verify `age_range` and `gender` are set correctly
   - Check character style map in `prompts.yaml` for age/gender templates
+  - **Style keyword check**: Verify no style keywords (manhwa, webtoon, aesthetic, etc.) appear in `identity_line` or `appearance` fields after migration `83f5330535c1`
 
 - **Variant activation issues**:
   - Query active variants: `SELECT * FROM character_variants WHERE story_id = ? AND is_active_for_story = true`

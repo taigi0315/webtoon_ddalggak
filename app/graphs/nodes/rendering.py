@@ -55,6 +55,12 @@ def run_prompt_compiler(
                 # Check for scene-level style override
                 effective_style_id = style_id or scene.image_style_override or (story.default_image_style if story else "default") or "default"
                 
+                # Load art direction artifact
+                art_direction_artifact = svc.get_latest_artifact(scene_id, ARTIFACT_ART_DIRECTION)
+                art_direction = None
+                if art_direction_artifact and art_direction_artifact.payload:
+                    art_direction = art_direction_artifact.payload
+                
                 characters = _list_characters(db, scene.story_id)
                 reference_char_ids = _character_ids_with_reference_images(db, scene.story_id)
                 variants_by_character = _active_variants_by_character(db, scene.story_id)
@@ -75,6 +81,7 @@ def run_prompt_compiler(
                         characters=characters,
                         reference_char_ids=reference_char_ids,
                         variants_by_character=variants_by_character,
+                        art_direction=art_direction,
                     )
                 
                 payload = {
@@ -105,7 +112,7 @@ def generate_character_reference_image(
     identity = character.identity_line or character.description or character.name
 
     prompt_parts = [
-        "High-quality character reference image for a Korean webtoon.",
+        "High-quality character reference image.",
         f"Character: {character.name}.",
         f"Identity: {identity}.",
         f"Ref type: {ref_type}.",
@@ -197,7 +204,7 @@ def generate_character_variant_reference_image(
     variant_text = _format_variant_attributes(override_attributes)
 
     prompt_parts = [
-        "High-quality character reference image for a Korean webtoon.",
+        "High-quality character reference image.",
         f"Character: {character.name}.",
         f"Identity: {identity}.",
         f"Variant: {variant_type.replace('_', ' ')}.",

@@ -22,7 +22,6 @@ ssuljaengi_v4/
 │   │   ├── panel_grammar_library_v1.json    # Valid shot types
 │   │   ├── layout_templates_9x16_v1.json    # Panel geometry
 │   │   ├── qc_rules_v1.json                 # Quality control rules
-│   │   ├── genre_guidelines_v1.json         # Genre-specific styles
 │   │   ├── image_styles.json                # Image style presets
 │   │   └── loaders.py                       # Config loading logic
 │   ├── core/                      # Core utilities
@@ -34,22 +33,35 @@ ssuljaengi_v4/
 │   ├── db/                        # Database layer
 │   │   ├── models.py              # SQLAlchemy models
 │   │   ├── base.py                # Database base config
-│   │   └── session.py             # Session management
+│   │   ├── session.py             # Session management
+│   │   └── migrations/            # Alembic migrations
+│   │       └── versions/          # Migration scripts
+│   │           ├── 83f5330535c1_sanitize_character_style_keywords.py
+│   │           └── 20260130_0003_remove_story_style.py
 │   ├── graphs/                    # LangGraph workflows
 │   │   ├── story_build.py         # Episode-level workflow
 │   │   ├── pipeline.py            # Scene planning + rendering
 │   │   ├── nodes/                 # Node implementations
 │   │       ├── planning/          # Planning nodes
-│   │       │   ├── character.py   # Character extraction
+│   │       │   ├── character.py   # Character extraction (style-neutral)
 │   │       │   ├── script_writer.py # Webtoon script writing
+│   │       │   ├── studio_director.py # Scene planning (style-agnostic)
+│   │       │   ├── art_direction.py # Art direction (mood & atmosphere)
+│   │       │   ├── panel_semantics.py # Cinematographer (layout focus)
 │   │       │   └── ...
 │   │       ├── rendering/         # Rendering nodes
 │   │       ├── prompts/           # Prompt compilation
+│   │       │   ├── compile.py     # Main prompt compiler (layered hierarchy)
+│   │       │   └── builders.py    # Prompt builders
 │   │       └── constants.py       # Artifact type constants
 │   ├── prompts/                   # Prompt templates
 │   │   ├── v1/                    # Versioned directory structure
 │   │   │   ├── story_build/       # Script/Optimization prompts
+│   │   │   │   ├── character_normalization.yaml # Style-neutral character normalization
+│   │   │   │   └── studio_director.yaml # Style-agnostic scene planning
 │   │   │   ├── scene_planning/    # Scene intent/panel prompts
+│   │   │   │   ├── art_direction.yaml # Art direction (mood & atmosphere)
+│   │   │   │   └── panel_semantics.yaml # Cinematographer (layout focus)
 │   │   │   └── shared/            # Common constraints/styles
 │   │   └── loader.py              # Jinja2 compilation
 │   ├── services/                  # Business logic
@@ -60,6 +72,18 @@ ssuljaengi_v4/
 │   │   └── config_watcher.py      # Hot-reload configs
 │   └── main.py                    # FastAPI app entry
 ├── tests/                         # Test suite
+│   ├── test_character_style_sanitization.py  # Character style sanitization tests
+│   ├── test_character_normalization.py       # Character normalization tests
+│   ├── test_hardcoded_anchor_removal.py      # Hardcoded anchor removal tests
+│   ├── test_prompt_layering.py               # Prompt layering hierarchy tests
+│   ├── test_prompt_validation.py             # Prompt validation tests
+│   ├── test_art_director.py                  # Art Director unit tests
+│   ├── test_art_director_integration.py      # Art Director integration tests
+│   ├── test_cinematographer_layout_focus.py  # Cinematographer layout focus tests
+│   ├── test_studio_director_style_agnosticism.py # Studio Director style agnosticism tests
+│   ├── test_genre_guidelines_deprecation.py  # Genre guidelines deprecation tests
+│   ├── test_image_style_authority.py         # Image style authority tests
+│   └── ...                        # Other test files
 ├── docs/                          # Comprehensive documentation
 │   ├── 01-application-workflow.md
 │   ├── 02-langgraph-architecture.md
@@ -389,7 +413,7 @@ curl http://localhost:8000/metrics
 - **Webtoon Script** - Structured visual beat-by-beat translation of the raw story
 - **QC Rules** - Quality control thresholds (closeup_ratio_max, dialogue_ratio_max, etc.)
 - **Episode Guardrails** - Layout diversity enforcement and hero single-panel requirements
-- **Identity Line** - Compiled character description for prompts (e.g., "Alice: young adult female, long black hair")
+- **Identity Line** - Compiled character description for prompts (e.g., "Alice: young adult female, long black hair") - style-neutral as of migration `83f5330535c1`
 
 ## Testing Patterns
 
@@ -564,3 +588,94 @@ def update_resource(db: Session, resource_id: uuid.UUID, new_data: dict):
 - **[docs/07-configuration-files.md](docs/07-configuration-files.md)** - JSON config reference
 - **[docs/08-api-reference.md](docs/08-api-reference.md)** - Endpoint documentation
 - **[docs/09-error-handling-observability.md](docs/09-error-handling-observability.md)** - Debugging and monitoring
+
+
+## Visual Responsibility Split Patterns
+
+### Style Neutralization Pattern
+
+```python
+# File: app/graphs/nodes/planning/character.py
+
+# Define forbidden style keywords
+FORBIDDEN_STYLE_KEYWORDS = [
+    "manhwa", "webtoon", "aesthetic", "flower-boy",
+    "K-drama", "Korean male lead", "romance female lead",
+    # ... more keywords
+]
+
+def _sanitize_character_output(text: str) -> str:
+    """Remove style keywords from character descriptions."""
+    import re
+    
+    sanitized = text
+    for keyword in FORBIDDEN_STYLE_KEYWORDS:
+        # Case-insensitive removal
+        pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+        sanitized = pattern.sub("", sanitized)
+    
+    # Clean up extra spaces
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    sanitized = re.sub(r'\s*([,;.])\s*', r'\1 ', sanitized).strip()
+    
+    return sanitized
+```
+
+### Prompt Validation Pattern
+
+```python
+# File: app/graphs/nodes/prompts/compile.py
+
+def _validate_compiled_prompt(prompt: str, style_id: str, style_desc: str) -> None:
+    """Validate compiled prompt for forbidden anchors."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Define forbidden anchors
+    forbidden_anchors = [
+        "korean webtoon", "korean manhwa", "naver webtoon",
+        "manhwa art style", "webtoon art style",
+    ]
+    
+    prompt_lower = prompt.lower()
+    
+    # Check for forbidden anchors
+    detected_anchors = []
+    for anchor in forbidden_anchors:
+        if anchor in prompt_lower:
+            detected_anchors.append(anchor)
+    
+    if detected_anchors:
+        error_msg = (
+            f"Prompt validation failed: Forbidden hardcoded anchors detected: "
+            f"{', '.join(detected_anchors)}. These anchors override user-selected "
+            f"style '{style_id}' and must not appear in prompts."
+        )
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+```
+
+### Style Keyword Detection Pattern
+
+```python
+# File: app/graphs/nodes/planning/studio_director.py
+
+FORBIDDEN_STUDIO_DIRECTOR_KEYWORDS = [
+    "color palette", "color scheme", "vibrant colors",
+    "lighting", "soft lighting", "dramatic lighting",
+    "warm tones", "cool tones", "color temperature",
+]
+
+def _detect_style_keywords_in_studio_output(response: dict) -> list[str]:
+    """Detect forbidden style keywords in Studio Director output."""
+    detected_keywords = []
+    
+    scenes = response.get("scenes", [])
+    for scene in scenes:
+        scene_emotion = scene.get("scene_emotion", "").lower()
+        for keyword in FORBIDDEN_STUDIO_DIRECTOR_KEYWORDS:
+            if keyword.lower() in scene_emotion:
+                detected_keywords.append(f"scene_emotion contains '{keyword}'")
+    
+    return detected_keywords
+```

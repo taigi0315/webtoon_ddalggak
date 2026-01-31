@@ -112,12 +112,14 @@ erDiagram
 - `role` - Character role (protagonist, antagonist, secondary, etc.)
 - `gender` - Gender for style mapping (male, female, non_binary)
 - `age_range` - Age range for style mapping (child, teen, young_adult, adult, middle_aged, elderly)
-- `appearance` - JSON field with visual details
+- `appearance` - JSON field with visual details (sanitized to remove style keywords)
 - `hair_description` - Hair style and color description
 - `base_outfit` - Default outfit description
-- `identity_line` - Compiled character description for prompts
+- `identity_line` - Compiled character description for prompts (style-neutral)
 - `is_library_saved` - Whether character is saved to Actor library
 - `approved` - Whether character is approved for use
+
+**Style Sanitization**: As of migration `83f5330535c1`, all style-specific keywords (manhwa, webtoon, aesthetic, flower-boy, K-drama, Korean male lead, romance female lead, Naver webtoon, authentic, trending, statuesque, willowy) have been removed from `identity_line` and `appearance` fields to ensure style neutrality.
 
 **Actor System**: Characters with `project_id = NULL` are global actors reusable across projects
 
@@ -369,6 +371,9 @@ erDiagram
 - `app/db/models.py` - All model definitions
 - `app/db/base.py` - SQLAlchemy base configuration
 - `app/db/session.py` - Database session management
+- `app/db/migrations/versions/` - Alembic migration scripts
+  - `83f5330535c1_sanitize_character_style_keywords.py` - Character style sanitization
+  - `20260130_0003_remove_story_style.py` - Remove deprecated default_story_style field
 - `app/services/artifacts.py` - Artifact versioning service
 - `app/services/casting.py` - Character variant management
 - `app/api/v1/schemas.py` - Pydantic schemas for API requests/responses

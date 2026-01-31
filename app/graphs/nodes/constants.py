@@ -11,6 +11,7 @@ ARTIFACT_QC_REPORT = "qc_report"
 ARTIFACT_BLIND_TEST_REPORT = "blind_test_report"
 ARTIFACT_DIALOGUE_SUGGESTIONS = "dialogue_suggestions"
 ARTIFACT_VISUAL_PLAN = "visual_plan"
+ARTIFACT_ART_DIRECTION = "art_direction"
 
 SYSTEM_PROMPT_JSON = get_prompt("system_prompt_json")
 GLOBAL_CONSTRAINTS = get_prompt("global_constraints")

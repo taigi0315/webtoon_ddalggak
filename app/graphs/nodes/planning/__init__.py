@@ -38,6 +38,9 @@ from .studio_director import run_studio_director
 # Scene intent
 from .scene_intent import run_scene_intent_extractor
 
+# Art direction
+from .art_direction import run_art_director
+
 # Panel planning
 from .panel_plan import (
     run_panel_plan_generator,
@@ -70,6 +73,8 @@ __all__ = [
     "run_studio_director",
     # Scene intent
     "run_scene_intent_extractor",
+    # Art direction
+    "run_art_director",
     # Panel plan
     "run_panel_plan_generator",
     "run_panel_plan_normalizer",

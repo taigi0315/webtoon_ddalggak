@@ -19,6 +19,7 @@ from app.services.images import ImageService
 from app.services.storage import LocalMediaStore
 from app.services.vertex_gemini import GeminiClient
 from app.graphs.nodes.constants import (
+    ARTIFACT_ART_DIRECTION,
     ARTIFACT_BLIND_TEST_REPORT,
     ARTIFACT_DIALOGUE_SUGGESTIONS,
     ARTIFACT_LAYOUT_TEMPLATE,
