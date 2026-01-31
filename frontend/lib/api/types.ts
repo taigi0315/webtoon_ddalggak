@@ -179,6 +179,8 @@ export type DialogueSuggestions = z.infer<typeof dialogueSuggestionsSchema>;
 export const dialogueBubbleSchema = z.object({
   bubble_id: z.string(),
   panel_id: z.number(),
+  bubble_type: z.string().default("chat"),  // chat, thought, narration, sfx
+  speaker: z.string().nullable().optional(),
   text: z.string(),
   position: z.object({ x: z.number(), y: z.number() }),
   size: z.object({ w: z.number(), h: z.number() }),

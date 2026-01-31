@@ -106,6 +106,8 @@ export default function DialogueEditorPage() {
       const payloadBubbles = validBubbles.map((bubble) => ({
         bubble_id: bubble.id,
         panel_id: bubble.panelId,
+        bubble_type: bubble.bubbleType ?? "chat",
+        speaker: bubble.speaker ?? null,
         text: bubble.text,
         position: bubble.position,
         size: bubble.size,
@@ -248,6 +250,8 @@ export default function DialogueEditorPage() {
       const loaded: DialogueBubble[] = dialogueLayerQuery.data.bubbles.map((bubble: any) => ({
         id: bubble.bubble_id,
         panelId: bubble.panel_id,
+        bubbleType: bubble.bubble_type ?? "chat",
+        speaker: bubble.speaker ?? undefined,
         text: bubble.text,
         position: bubble.position,
         size: bubble.size,
@@ -480,11 +484,25 @@ export default function DialogueEditorPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Inspector</p>
             <div className="mt-3 space-y-2">
-              <select className="input text-xs">
-                <option>Speech</option>
-                <option>Thought</option>
-                <option>Narration</option>
-                <option>SFX</option>
+              <select 
+                className="input text-xs"
+                value={
+                  bubbles.find((bubble) => bubble.id === activeBubbleId)?.bubbleType ?? "chat"
+                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setBubbles((prev) =>
+                    prev.map((bubble) =>
+                      bubble.id === activeBubbleId ? { ...bubble, bubbleType: value } : bubble
+                    )
+                  );
+                }}
+                disabled={!activeBubbleId}
+              >
+                <option value="chat">Speech</option>
+                <option value="thought">Thought</option>
+                <option value="narration">Narration</option>
+                <option value="sfx">SFX</option>
               </select>
               <input
                 className="input"
@@ -710,6 +728,7 @@ export default function DialogueEditorPage() {
 type DialogueBubble = {
   id: string;
   panelId: number;
+  bubbleType?: string;  // chat, thought, narration, sfx
   text: string;
   speaker?: string;
   position: { x: number; y: number };
@@ -907,11 +926,35 @@ function SceneCanvas({
             {rendersQuery.isLoading ? "Loading render..." : "No render found for this scene."}
           </div>
         )}
-        {bubbles.map((bubble) => (
+        {bubbles.map((bubble) => {
+          // Get bubble type styling
+          const bubbleType = bubble.bubbleType || "chat";
+          let bubbleStyle = "";
+          let textColorClass = "text-slate-700";
+          
+          switch (bubbleType) {
+            case "thought":
+              bubbleStyle = "bg-blue-50/60 border-blue-300";
+              textColorClass = "text-blue-900";
+              break;
+            case "narration":
+              bubbleStyle = "bg-slate-900/60 border-slate-700";
+              textColorClass = "text-white";
+              break;
+            case "sfx":
+              bubbleStyle = "bg-transparent border-red-500 border-2";
+              textColorClass = "text-red-600 font-bold";
+              break;
+            default: // chat
+              bubbleStyle = "bg-white/40 border-slate-200";
+              textColorClass = "text-slate-700";
+          }
+          
+          return (
           <div key={bubble.id}>
             <button
               type="button"
-              className="absolute rounded-xl bg-white/90 text-[11px] text-slate-700 shadow-soft px-2 py-0.5 border border-slate-200 hover:border-indigo-300"
+              className={`absolute rounded-xl text-[11px] shadow-soft px-2 py-0.5 border hover:border-indigo-300 ${bubbleStyle} ${textColorClass}`}
               style={{
                 left: `${bubble.position.x * 100}%`,
                 top: `${bubble.position.y * 100}%`,
@@ -979,7 +1022,8 @@ function SceneCanvas({
               />
             )}
           </div>
-        ))}
+          );
+        })}
         {dragGhost && (
           <div
             className="absolute rounded-xl border border-dashed border-indigo-300 bg-white/60 text-[11px] text-indigo-400 px-2 py-1 pointer-events-none"

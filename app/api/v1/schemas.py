@@ -334,6 +334,8 @@ class CharacterVariantGenerateRequest(BaseModel):
 class DialogueBubble(BaseModel):
     bubble_id: uuid.UUID
     panel_id: int = Field(ge=1)
+    bubble_type: str = Field(default="chat", min_length=1, max_length=32)  # chat, thought, narration, sfx
+    speaker: str | None = Field(default=None, max_length=255)
     text: str = Field(min_length=1)
     position: BubblePosition
     size: BubbleSize

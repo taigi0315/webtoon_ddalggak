@@ -1,0 +1,78 @@
+{
+  "dialogue": {
+    "chat": {
+      "type": "speech",
+      "description": "Regular speech bubble",
+      "background_color": "#FFFFFF",
+      "border_color": "#000000",
+      "border_width": 2,
+      "opacity": 0.4,
+      "font_name": "dialogue",
+      "bubble_shape": "ellipse"
+    },
+    "thought": {
+      "type": "thought",
+      "description": "Thought bubble (cloud style)",
+      "background_color": "#F0F8FF",
+      "border_color": "#4682B4",
+      "border_width": 2,
+      "opacity": 0.4,
+      "font_name": "thought",
+      "bubble_shape": "cloud"
+    },
+    "narration": {
+      "type": "narration",
+      "description": "Narration box (rectangular caption)",
+      "background_color": "#000000",
+      "border_color": "#333333",
+      "border_width": 1,
+      "opacity": 0.6,
+      "font_name": "narration",
+      "bubble_shape": "rectangle",
+      "text_color": "#FFFFFF"
+    },
+    "sfx": {
+      "type": "sfx",
+      "description": "Sound effect (text only, no bubble)",
+      "background_color": null,
+      "border_color": null,
+      "border_width": 0,
+      "opacity": 1.0,
+      "font_name": "sfx",
+      "bubble_shape": "none",
+      "text_color": "#FF0000",
+      "text_stroke": true,
+      "stroke_color": "#000000",
+      "stroke_width": 2
+    }
+  },
+  "fonts": {
+    "dialogue": {
+      "path": "app/assets/fonts/cs-raving-drawn-font/CsravingdrawnRegularDemo-DYjD1.otf",
+      "size": 16,
+      "scale": 1.8
+    },
+    "thought": {
+      "path": "app/assets/fonts/cs-raving-drawn-font/CsravingdrawnRegularDemo-DYjD1.otf",
+      "size": 14,
+      "scale": 1.6
+    },
+    "narration": {
+      "path": "app/assets/fonts/cs-raving-drawn-font/CsravingdrawnRegularDemo-DYjD1.otf",
+      "size": 14,
+      "scale": 1.5
+    },
+    "sfx": {
+      "path": "app/assets/fonts/cs-raving-drawn-font/CsravingdrawnRegularDemo-DYjD1.otf",
+      "size": 24,
+      "scale": 2.5,
+      "bold": true
+    }
+  },
+  "animation": {
+    "min_stay_time": 2.0,
+    "time_per_character": 0.05,
+    "transition_duration": 0.3,
+    "sequential": true
+  }
+}
