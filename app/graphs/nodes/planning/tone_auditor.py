@@ -64,8 +64,10 @@ def run_tone_auditor(
         }
 
     from app.config.loaders import load_image_styles_v1
+    from app.core.image_styles import get_style_semantic_hint
+    
     styles = load_image_styles_v1().styles
-    style_summary = "\n".join([f"- {s.id}: {s.description}" for s in styles])
+    style_summary = "\n".join([f"- {s.id}: {get_style_semantic_hint(s.id)}" for s in styles])
 
     rendered_prompt = render_prompt(
         "prompt_tone_auditor",

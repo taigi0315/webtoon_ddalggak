@@ -82,7 +82,10 @@ def run_scene_optimizer(
         return {"action": "proceed", "scenes": scenes}
 
     from app.config.loaders import load_image_styles_v1
-    available_styles = [s.id for s in load_image_styles_v1().styles]
+    from app.core.image_styles import get_style_semantic_hint
+    
+    styles = load_image_styles_v1().styles
+    style_descriptions = "\n".join([f"- {s.id}: {get_style_semantic_hint(s.id)}" for s in styles])
 
     rendered_prompt = render_prompt(
         "prompt_scene_optimizer",
@@ -90,7 +93,7 @@ def run_scene_optimizer(
         episode_intent=script.get("episode_intent", "Unknown"),
         beats_json=json.dumps(script.get("visual_beats", []), ensure_ascii=False, indent=2),
         tone_analysis_json=json.dumps(tone_analysis or {}, ensure_ascii=False, indent=2),
-        available_styles=", ".join(available_styles),
+        available_styles=style_descriptions,
     )
 
     raw_result = _maybe_json_from_gemini(gemini, rendered_prompt)

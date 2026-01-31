@@ -1,7 +1,20 @@
-VISUAL_STYLE_PROMPTS = {
-    "NO_STYLE": "EMPTY - Default AI rendering",
+from typing import TypedDict, List
 
-    "SOFT_ROMANTIC_WEBTOON": """
+class ImageStyleProfile(TypedDict):
+    prompt: str
+    aesthetic_vibe: str
+    visual_elements: List[str]
+    emotional_range: str
+
+IMAGE_STYLE_PROFILES: dict[str, ImageStyleProfile] = {
+    "NO_STYLE": {
+        "prompt": "EMPTY - Default AI rendering",
+        "aesthetic_vibe": "Neutral baseline rendering without stylistic bias",
+        "visual_elements": ["Standard AI output", "No specific style keywords"],
+        "emotional_range": "General purpose, neutral storytelling"
+    },
+    "SOFT_ROMANTIC_WEBTOON": {
+        "prompt": """
 [MEDIUM: Digital Webtoon - Soft Cel-Shading]
 ultra-soft cel-shading, gentle gradient blending, airy smooth transitions, 
 luminous digital painting, polished contemporary webtoon art style,
@@ -27,8 +40,12 @@ trending romantic webtoon aesthetic, luminous skin rendering,
 glossy subtle highlights on hair and eyes, soft focus background depth,
 8k resolution, professional webtoon illustration
 """,
-
-    "VIBRANT_FANTASY_WEBTOON": """
+        "aesthetic_vibe": "Digital Webtoon with Soft Cel-Shading and watercolor-like Gentleness",
+        "visual_elements": ["Pastel colors", "Golden-hour lighting", "Soft bokeh", "Clean fluid lineart"],
+        "emotional_range": "Dreamy romance, peaceful daily life, heartwarming moments, emotional intimacy"
+    },
+    "VIBRANT_FANTASY_WEBTOON": {
+        "prompt": """
 [MEDIUM: Digital Webtoon - Clean Cel-Shading]
 clean sharp cel-shading, smooth gradient transitions,
 crisp digital comic illustration, polished fantasy manhwa style,
@@ -53,8 +70,14 @@ glossy shine on hair and accessories, reflective highlights,
 magical sparkle overlays, soft depth of field, cinematic composition,
 trending fantasy manhwa aesthetic, 4k quality webtoon art
 """,
+        "aesthetic_vibe": "Polished Fantasy Manhwa with Crisp Lineart and Magical Glow",
+        "visual_elements": ["Magical ambient glow", "Sharp cel-shading", "Sparkle particles", "Vibrant but soft palette"],
+        "emotional_range": "High fantasy adventure, magical wonder, epic encounters, mystic romance"
+    },
 
-    "DRAMATIC_HISTORICAL_WEBTOON": """
+    },
+    "DRAMATIC_HISTORICAL_WEBTOON": {
+        "prompt": """
 [MEDIUM: Digital Webtoon - Rich Cel-Shading]
 rich deep cel-shading, heavy gradient work, dramatic digital painting,
 elegant traditional-meets-digital style, historical manhwa rendering,
@@ -79,8 +102,12 @@ glossy wet shine on silk fabrics and hair, glistening highlights,
 dramatic emotional atmosphere, painterly texture detail,
 trending historical manhwa aesthetic, museum-quality illustration
 """,
-
-    "BRIGHT_YOUTHFUL_WEBTOON": """
+        "aesthetic_vibe": "Cinematic Historical Manhwa with Dramatic Candlelight",
+        "visual_elements": ["Chiaroscuro lighting", "Deep earthtones", "Rich fabric textures", "Midnight blue shadows"],
+        "emotional_range": "High drama, political intrigue, royal romance, tense confrontations"
+    },
+    "BRIGHT_YOUTHFUL_WEBTOON": {
+        "prompt": """
 [MEDIUM: Digital Webtoon - Smooth Cel-Shading]
 smooth gentle cel-shading, soft gradient work, clean digital comic style,
 contemporary school webtoon rendering, approachable friendly art style,
@@ -105,8 +132,12 @@ subtle shine on hair, delicate highlights, fresh youthful atmosphere,
 trending school romance webtoon aesthetic, bright optimistic mood,
 commercial webtoon quality, HD resolution
 """,
-
-    "DREAMY_ISEKAI_WEBTOON": """
+        "aesthetic_vibe": "Cheerful Contemporary Webtoon with Sunny Atmosphere",
+        "visual_elements": ["Bright natural daylight", "Fresh pastel palette", "Soft rounded curves", "Optimistic mood"],
+        "emotional_range": "High school romance, coming-of-age story, youthful joy, lighthearted daily life"
+    },
+    "DREAMY_ISEKAI_WEBTOON": {
+        "prompt": """
 [MEDIUM: Digital Webtoon - Elegant Cel-Shading]
 soft elegant cel-shading with gentle gradient work,
 smooth blending with light cel-shading structure, refined digital painting,
@@ -132,8 +163,14 @@ floral particle effects, floating sparkles, romantic overlay effects,
 trending isekai otome aesthetic, whimsical dreamy atmosphere,
 professional fantasy webtoon illustration
 """,
+        "aesthetic_vibe": "Ethereal Isekai Fantasy with Elegant Palace Lighting",
+        "visual_elements": ["Ethereal glow", "Champagne and gold tones", "Decorative ornaments", "Floating sparkles"],
+        "emotional_range": "Isekai romance, noble life, magical destiny, elegant fantasy"
+    },
 
-    "DARK_SENSUAL_WEBTOON": """
+    },
+    "DARK_SENSUAL_WEBTOON": {
+        "prompt": """
 [MEDIUM: Digital Webtoon - Detailed Cel-Shading]
 ultra-detailed cel-shading, sensual gradient work, intimate blending,
 dramatic fantasy webtoon rendering, ornate detailed illustration style,
@@ -161,8 +198,12 @@ hazy bokeh effects, atmospheric particles, cinematic composition,
 trending dark fantasy romance aesthetic, opulent mysterious mood,
 professional mature webtoon illustration
 """,
-
-    "CLEAN_MODERN_WEBTOON": """
+        "aesthetic_vibe": "Intimate Dark Fantasy Romance with Moody Contrast",
+        "visual_elements": ["Sultry candlelight", "Deep crimson and velvety blacks", "Glossy skin sheen", "Chiaroscuro"],
+        "emotional_range": "Mature romance, dark fantasy, intense drama, seductive mystery"
+    },
+    "CLEAN_MODERN_WEBTOON": {
+        "prompt": """
 [MEDIUM: Digital Webtoon - Crisp Cel-Shading]
 crisp clean cel-shading, smooth professional gradient work,
 polished contemporary digital comic style, commercial webtoon rendering,
@@ -185,8 +226,12 @@ masterpiece quality, best quality, commercial webtoon standard,
 subtle highlights, clean rendering, professional illustration,
 trending modern webtoon aesthetic, HD quality, 4k resolution
 """,
-
-    "PAINTERLY_ARTISTIC_WEBTOON": """
+        "aesthetic_vibe": "Modern Commercial Webtoon with Balanced Studio Lighting",
+        "visual_elements": ["Crisp lineart", "Neutral-warm palette", "Professional studio lighting", "Modern curves"],
+        "emotional_range": "Modern romance, office drama, daily life, procedural stories"
+    },
+    "PAINTERLY_ARTISTIC_WEBTOON": {
+        "prompt": """
 [MEDIUM: Semi-Painterly Digital]
 painterly digital rendering, visible brushstroke texture,
 artistic illustration style, semi-realistic webtoon approach,
@@ -211,8 +256,14 @@ painterly texture throughout, expressive brushwork visible,
 museum-quality digital painting, artistic webtoon style,
 high-end illustration standard
 """,
+        "aesthetic_vibe": "Artistic Semi-Painterly Style with Visible Brushstrokes",
+        "visual_elements": ["Artistic texture", "Visible brushwork", "Mood-driven lighting", "Varied line weight"],
+        "emotional_range": "Introspective moments, artistic themes, high emotional stakes, unique visual storytelling"
+    },
 
-    "EMOTIVE_LUXURY_WEBTOON": """
+    },
+    "EMOTIVE_LUXURY_WEBTOON": {
+        "prompt": """
 [MEDIUM: High-End Webtoon Illustration]
 polished digital webtoon illustration, ultra-clean lineart,
 delicate yet expressive facial detailing, sharp anime-inspired features,
@@ -256,8 +307,12 @@ luxury webtoon/manhwa standard,
 clean background fades with architectural fantasy hints,
 editorial-grade illustration suitable for top-tier digital comics
 """,
-
-    "OPERATION_TRUE_LOVE": """
+        "aesthetic_vibe": "Premium Romance Fantasy with Heightened Emotional Expression",
+        "visual_elements": ["Jewelry and lace accents", "Glassy eye reflections", "Pastel jewel palette", "Sparkle overlays"],
+        "emotional_range": "Peak emotional moments, critical romance scenes, high-stakes drama, vulnerable intimacy"
+    },
+    "OPERATION_TRUE_LOVE": {
+        "prompt": """
 [MEDIUM: Cinematic Modern Manhwa Illustration]
 high-end Korean webtoon/manhwa illustration, semi-realistic anime aesthetic, elegant character anatomy with long proportions, refined facial sculpting with subtle realism, fashion-forward modern wardrobe styling, cinematic romance-drama composition, premium serialized webtoon quality, editorial-grade polish
 
@@ -279,8 +334,12 @@ restrained emotional expression, subtle eye direction and micro-expressions, con
 [FINISHER: Premium Cinematic Romance Finish]
 film-inspired color grading, soft vignette, gentle bloom highlights, background architecture simplified with depth haze, polished high-resolution finish, no harsh outlines or neon saturation, modern prestige-drama webtoon aesthetic, gallery-ready editorial realism
 """,
-
-    "CINEMATIC_MODERN_MANHWA": """
+        "aesthetic_vibe": "Cinematic Modern Romance with Muted Tones and Soft Depth",
+        "visual_elements": ["Golden-hour lighting", "Muted warm-neutral palette", "Minimalist controlled lineart", "Film-inspired grading"],
+        "emotional_range": "Quiet intimacy, modern drama, contemplative romance, sophisticated storytelling"
+    },
+    "CINEMATIC_MODERN_MANHWA": {
+        "prompt": """
 [MEDIUM: Cinematic Modern Manhwa Illustration]
 semi-realistic modern manhwa, clean refined lineart, elegant anatomy and facial structure,
 fashion-forward wardrobe styling, cinematic romance-drama composition, premium serialized polish
@@ -297,8 +356,11 @@ realistic skin tones with soft blush nuance, warm highlights with cool shadows
 film-inspired color grading, soft vignette, subtle bloom highlights,
 backgrounds simplified with depth haze, polished high-resolution finish
 """,
-
-"CUTE_CHIBI_SCHOOL_ROMANCE_MANHWA": """
+        "aesthetic_vibe": "Semi-Realistic Modern Manhwa with Cinematic Interior Lighting",
+        "visual_elements": ["Muted rose accents", "Feathered shadows", "Semi-realistic anatomy", "Fashion-forward styling"],
+        "emotional_range": "Modern romance drama, stylish daily life, cinematic storytelling"
+    "CUTE_CHIBI_SCHOOL_ROMANCE_MANHWA": {
+        "prompt": """
 cute chibi school romance manhwa style, bright playful pastel color palette, dominant soft pinks, mint greens, light blues, warm beiges, cherry blossom accents, bubbly speech bubbles with polka dots and stars, low saturation for gentle feel with selective vibrant pops on cheeks, eyes, and effects, high contrast only on emotional focal points like blushes and sparkles,
 
 chibi proportions with large sparkling eyes, oversized heads, tiny bodies, exaggerated expressions—wide open mouths for surprise/laughter, heavy blushing gradients from pink to deep red with steam lines or sweat drops, teary sparkles, hiccups with wavy breath effects, dynamic action lines like speed streaks, impact stars, pat-pat motions, onomatopoeia in bold Korean/English text integrated into panels,
@@ -309,14 +371,37 @@ shading is soft cel-style with gentle gradients, strong rim lighting and back gl
 
 intense comedic-romantic tension through chibi antics—awkward hugs, surprise tackles, blushing confrontations, hiccup panic, playful teasing, school hallway chaos with effect lines exploding outward, immersive lighthearted Korean webtoon chibi mood, adorable exaggerated cuteness, masterpiece, best quality, vibrant yet soft composition, highly expressive faces, dynamic panel energy
 """,
-
-"MYSTICAL_SILVER_HAIRED_ROMANCE_MANHWA": """
+        "aesthetic_vibe": "Adorable Chibi Style with Playful Pastel Colors and Exaggerated Expressions",
+        "visual_elements": ["Chibi proportions", "Bubbly frames and speech bubbles", "Floating hearts/stars", "Soft pinks and mint greens"],
+        "emotional_range": "Lighthearted comedy, cute romance, intense embarrassment, playful antics"
+    },
+    "MYSTICAL_SILVER_HAIRED_ROMANCE_MANHWA": {
+        "prompt": """
 mystical silver-haired romance manhwa style, dreamy ethereal-aquamarine color palette with soft teal-cyan glows, dominant hues of pale turquoise, icy lavender, shimmering pearl white, warm muted rose for skin and lips, deep midnight blue accents for hair shadows, accented by subtle gold flecks and sparkling highlights, moderate-to-low saturation with high luminous iridescence and magical sparkle effects, skin rendered in translucent porcelain-peach bases with radiant inner glow, delicate starry freckles or glowing markings on forehead, never flat or dull tones,
 
 shading is ultra-soft multi-layered airbrush gradient, shadows dissolve into gentle cyan-purple haze, heavy use of sparkling particle effects, floating motes, bokeh circles, and rainbow prism glows around hair and faces, signature glossy iridescent highlights on ultra-long flowing silver-white hair with subtle teal-blue undertones and wind-swept ethereal strands, soft diffused backlighting creating halo aura, gentle rim lighting with magical shimmer, ambient sparkling dust and star-like glints for otherworldly romance atmosphere, tear glints with prism refraction, soft breath glows during kisses,
 
 linework is extremely fine and delicate, almost invisible thin lines with glossy polished finish, outlines frequently absent or fully blended into glowing shading especially around hair edges, cheeks, and neck for dreamy floaty softness, facial features rendered with minimal structure—large luminous blue/teal eyes filled with multiple layered catchlights, subtle reflections, and starry sparkles, nose and lips softly implied through highlight and shadow, long silver hair drawn in sweeping layered translucent strands with fluid ribbon-like motion and scattered light particles, hands elegant, elongated, fingers gently curled with soft glow,
 
-overall aesthetic is magical romantic fantasy, intense emotional closeness through tender embraces, forehead-to-forehead touches, passionate close-up kisses with parted lips and sparkling breath effects, protective hugs from behind, longing profile gazes, mystical forehead markings that glow softly, modern-casual clothing (hoodies, simple dresses) contrasted with ethereal hair and aura, softly blurred dreamy backgrounds (starry teal gradients, floating bubbles, faint floral motifs) to keep characters luminous and dominant, glossy wet shine on lips, hair, skin, and delicate fabric textures, immersive enchanting yet heartfelt romance mood with subtle supernatural beauty, masterpiece, best quality, highly detailed luminous ethereal composition, emotionally charged magical intimacy, soft sparkling dreamy atmosphere
-"""
+overall aesthetic is magical romantic fantasy, intense emotional closeness through tender embraces, forehead-to-head touches, passionate close-up kisses with parted lips and sparkling breath effects, protective hugs from behind, longing profile gazes, mystical forehead markings that glow softly, modern-casual clothing (hoodies, simple dresses) contrasted with ethereal hair and aura, softly blurred dreamy backgrounds (starry teal gradients, floating bubbles, faint floral motifs) to keep characters luminous and dominant, glossy wet shine on lips, hair, skin, and delicate fabric textures, immersive enchanting yet heartfelt romance mood with subtle supernatural beauty, masterpiece, best quality, highly detailed luminous ethereal composition, emotionally charged magical intimacy, soft sparkling dreamy atmosphere
+""",
+        "aesthetic_vibe": "Ethereal Mystical Romance with Luminous Silver and Aquamarine Glow",
+        "visual_elements": ["Luminous silver hair", "Aquamarine and teal glows", "Sparkling glints and motes", "Fine delicate linework"],
+        "emotional_range": "Supernatural romance, magical intimacy, enchanting beauty, otherworldly devotion"
+    },
 }
+
+# Backward compatibility
+VISUAL_STYLE_PROMPTS = {k: v["prompt"] for k, v in IMAGE_STYLE_PROFILES.items()}
+
+def get_style_semantic_hint(style_id: str) -> str:
+    """Return a semantic description of the style for LLM reasoning."""
+    profile = IMAGE_STYLE_PROFILES.get(style_id)
+    if not profile:
+        return f"Unknown style ID: {style_id}"
+    
+    vibe = profile["aesthetic_vibe"]
+    elements = ", ".join(profile["visual_elements"])
+    range_ = profile["emotional_range"]
+    
+    return f"AESTHETIC: {vibe}\nELEMENTS: {elements}\nBEST FOR: {range_}"

@@ -211,11 +211,8 @@ def _compile_prompt(
 
 
 def _style_description(style_id: str) -> str:
-    styles = loaders.load_image_styles_v1().styles
-    for style in styles:
-        if style.id == style_id:
-            return f"{style.label}: {style.description}"
-    return style_id
+    from app.core.image_styles import get_style_semantic_hint
+    return get_style_semantic_hint(style_id)
 
 
 def _panel_semantics_text(panel_semantics: dict) -> str:
