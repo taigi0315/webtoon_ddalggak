@@ -47,7 +47,13 @@ def _compile_prompt(
         variant = None
         if isinstance(variants_by_character, dict):
             if style_id:
-                variant = variants_by_character.get((c.character_id, style_id.lower()))
+                style_key = style_id.lower()
+                variant = variants_by_character.get((c.character_id, style_key))
+                
+                # Check for "chibi" heuristic if specific style variant not found
+                if not variant and "chibi" in style_key:
+                    variant = variants_by_character.get((c.character_id, "chibi"))
+
             if not variant:
                 variant = variants_by_character.get((c.character_id, "default"))
             if not variant:

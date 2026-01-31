@@ -33,8 +33,7 @@ from .visual_plan import (
 
 # Script writing and optimization
 from .script_writer import run_webtoon_script_writer
-from .tone_auditor import run_tone_auditor
-from .scene_optimizer import run_scene_optimizer
+from .studio_director import run_studio_director
 
 # Scene intent
 from .scene_intent import run_scene_intent_extractor
@@ -68,8 +67,7 @@ __all__ = [
     "compile_visual_plan_bundle_llm",
     "compute_scene_chunker",
     "run_webtoon_script_writer",
-    "run_tone_auditor",
-    "run_scene_optimizer",
+    "run_studio_director",
     # Scene intent
     "run_scene_intent_extractor",
     # Panel plan

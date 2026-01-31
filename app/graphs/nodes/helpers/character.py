@@ -127,11 +127,17 @@ def _inject_character_identities(
         base = f"{code} ({c.name})"
         dialogue_label = base
         
-        # Resolve variant: style-specific -> default -> any
+        # Resolve variant: style-specific -> chibi (if chibi style) -> default -> any
         variant = None
         if isinstance(variants_by_character, dict):
             if style_id:
-                variant = variants_by_character.get((c.character_id, style_id.lower()))
+                style_key = style_id.lower()
+                variant = variants_by_character.get((c.character_id, style_key))
+                
+                # Check for "chibi" heuristic if specific style variant not found
+                if not variant and "chibi" in style_key:
+                    variant = variants_by_character.get((c.character_id, "chibi"))
+                    
             if not variant:
                 variant = variants_by_character.get((c.character_id, "default"))
             if not variant:

@@ -1,4 +1,4 @@
-"""Scene Optimizer node for budget management and style assignment."""
+"""Studio Director node for unified tone analysis and production optimization."""
 
 from __future__ import annotations
 
@@ -13,43 +13,45 @@ from ..utils import (
     render_prompt,
 )
 
-class OptimizedScene(BaseModel):
+class StudioScene(BaseModel):
     scene_index: int
     summary: str
-    source_text: str
+    primary_tone: str
+    image_style_id: str = "default"
+    scene_emotion: str
+    dramatic_intent: str
     beats: list[dict] = Field(default_factory=list)
-    image_style_id: str | None = "default"
-    primary_tone: str | None = None
+    source_text: str
 
-class SceneOptimizerResponse(BaseModel):
+class StudioDirectorResponse(BaseModel):
     action: str = "proceed"
     feedback: str | None = None
-    scenes: list[OptimizedScene] = Field(default_factory=list)
+    allocation_report: str | None = None
+    scenes: list[StudioScene] = Field(default_factory=list)
 
     @field_validator("scenes")
     @classmethod
-    def validate_scene_styles(cls, scenes: list[OptimizedScene]) -> list[OptimizedScene]:
+    def validate_scene_styles(cls, scenes: list[StudioScene]) -> list[StudioScene]:
         from app.config.loaders import has_image_style
         for scene in scenes:
             if scene.image_style_id and scene.image_style_id.lower() != "default":
                 if not has_image_style(scene.image_style_id):
-                    logger.warning(f"SceneOptimizer suggested unknown style '{scene.image_style_id}', falling back to default")
+                    logger.warning(f"StudioDirector suggested unknown style '{scene.image_style_id}', falling back to default")
                     scene.image_style_id = "default"
         return scenes
 
-def run_scene_optimizer(
+def run_studio_director(
     script: dict[str, Any] | None,
-    tone_analysis: dict[str, Any] | None,
     max_scenes: int = 6,
     gemini: GeminiClient | None = None,
 ) -> dict[str, Any]:
-    """Optimize script beats into final scenes based on budget and tone."""
+    """Unified node for tone analysis, importance weighting, and budget-aware scene optimization."""
     if not script or "visual_beats" not in script:
         return {"action": "proceed", "scenes": []}
 
     if gemini is None:
-        logger.warning("Gemini client missing in SceneOptimizer, using simple grouping")
-        # Fallback to simple grouping logic similar to old scene_splitter
+        logger.warning("Gemini client missing in StudioDirector, using fallback splitter")
+        # Reuse minimalist grouping if no LLM
         beats = script.get("visual_beats", [])
         total_beats = len(beats)
         beats_per_scene = max(1, (total_beats + max_scenes - 1) // max_scenes)
@@ -72,9 +74,12 @@ def run_scene_optimizer(
                 {
                     "scene_index": idx,
                     "summary": batch[0].get("visual_action", "")[:100],
+                    "primary_tone": "Neutral",
+                    "image_style_id": "default",
+                    "scene_emotion": "Neutral",
+                    "dramatic_intent": "Progress the story",
                     "source_text": source_text,
                     "beats": batch,
-                    "image_style_id": "default",
                 }
             )
             if len(scenes) >= max_scenes:
@@ -85,26 +90,25 @@ def run_scene_optimizer(
     from app.core.image_styles import get_style_semantic_hint
     
     styles = load_image_styles_v1().styles
-    style_descriptions = "\n".join([f"- {s.id}: {get_style_semantic_hint(s.id)}" for s in styles])
+    style_summary = "\n".join([f"- {s.id}: {get_style_semantic_hint(s.id)}" for s in styles])
 
     rendered_prompt = render_prompt(
-        "prompt_scene_optimizer",
+        "prompt_studio_director",
         max_scenes=max_scenes,
         episode_intent=script.get("episode_intent", "Unknown"),
         beats_json=json.dumps(script.get("visual_beats", []), ensure_ascii=False, indent=2),
-        tone_analysis_json=json.dumps(tone_analysis or {}, ensure_ascii=False, indent=2),
-        available_styles=style_descriptions,
+        style_library=style_summary,
     )
 
     raw_result = _maybe_json_from_gemini(gemini, rendered_prompt)
-    if not raw_result or ("scenes" not in raw_result and raw_result.get("action") == "proceed"):
-        logger.error("SceneOptimizer failed to produce optimized scenes")
+    if not raw_result:
+        logger.error("StudioDirector failed to produce response")
         return {"action": "proceed", "scenes": []}
     
     try:
-        validated = SceneOptimizerResponse.model_validate(raw_result)
+        validated = StudioDirectorResponse.model_validate(raw_result)
         return validated.model_dump()
     except Exception as e:
-        logger.error(f"SceneOptimizer validation error: {e}, raw_result={raw_result}")
-        # Final fallback - return raw if possible, or empty structure
+        logger.error(f"StudioDirector validation error: {e}, raw_result={raw_result}")
+        # Return what we can or empty
         return raw_result if isinstance(raw_result, dict) else {"action": "proceed", "scenes": []}

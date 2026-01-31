@@ -48,7 +48,7 @@ class StoryBuildState(TypedDict, total=False):
 
 
 def _total_steps(planning_mode: str | None) -> int:
-    return 11 if planning_mode == "full" else 8
+    return 10 if planning_mode == "full" else 6
 
 
 def _persist_progress(state: StoryBuildState, progress: dict) -> None:
@@ -213,23 +213,9 @@ def _node_webtoon_script_writer(state: StoryBuildState, gemini: GeminiClient | N
     return progress
 
 
-def _node_tone_auditor(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
-    analysis = nodes.run_tone_auditor(
+def _node_studio_director(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
+    result = nodes.run_studio_director(
         script=state.get("webtoon_script"),
-        gemini=gemini,
-    )
-    progress = {
-        "tone_analysis": analysis,
-        "progress": {"current_node": "ToneAuditor", "message": "Analyzing tone and mood shifts...", "step": 5},
-    }
-    _persist_progress(state, progress["progress"])
-    return progress
-
-
-def _node_scene_optimizer(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
-    result = nodes.run_scene_optimizer(
-        script=state.get("webtoon_script"),
-        tone_analysis=state.get("tone_analysis"),
         max_scenes=state.get("max_scenes", 6),
         gemini=gemini,
     )
@@ -246,7 +232,7 @@ def _node_scene_optimizer(state: StoryBuildState, gemini: GeminiClient | None) -
 
     progress = {
         "scenes": result.get("scenes"),
-        "progress": {"current_node": "SceneOptimizer", "message": "Optimizing scenes and merging beats...", "step": 6},
+        "progress": {"current_node": "StudioDirector", "message": "Unified planning and budget optimization...", "step": 5},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -285,7 +271,7 @@ def _node_blind_test_critic(state: StoryBuildState, gemini: GeminiClient | None)
         }
 
     progress = {
-        "progress": {"current_node": "BlindTestCritic", "message": "Analyzing blind test results...", "step": 11},
+        "progress": {"current_node": "BlindTestCritic", "message": "Analyzing blind test results...", "step": 10},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -589,19 +575,17 @@ def build_story_build_graph(planning_mode: str = "full", gemini: GeminiClient | 
     graph.add_node("llm_character_extractor", partial(_node_llm_character_extractor, gemini=gemini))
     graph.add_node("llm_character_normalizer", partial(_node_llm_character_normalizer, gemini=gemini))
     graph.add_node("webtoon_script_writer", partial(_node_webtoon_script_writer, gemini=gemini))
-    graph.add_node("tone_auditor", partial(_node_tone_auditor, gemini=gemini))
-    graph.add_node("scene_optimizer", partial(_node_scene_optimizer, gemini=gemini))
+    graph.add_node("studio_director", partial(_node_studio_director, gemini=gemini))
     graph.add_node("persist_story_bundle", _node_persist_story_bundle)
 
     graph.set_entry_point("validate_inputs")
     graph.add_edge("validate_inputs", "llm_character_extractor")
     graph.add_edge("llm_character_extractor", "llm_character_normalizer")
     graph.add_edge("llm_character_normalizer", "webtoon_script_writer")
-    graph.add_edge("webtoon_script_writer", "tone_auditor")
-    graph.add_edge("tone_auditor", "scene_optimizer")
+    graph.add_edge("webtoon_script_writer", "studio_director")
     
     graph.add_conditional_edges(
-        "scene_optimizer",
+        "studio_director",
         _router_optimization,
         {
             "webtoon_script_writer": "webtoon_script_writer",
