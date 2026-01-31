@@ -147,12 +147,38 @@ export default function DialogueEditorPage() {
 
   const generateVideoMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedEpisodeId) throw new Error("Select an episode");
       if (!scenesQuery.data || scenesQuery.data.length === 0) {
         throw new Error("No scenes found for this story");
       }
+      
+      // Auto-create or find episode with story name
+      let episodeId = selectedEpisodeId;
+      
+      if (!episodeId) {
+        // Check if episode with story name exists
+        const existingEpisode = episodesQuery.data?.find(
+          (ep) => ep.title === storyQuery.data?.title
+        );
+        
+        if (existingEpisode) {
+          episodeId = existingEpisode.episode_id;
+          setSelectedEpisodeId(episodeId);
+        } else {
+          // Auto-create episode with story name
+          if (!storyQuery.data) throw new Error("Story not found");
+          const newEpisode = await createEpisode({
+            storyId,
+            title: storyQuery.data.title,
+            defaultImageStyle: storyQuery.data.default_image_style
+          });
+          episodeId = newEpisode.episode_id;
+          setSelectedEpisodeId(episodeId);
+          await queryClient.invalidateQueries({ queryKey: ["episodes", storyId] });
+        }
+      }
+      
       const selectedEpisode = episodesQuery.data?.find(
-        (episode) => episode.episode_id === selectedEpisodeId
+        (episode) => episode.episode_id === episodeId
       );
       const episodeSceneIds = selectedEpisode?.scene_ids_ordered ?? [];
       const sceneIds =
@@ -160,10 +186,10 @@ export default function DialogueEditorPage() {
           ? episodeSceneIds
           : scenesQuery.data.map((scene) => scene.scene_id);
       if (episodeSceneIds.length === 0) {
-        await setEpisodeScenes({ episodeId: selectedEpisodeId, sceneIds });
+        await setEpisodeScenes({ episodeId, sceneIds });
         await queryClient.invalidateQueries({ queryKey: ["episodes", storyId] });
       }
-      const exportJob = await createEpisodeExport(selectedEpisodeId);
+      const exportJob = await createEpisodeExport(episodeId);
       const finalized = await finalizeExport(exportJob.export_id);
       const videoJob = await generateVideoExport(finalized.export_id);
       setLastExportId(videoJob.export_id);
@@ -649,28 +675,6 @@ export default function DialogueEditorPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="input text-xs"
-              value={selectedEpisodeId}
-              onChange={(e) => setSelectedEpisodeId(e.target.value)}
-              disabled={!storyId}
-            >
-              <option value="">Select episode</option>
-              {episodesQuery.data?.map((episode: any) => (
-                <option key={episode.episode_id} value={episode.episode_id}>
-                  {episode.title}
-                </option>
-              ))}
-            </select>
-            {episodesQuery.data?.length === 0 && storyQuery.data && (
-              <button
-                className="btn-ghost text-xs"
-                onClick={() => createEpisodeMutation.mutate()}
-                disabled={createEpisodeMutation.isPending}
-              >
-                {createEpisodeMutation.isPending ? "Creating..." : "Create Episode"}
-              </button>
-            )}
             <button
               className="btn-primary text-xs"
               onClick={() => {
@@ -680,10 +684,13 @@ export default function DialogueEditorPage() {
                 setPollSeconds(0);
                 generateVideoMutation.mutate();
               }}
-              disabled={!selectedEpisodeId || generateVideoMutation.isPending}
+              disabled={!storyId || generateVideoMutation.isPending || !scenesQuery.data || scenesQuery.data.length === 0}
             >
               {generateVideoMutation.isPending ? "Generating..." : "Generate Video"}
             </button>
+            {(!scenesQuery.data || scenesQuery.data.length === 0) && (
+              <span className="text-xs text-slate-400">Add scenes to enable video generation</span>
+            )}
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
