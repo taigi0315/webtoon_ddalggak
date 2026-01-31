@@ -13,7 +13,7 @@ from app.api.v1.schemas import (
     SceneSetStyleRequest,
 )
 from app.services.artifacts import ArtifactService
-from app.config.loaders import has_image_style, has_story_style
+from app.config.loaders import has_image_style
 from app.db.models import EnvironmentAnchor, Scene, Story
 from app.graphs import nodes
 from app.services.artifacts import ArtifactService
@@ -96,11 +96,6 @@ def set_scene_style(scene_id: uuid.UUID, payload: SceneSetStyleRequest, db=DbSes
     scene = db.get(Scene, scene_id)
     if scene is None:
         raise HTTPException(status_code=404, detail="scene not found")
-
-    if "story_style_id" in payload.model_fields_set:
-        if payload.story_style_id is not None and not has_story_style(payload.story_style_id):
-            raise HTTPException(status_code=400, detail="unknown story_style_id")
-        scene.story_style_override = payload.story_style_id
 
     if "image_style_id" in payload.model_fields_set:
         if payload.image_style_id is not None and not has_image_style(payload.image_style_id):

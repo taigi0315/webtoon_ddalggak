@@ -2,7 +2,7 @@
 # Version: 1.0
 # Domain: casting
 # Description: Generate character variant using base reference for identity preservation
-# Required Variables: base_traits, story_style, image_style
+# Required Variables: base_traits, image_style
 # Optional Variables: hair_changes, mood_changes, outfit_changes, custom_changes
 
 prompt_variant_generation: |
@@ -28,7 +28,6 @@ prompt_variant_generation: |
   ===============================================
   STYLE CONTEXT
   ===============================================
-  - Story Style: {{ story_style }}
   - Image Style: {{ image_style }}
 
   ===============================================

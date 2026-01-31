@@ -15,7 +15,6 @@ import {
   importActor,
   deleteActor,
   deleteActorVariant,
-  fetchStoryStyles,
   fetchImageStyles
 } from "@/lib/api/queries";
 import type {
@@ -47,7 +46,6 @@ export default function CastingStudioPage() {
   });
 
   // Form state for generation
-  const [storyStyleId, setStoryStyleId] = useState("default");
   const [imageStyleId, setImageStyleId] = useState("default");
   const [traits, setTraits] = useState<CharacterTraitsInput>({
     gender: null,
@@ -62,11 +60,6 @@ export default function CastingStudioPage() {
   const projectsQuery = useQuery({
     queryKey: ["projects"],
     queryFn: fetchProjects
-  });
-
-  const storyStylesQuery = useQuery({
-    queryKey: ["storyStyles"],
-    queryFn: fetchStoryStyles
   });
 
   const imageStylesQuery = useQuery({
@@ -119,8 +112,6 @@ export default function CastingStudioPage() {
     if (!projectId) return;
     setGenerationState((prev) => ({ ...prev, isGenerating: true }));
     generateMutation.mutate({
-      projectId,
-      storyStyleId,
       imageStyleId,
       traits
     });
@@ -243,25 +234,20 @@ export default function CastingStudioPage() {
           {activeTab === "generate" && (
             <GenerateTab
               projectId={projectId}
-              storyStyles={storyStylesQuery.data ?? []}
               imageStyles={imageStylesQuery.data ?? []}
-              storyStyleId={storyStyleId}
               imageStyleId={imageStyleId}
               traits={traits}
               generationState={generationState}
-              onStoryStyleChange={setStoryStyleId}
               onImageStyleChange={setImageStyleId}
               onTraitsChange={setTraits}
               onGenerate={handleGenerate}
               onSave={(displayName, description) => {
                 if (!generationState.imageId) return;
                 saveMutation.mutate({
-                  projectId,
                   imageId: generationState.imageId,
                   displayName,
                   description,
                   traits: generationState.traits,
-                  storyStyleId,
                   imageStyleId
                 });
               }}
@@ -272,7 +258,6 @@ export default function CastingStudioPage() {
           {activeTab === "import" && (
             <ImportTab
               projectId={projectId}
-              storyStyles={storyStylesQuery.data ?? []}
               imageStyles={imageStylesQuery.data ?? []}
               onImported={() => {
                 queryClient.invalidateQueries({ queryKey: ["actorLibrary", projectId] });
@@ -556,9 +541,9 @@ function ActorDetail({
             <p className="text-sm text-ink">{actor.age_range ?? "Not specified"}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500">Default Styles</p>
+            <p className="text-xs font-semibold text-slate-500">Default Style</p>
             <p className="text-sm text-ink">
-              {actor.default_story_style_id ?? "default"} / {actor.default_image_style_id ?? "default"}
+              {actor.default_image_style_id ?? "default"}
             </p>
           </div>
         </div>
@@ -714,13 +699,10 @@ function VariantForm({
 
 function GenerateTab({
   projectId,
-  storyStyles,
   imageStyles,
-  storyStyleId,
   imageStyleId,
   traits,
   generationState,
-  onStoryStyleChange,
   onImageStyleChange,
   onTraitsChange,
   onGenerate,
@@ -728,13 +710,10 @@ function GenerateTab({
   isSaving
 }: {
   projectId: string;
-  storyStyles: StyleItem[];
   imageStyles: StyleItem[];
-  storyStyleId: string;
   imageStyleId: string;
   traits: CharacterTraitsInput;
   generationState: GenerationState;
-  onStoryStyleChange: (id: string) => void;
   onImageStyleChange: (id: string) => void;
   onTraitsChange: (traits: CharacterTraitsInput) => void;
   onGenerate: () => void;
@@ -828,22 +807,6 @@ function GenerateTab({
         <h3 className="text-sm font-semibold text-ink">Character Traits</h3>
 
         <div className="mt-4 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-slate-500">Story Style</label>
-            <select
-              className="input mt-1 w-full text-sm"
-              value={storyStyleId}
-              onChange={(e) => onStoryStyleChange(e.target.value)}
-            >
-              <option value="default">Default</option>
-              {storyStyles.map((style) => (
-                <option key={style.id} value={style.id}>
-                  {style.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div>
             <label className="text-xs font-semibold text-slate-500">Image Style</label>
             <select
@@ -945,19 +908,16 @@ function GenerateTab({
 
 function ImportTab({
   projectId,
-  storyStyles,
   imageStyles,
   onImported
 }: {
   projectId: string;
-  storyStyles: StyleItem[];
   imageStyles: StyleItem[];
   onImported: () => void;
 }) {
   const [imageUrl, setImageUrl] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
-  const [storyStyleId, setStoryStyleId] = useState("default");
   const [imageStyleId, setImageStyleId] = useState("default");
   const [gender, setGender] = useState("");
   const [ageRange, setAgeRange] = useState("");
@@ -978,12 +938,10 @@ function ImportTab({
     if (ageRange) traits.age_range = ageRange;
 
     importMutation.mutate({
-      projectId,
       imageUrl,
       displayName,
       description: description || null,
       traits,
-      storyStyleId: storyStyleId !== "default" ? storyStyleId : null,
       imageStyleId: imageStyleId !== "default" ? imageStyleId : null
     });
   };
@@ -1058,22 +1016,6 @@ function ImportTab({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-500">Story Style</label>
-            <select
-              className="input mt-1 w-full text-sm"
-              value={storyStyleId}
-              onChange={(e) => setStoryStyleId(e.target.value)}
-            >
-              <option value="default">Default</option>
-              {storyStyles.map((style) => (
-                <option key={style.id} value={style.id}>
-                  {style.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           <div>

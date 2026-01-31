@@ -341,7 +341,6 @@ def generate_character_variant_suggestion_refs(
                 variant_type=suggestion.variant_type,
                 override_attributes=suggestion.override_attributes,
                 base_reference=base_ref,
-                story_style=story.default_story_style,
             )
         except Exception as exc:  # noqa: BLE001
             results.append(
@@ -506,21 +505,6 @@ def generate_character_refs(character_id: uuid.UUID, payload: CharacterGenerateR
             detail="character needs description or identity_line to generate reference images"
         )
 
-    story_style = None
-    linked_story = (
-        db.execute(
-            select(Story)
-            .join(StoryCharacter, StoryCharacter.story_id == Story.story_id)
-            .where(StoryCharacter.character_id == character_id)
-            .order_by(Story.created_at.desc())
-            .limit(1)
-        )
-        .scalars()
-        .one_or_none()
-    )
-    if linked_story is not None:
-        story_style = linked_story.default_story_style
-
     generated_refs: list[CharacterReferenceImage] = []
     for ref_type in payload.ref_types:
         for _ in range(payload.count_per_type):
@@ -528,7 +512,6 @@ def generate_character_refs(character_id: uuid.UUID, payload: CharacterGenerateR
                 db=db,
                 character_id=character_id,
                 ref_type=ref_type,
-                story_style=story_style,
             )
             generated_refs.append(ref)
 
@@ -918,7 +901,6 @@ def generate_character_with_reference(
             variant_type=payload.variant_type,
             override_attributes=override_attributes,
             base_reference=base_ref,
-            story_style=story.default_story_style,
         )
         
         # 5. Set the new generated image as primary/approved for this new character

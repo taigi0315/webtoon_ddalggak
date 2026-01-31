@@ -2,14 +2,13 @@
 # Version: 1.0
 # Domain: casting
 # Description: Generate character profile sheet with full body and expression insets
-# Required Variables: story_style, image_style
+# Required Variables: image_style
 # Optional Variables: gender, age_range, face_traits, hair_traits, mood, custom_prompt
 
 prompt_profile_sheet: |
   You are generating a CHARACTER PROFILE SHEET for a Korean webtoon character.
 
   STYLE CONTEXT:
-  - Story Style: {{ story_style }}
   - Image Style: {{ image_style }}
 
   CHARACTER TRAITS:

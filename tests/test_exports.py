@@ -31,7 +31,7 @@ async def test_export_stub(client):
     episode = (
         await client.post(
             f"/v1/stories/{story['story_id']}/episodes",
-            json={"title": "Episode 1", "default_story_style": "default", "default_image_style": "default"},
+            json={"title": "Episode 1", "default_image_style": "default"},
         )
     ).json()
 

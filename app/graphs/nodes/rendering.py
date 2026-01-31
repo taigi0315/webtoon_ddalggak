@@ -18,7 +18,6 @@ def compute_prompt_compiler(
     style_id: str,
     characters: list[Character] | None = None,
     reference_char_ids: set[uuid.UUID] | None = None,
-    story_style: str | None = None,
     variants_by_character: dict[uuid.UUID, CharacterVariant] | None = None,
 ) -> dict:
     prompt = _compile_prompt(
@@ -27,7 +26,6 @@ def compute_prompt_compiler(
         style_id=style_id,
         characters=characters or [],
         reference_char_ids=reference_char_ids or set(),
-        story_style=story_style,
         variants_by_character=variants_by_character,
     )
     return {
@@ -73,7 +71,6 @@ def run_prompt_compiler(
                         characters=characters,
                         reference_char_ids=reference_char_ids,
                         variants_by_character=variants_by_character,
-                        story_style=(story.default_story_style if story else None),
                     )
 
                 payload = {
@@ -89,7 +86,6 @@ def generate_character_reference_image(
     db: Session,
     character_id: uuid.UUID,
     ref_type: str = "face",
-    story_style: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> CharacterReferenceImage:
     character = db.get(Character, character_id)
@@ -103,7 +99,6 @@ def generate_character_reference_image(
 
     style_prompt = get_character_style_prompt(character.gender, character.age_range)
     identity = character.identity_line or character.description or character.name
-    story_style_text = story_style or (character.story.default_story_style if character.story else None)
 
     prompt_parts = [
         "High-quality character reference image for a Korean webtoon.",
@@ -111,8 +106,6 @@ def generate_character_reference_image(
         f"Identity: {identity}.",
         f"Ref type: {ref_type}.",
     ]
-    if story_style_text:
-        prompt_parts.append(f"Story style: {story_style_text}.")
     if style_prompt:
         prompt_parts.append(style_prompt)
     prompt_parts.append("Plain background, clean silhouette, full body if possible.")
@@ -184,7 +177,6 @@ def generate_character_variant_reference_image(
     variant_type: str,
     override_attributes: dict,
     base_reference: CharacterReferenceImage,
-    story_style: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> CharacterReferenceImage:
     character = db.get(Character, character_id)
@@ -198,7 +190,6 @@ def generate_character_variant_reference_image(
 
     style_prompt = get_character_style_prompt(character.gender, character.age_range)
     identity = character.identity_line or character.description or character.name
-    story_style_text = story_style or (character.story.default_story_style if character.story else None)
     variant_text = _format_variant_attributes(override_attributes)
 
     prompt_parts = [
@@ -210,8 +201,6 @@ def generate_character_variant_reference_image(
         "Preserve identity exactly; only update the variant details.",
         "Full body if possible.",
     ]
-    if story_style_text:
-        prompt_parts.append(f"Story style: {story_style_text}.")
     if variant_text:
         prompt_parts.append(variant_text)
     if style_prompt:

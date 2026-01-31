@@ -1,7 +1,7 @@
 # Visual Plan Prompt
 # Version: 1.0
 # Description: Convert scenes into visual beats for webtoon adaptation
-# Required Variables: story_style, character_identities, scenes_block
+# Required Variables: character_identities, scenes_block
 # Output Schema: { global_environment_anchors: [...], scene_plans: [...] }
 
 prompt_visual_plan: |
@@ -10,8 +10,6 @@ prompt_visual_plan: |
 
   Convert the following scenes into visual beats for webtoon adaptation.
   Each scene should have 2-6 visual beats depending on complexity.
-
-  Story style: {{ story_style }}
 
   Characters:
   {{ character_identities }}

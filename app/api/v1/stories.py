@@ -20,7 +20,7 @@ from app.api.v1.schemas import (
     StoryGenerateResponse,
     StoryProgressRead,
 )
-from app.config.loaders import has_image_style, has_story_style
+from app.config.loaders import has_image_style
 from app.core.settings import settings
 from app.db.session import get_sessionmaker
 from app.db.models import Character, Project, Scene, Story, StoryCharacter
@@ -61,8 +61,6 @@ def create_story(project_id: uuid.UUID, payload: StoryCreate, db=DbSessionDep):
     if project is None:
         raise HTTPException(status_code=404, detail="project not found")
 
-    if not has_story_style(payload.default_story_style):
-        raise HTTPException(status_code=400, detail="unknown default_story_style")
     if not has_image_style(payload.default_image_style):
         raise HTTPException(status_code=400, detail="unknown default_image_style")
 
@@ -70,7 +68,6 @@ def create_story(project_id: uuid.UUID, payload: StoryCreate, db=DbSessionDep):
     story = Story(
         project_id=project_id,
         title=payload.title,
-        default_story_style=payload.default_story_style,
         default_image_style=payload.default_image_style,
         created_by=request_id,
         updated_by=request_id,
@@ -87,7 +84,6 @@ def create_story(project_id: uuid.UUID, payload: StoryCreate, db=DbSessionDep):
         new_value={
             "project_id": str(story.project_id),
             "title": story.title,
-            "default_story_style": story.default_story_style,
             "default_image_style": story.default_image_style,
         },
     )
@@ -170,7 +166,6 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
             max_characters=payload.max_characters,
             panel_count=payload.panel_count,
             allow_append=payload.allow_append,
-            story_style=story.default_story_style,
             image_style=payload.style_id or story.default_image_style,
             gemini=gemini,
             planning_mode=planning_mode,
@@ -239,7 +234,6 @@ def _handle_story_blueprint_job(job: job_queue.JobRecord) -> dict | None:
             max_characters=payload.max_characters,
             panel_count=payload.panel_count,
             allow_append=payload.allow_append,
-            story_style=story.default_story_style,
             image_style=payload.style_id or story.default_image_style,
             gemini=gemini,
             planning_mode=planning_mode,
@@ -376,12 +370,9 @@ def set_story_style_defaults(story_id: uuid.UUID, payload: StorySetStyleDefaults
     if story is None:
         raise HTTPException(status_code=404, detail="story not found")
 
-    if not has_story_style(payload.default_story_style):
-        raise HTTPException(status_code=400, detail="unknown default_story_style")
     if not has_image_style(payload.default_image_style):
         raise HTTPException(status_code=400, detail="unknown default_image_style")
 
-    story.default_story_style = payload.default_story_style
     story.default_image_style = payload.default_image_style
     db.add(story)
     db.commit()

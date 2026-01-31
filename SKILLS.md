@@ -23,7 +23,6 @@ ssuljaengi_v4/
 │   │   ├── layout_templates_9x16_v1.json    # Panel geometry
 │   │   ├── qc_rules_v1.json                 # Quality control rules
 │   │   ├── genre_guidelines_v1.json         # Genre-specific styles
-│   │   ├── story_styles.json                # Story style presets
 │   │   ├── image_styles.json                # Image style presets
 │   │   └── loaders.py                       # Config loading logic
 │   ├── core/                      # Core utilities

@@ -64,7 +64,6 @@ def _node_llm_scene_intent(state: PlanningState, gemini: GeminiClient | None) ->
         artifact = nodes.run_scene_intent_extractor(
             db=db,
             scene_id=state["scene_id"],
-            genre=state.get("genre"),
             gemini=gemini,
         )
     return {"scene_intent_artifact_id": str(artifact.artifact_id)}

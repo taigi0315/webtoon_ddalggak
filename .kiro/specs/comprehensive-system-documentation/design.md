@@ -333,7 +333,7 @@ docs/
    - layout_templates_9x16_v1.json: Panel geometry
    - qc_rules_v1.json: Quality thresholds
    - genre_guidelines_v1.json: Genre-specific styles
-   - story_styles.json, image_styles.json: Style presets
+   - image_styles.json: Style presets
 
 2. Panel Grammar Library
    - Valid grammar IDs (establishing, dialogue_medium, emotion_closeup, action, reaction, object_focus, reveal, impact_silence)

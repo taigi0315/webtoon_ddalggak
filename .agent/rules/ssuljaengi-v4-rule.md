@@ -23,9 +23,124 @@ trigger: always_on
 ## 3. Tech Stack (Strict)
 
 - **Backend:** Python 3.11+, FastAPI (Async mandatory), Pydantic V2.
+- **Frontend:** Next.js 14+, TypeScript, React Query, Tailwind CSS.
 - **AI:** LangChain (Primary), LangGraph for complex flows. No raw OpenAI SDK unless specified.
 - **Infra:** AWS (boto3), Kubernetes (Helm), ArgoCD (Declarative).
 - **Observability:** OpenTelemetry (OTEL) tracing for all LLM calls.
+
+## 3.1 Fullstack Development Principle (CRITICAL)
+
+**This workspace includes BOTH frontend and backend code. When implementing features or changes, you MUST consider BOTH sides.**
+
+### Frontend-Backend Coordination Rules
+
+**When making ANY change, ask yourself:**
+
+1. Does this change affect the API contract (request/response schemas)?
+2. Does this change affect the UI/UX?
+3. Do I need to update both frontend and backend?
+
+### Common Change Patterns
+
+| Change Type           | Backend Updates                          | Frontend Updates                     |
+| --------------------- | ---------------------------------------- | ------------------------------------ |
+| **New Feature**       | Models, API endpoints, services, schemas | Pages, components, API client, types |
+| **Remove Feature**    | Delete models/endpoints, update schemas  | Remove UI components, update routes  |
+| **Schema Change**     | Update Pydantic schemas, API responses   | Update TypeScript types, API calls   |
+| **Field Removal**     | Remove from models/schemas               | Remove from forms/displays           |
+| **Field Addition**    | Add to models/schemas                    | Add to forms/displays                |
+| **Validation Change** | Update Pydantic validators               | Update form validation               |
+
+### Fullstack Implementation Checklist
+
+When implementing a feature, complete ALL of these:
+
+**Backend:**
+
+- [ ] Database models updated (`app/db/models.py`)
+- [ ] Database migration created and applied
+- [ ] Pydantic schemas updated (`app/api/v1/schemas.py`)
+- [ ] API endpoints updated (`app/api/v1/*.py`)
+- [ ] Service layer updated (`app/services/*.py`)
+- [ ] Backend tests updated/created
+
+**Frontend:**
+
+- [ ] TypeScript types updated (`frontend/lib/api/types.ts`)
+- [ ] API client functions updated (`frontend/lib/api/client.ts` or `queries.ts`)
+- [ ] UI components updated (forms, displays, etc.)
+- [ ] Pages updated if needed
+- [ ] Frontend validation updated if needed
+
+**Documentation:**
+
+- [ ] API documentation updated (`docs/08-api-reference.md`)
+- [ ] Database documentation updated (`docs/04-database-models.md`)
+- [ ] User-facing documentation updated if needed
+
+### Example: Removing a Field
+
+When removing a field from the system:
+
+**Backend:**
+
+1. Create migration to drop column
+2. Remove field from SQLAlchemy models
+3. Remove field from Pydantic schemas (Create, Read, Update)
+4. Remove field from API endpoint handlers
+5. Remove field from service functions
+6. Update tests
+
+**Frontend:**
+
+1. Remove field from TypeScript types
+2. Remove field from API calls
+3. Remove UI components (dropdowns, selectors)
+4. Remove from forms
+5. Remove validation logic
+
+**Both:**
+
+- Update documentation
+- Test end-to-end flow
+
+### Red Flags (Incomplete Implementation)
+
+❌ **Warning Signs:**
+
+- Backend schema changed but frontend types not updated
+- API endpoint removed but frontend still calling it
+- New field added to backend but not shown in UI
+- Form submitting data that backend doesn't accept
+- TypeScript types don't match Pydantic schemas
+
+✅ **Good Practice:**
+
+- Make changes in pairs (backend + frontend)
+- Test the full flow after changes
+- Update types/schemas together
+- Keep API contract in sync
+
+### Frontend-Specific Guidelines
+
+**File Structure:**
+
+- `frontend/app/` - Next.js pages and routes
+- `frontend/components/` - Reusable React components
+- `frontend/lib/api/` - API client and types
+- `frontend/lib/query/` - React Query setup
+
+**Type Safety:**
+
+- Always define TypeScript types for API responses
+- Use Pydantic schemas as source of truth
+- Keep `types.ts` in sync with backend schemas
+
+**API Integration:**
+
+- Use React Query for data fetching
+- Centralize API calls in `client.ts` or `queries.ts`
+- Handle loading/error states consistently
 
 ## 4. "Do Not" List
 

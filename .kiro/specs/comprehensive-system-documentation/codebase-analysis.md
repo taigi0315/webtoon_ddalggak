@@ -297,7 +297,7 @@ prompts/
    - Shot preferences, composition, camera, lighting
    - Shot distribution per genre
 
-6. **story_styles.json / image_styles.json**
+6. **image_styles.json**
    - Style presets for generation
    - ID, label, description, image_url
 
@@ -319,7 +319,6 @@ prompts/
 - get_layout_template(template_id)
 - select_template(panel_plan, derived_features, excluded_template_ids)
 - get_genre_guideline(genre)
-- has_story_style(style_id)
 - has_image_style(style_id)
 
 
@@ -605,7 +604,7 @@ prompts/
 - `app/config/layout_selection_rules_v1.json` - Selection rules
 - `app/config/qc_rules_v1.json` - Quality control rules
 - `app/config/genre_guidelines_v1.json` - Genre guidelines
-- `app/config/story_styles.json` - Story styles
+
 - `app/config/image_styles.json` - Image styles
 
 ### Services

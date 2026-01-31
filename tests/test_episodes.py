@@ -26,7 +26,7 @@ async def test_episode_crud(client):
     episode = (
         await client.post(
             f"/v1/stories/{story['story_id']}/episodes",
-            json={"title": "Episode 1", "default_story_style": "default", "default_image_style": "default"},
+            json={"title": "Episode 1", "default_image_style": "default"},
         )
     ).json()
 
@@ -44,10 +44,10 @@ async def test_episode_crud(client):
     styled = (
         await client.post(
             f"/v1/episodes/{episode['episode_id']}/set-style",
-            json={"default_story_style": "comedy", "default_image_style": "soft_webtoon"},
+            json={"default_image_style": "soft_webtoon"},
         )
     ).json()
-    assert styled["default_story_style"] == "comedy"
+    assert styled["default_image_style"] == "soft_webtoon"
 
     asset = (
         await client.post(

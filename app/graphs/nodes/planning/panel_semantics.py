@@ -65,7 +65,6 @@ def run_panel_semantic_filler(
                 panel_plan=panel_plan.payload,
                 layout_template=layout.payload,
                 characters=characters,
-                story_style=(story.default_story_style if story else None),
                 scene_intent=scene_intent,
             )
 
@@ -78,7 +77,6 @@ def run_panel_semantic_filler(
                         layout.payload,
                         characters,
                         scene_intent=scene_intent,
-                        genre=(story.default_story_style if story else None),
                     ),
                 )
                 if isinstance(llm, dict) and isinstance(llm.get("panels"), list):

@@ -60,7 +60,6 @@ erDiagram
 - `story_id` - UUID primary key
 - `project_id` - Foreign key to Project
 - `title` - Story display name
-- `default_story_style` - Default style preset for story generation
 - `default_image_style` - Default style preset for image generation
 - `generation_status` - Current status (idle, processing, completed, failed)
 - `generation_error` - Error message if generation failed
@@ -82,7 +81,6 @@ erDiagram
 - `source_text` - Raw scene text input
 - `scene_importance` - Importance rating (critical, high, medium, low)
 - `planning_locked` - Prevents regeneration when true
-- `story_style_override` - Optional style override for this scene
 - `image_style_override` - Optional image style override for this scene
 - `environment_id` - Optional reference to reusable environment
 
@@ -289,7 +287,6 @@ erDiagram
 - `episode_id` - UUID primary key
 - `story_id` - Foreign key to Story
 - `title` - Episode title
-- `default_story_style` - Default story style for episode
 - `default_image_style` - Default image style for episode
 - `status` - Episode status (draft, published, etc.)
 
@@ -421,7 +418,7 @@ SELECT story_id, title, generation_status, generation_error, progress
 FROM stories WHERE story_id = ?;
 
 -- Review scene style overrides
-SELECT scene_id, story_style_override, image_style_override, planning_locked
+SELECT scene_id, image_style_override, planning_locked
 FROM scenes WHERE story_id = ?;
 
 -- Check style preset inheritance

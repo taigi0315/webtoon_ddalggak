@@ -27,7 +27,6 @@ class Story(Base):
         ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    default_story_style: Mapped[str] = mapped_column(String(64), nullable=False, default="default")
     default_image_style: Mapped[str] = mapped_column(String(64), nullable=False, default="default")
     generation_status: Mapped[str] = mapped_column(String(32), nullable=False, default="idle")
     generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -68,7 +67,6 @@ class Scene(Base):
     source_text: Mapped[str] = mapped_column(Text, nullable=False)
     scene_importance: Mapped[str | None] = mapped_column(String(24), nullable=True)
     planning_locked: Mapped[bool] = mapped_column(nullable=False, default=False)
-    story_style_override: Mapped[str | None] = mapped_column(String(64), nullable=True)
     image_style_override: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[object] = mapped_column(
@@ -102,7 +100,6 @@ class Character(Base):
     generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Actor system fields
     display_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    default_story_style_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     default_image_style_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_library_saved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     approved: Mapped[bool] = mapped_column(nullable=False, default=False)
@@ -180,7 +177,6 @@ class CharacterVariant(Base):
     variant_type: Mapped[str] = mapped_column(String(32), nullable=False, default="base")
     variant_name: Mapped[str | None] = mapped_column(String(128), nullable=True)  # "Summer Look", "Battle Mode"
     image_style_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    story_style_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     traits: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # {face, hair, mood, outfit}
     override_attributes: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     reference_image_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -312,7 +308,6 @@ class Episode(Base):
         ForeignKey("stories.story_id", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    default_story_style: Mapped[str] = mapped_column(String(64), nullable=False, default="default")
     default_image_style: Mapped[str] = mapped_column(String(64), nullable=False, default="default")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())

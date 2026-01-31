@@ -67,14 +67,12 @@ export async function deleteProject(projectId: string) {
 export async function createStory(params: {
   projectId: string;
   title: string;
-  defaultStoryStyle: string;
   defaultImageStyle: string;
 }) {
   const payload = await fetchJson(`/v1/projects/${params.projectId}/stories`, {
     method: "POST",
     body: JSON.stringify({
       title: params.title,
-      default_story_style: params.defaultStoryStyle,
       default_image_style: params.defaultImageStyle
     })
   });
@@ -83,13 +81,11 @@ export async function createStory(params: {
 
 export async function setStoryStyleDefaults(params: {
   storyId: string;
-  defaultStoryStyle: string;
   defaultImageStyle: string;
 }) {
   const payload = await fetchJson(`/v1/stories/${params.storyId}/set-style-defaults`, {
     method: "POST",
     body: JSON.stringify({
-      default_story_style: params.defaultStoryStyle,
       default_image_style: params.defaultImageStyle
     })
   });
@@ -182,11 +178,6 @@ export async function fetchSceneArtifacts(sceneId: string) {
 export async function fetchSceneRenders(sceneId: string) {
   const payload = await fetchJson(`/v1/scenes/${sceneId}/renders`);
   return artifactsSchema.parse(payload);
-}
-
-export async function fetchStoryStyles() {
-  const payload = await fetchJson("/v1/styles/story");
-  return styleItemsSchema.parse(payload);
 }
 
 export async function fetchImageStyles() {
@@ -514,14 +505,12 @@ export async function fetchEpisodes(storyId: string) {
 export async function createEpisode(params: {
   storyId: string;
   title: string;
-  defaultStoryStyle: string;
   defaultImageStyle: string;
 }) {
   const payload = await fetchJson(`/v1/stories/${params.storyId}/episodes`, {
     method: "POST",
     body: JSON.stringify({
       title: params.title,
-      default_story_style: params.defaultStoryStyle,
       default_image_style: params.defaultImageStyle
     })
   });
@@ -686,18 +675,15 @@ export async function generateWithReference(params: {
 // ============================================================================
 
 /**
- * Generate a new character profile sheet (preview before saving).
- * Uses global endpoint - actors are not tied to projects.
+ * Generate a new character profile sheet (global actor).
  */
 export async function generateActor(params: {
-  storyStyleId: string;
   imageStyleId: string;
   traits: CharacterTraitsInput;
 }) {
   const payload = await fetchJson(`/v1/casting/generate`, {
     method: "POST",
     body: JSON.stringify({
-      story_style_id: params.storyStyleId,
       image_style_id: params.imageStyleId,
       traits: params.traits
     })
@@ -713,7 +699,6 @@ export async function saveActor(params: {
   displayName: string;
   description?: string | null;
   traits: CharacterTraitsInput;
-  storyStyleId: string;
   imageStyleId: string;
 }) {
   const payload = await fetchJson(`/v1/casting/save`, {
@@ -723,7 +708,6 @@ export async function saveActor(params: {
       display_name: params.displayName,
       description: params.description ?? null,
       traits: params.traits,
-      story_style_id: params.storyStyleId,
       image_style_id: params.imageStyleId
     })
   });
@@ -765,7 +749,6 @@ export async function generateActorVariant(params: {
   characterId: string;
   baseVariantId: string;
   traitChanges: CharacterTraitsInput;
-  storyStyleId?: string | null;
   imageStyleId?: string | null;
   variantName?: string | null;
 }) {
@@ -774,7 +757,6 @@ export async function generateActorVariant(params: {
     body: JSON.stringify({
       base_variant_id: params.baseVariantId,
       trait_changes: params.traitChanges,
-      story_style_id: params.storyStyleId ?? null,
       image_style_id: params.imageStyleId ?? null,
       variant_name: params.variantName ?? null
     })
@@ -791,7 +773,6 @@ export async function importActor(params: {
   displayName: string;
   description?: string | null;
   traits?: CharacterTraitsInput | null;
-  storyStyleId?: string | null;
   imageStyleId?: string | null;
 }) {
   const payload = await fetchJson(`/v1/casting/import`, {
@@ -801,7 +782,6 @@ export async function importActor(params: {
       display_name: params.displayName,
       description: params.description ?? null,
       traits: params.traits ?? {},
-      story_style_id: params.storyStyleId ?? null,
       image_style_id: params.imageStyleId ?? null
     })
   });
@@ -816,7 +796,6 @@ export async function importActorFromFile(params: {
   displayName: string;
   description?: string | null;
   traits?: CharacterTraitsInput | null;
-  storyStyleId?: string | null;
   imageStyleId?: string | null;
   projectId?: string | null;
 }) {
@@ -825,7 +804,6 @@ export async function importActorFromFile(params: {
   formData.append("display_name", params.displayName);
   if (params.description) formData.append("description", params.description);
   if (params.traits) formData.append("traits", JSON.stringify(params.traits));
-  if (params.storyStyleId) formData.append("story_style_id", params.storyStyleId);
   if (params.imageStyleId) formData.append("image_style_id", params.imageStyleId);
   if (params.projectId) formData.append("project_id", params.projectId);
 

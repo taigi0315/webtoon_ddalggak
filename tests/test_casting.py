@@ -80,18 +80,15 @@ class TestGenerateActorRequestSchema:
     def test_required_fields(self):
         """Request requires style IDs and traits."""
         req = GenerateActorRequest(
-            story_style_id="webtoon",
             image_style_id="anime",
             traits=CharacterTraitsInput(gender="female"),
         )
-        assert req.story_style_id == "webtoon"
         assert req.image_style_id == "anime"
         assert req.traits.gender == "female"
 
     def test_empty_traits_allowed(self):
         """Empty traits should be allowed."""
         req = GenerateActorRequest(
-            story_style_id="default",
             image_style_id="default",
             traits=CharacterTraitsInput(),
         )
@@ -135,7 +132,6 @@ class TestSaveActorToLibraryRequestSchema:
             image_id=uuid.uuid4(),
             display_name="Hero Character",
             traits=CharacterTraitsInput(gender="male"),
-            story_style_id="webtoon",
             image_style_id="anime",
         )
         assert req.display_name == "Hero Character"
@@ -148,7 +144,6 @@ class TestSaveActorToLibraryRequestSchema:
                 image_id=uuid.uuid4(),
                 display_name="",  # Empty not allowed
                 traits=CharacterTraitsInput(),
-                story_style_id="default",
                 image_style_id="default",
             )
 
@@ -159,7 +154,6 @@ class TestSaveActorToLibraryRequestSchema:
             display_name="Hero",
             description="The main protagonist",
             traits=CharacterTraitsInput(),
-            story_style_id="default",
             image_style_id="default",
         )
         assert req.description == "The main protagonist"
@@ -176,7 +170,6 @@ class TestActorVariantReadSchema:
             "variant_name": None,
             "variant_type": "base",
             "image_style_id": None,
-            "story_style_id": None,
             "traits": {},
             "is_default": True,
         }
@@ -192,7 +185,6 @@ class TestActorVariantReadSchema:
             "variant_name": "Summer Outfit",
             "variant_type": "variant",
             "image_style_id": "anime",
-            "story_style_id": "webtoon",
             "traits": {"mood": "happy"},
             "is_default": False,
             "reference_image_url": "http://example.com/ref.png",
@@ -217,7 +209,6 @@ class TestActorCharacterReadSchema:
             "description": None,
             "gender": "male",
             "age_range": "adult",
-            "default_story_style_id": None,
             "default_image_style_id": None,
             "is_library_saved": True,
             "variants": [],
@@ -234,7 +225,6 @@ class TestActorCharacterReadSchema:
             "variant_name": "Default",
             "variant_type": "base",
             "image_style_id": None,
-            "story_style_id": None,
             "traits": {},
             "is_default": True,
         }
@@ -246,7 +236,6 @@ class TestActorCharacterReadSchema:
             "description": "The protagonist",
             "gender": "male",
             "age_range": "adult",
-            "default_story_style_id": "webtoon",
             "default_image_style_id": "anime",
             "is_library_saved": True,
             "variants": [variant_data],
@@ -266,19 +255,16 @@ class TestGenerateActorVariantRequestSchema:
             trait_changes=CharacterTraitsInput(hair_traits="Pink hair"),
         )
         assert req.variant_name is None
-        assert req.story_style_id is None
 
     def test_optional_overrides(self):
         """Can override styles and name."""
         req = GenerateActorVariantRequest(
             base_variant_id=uuid.uuid4(),
             variant_name="Winter Look",
-            story_style_id="manhwa",
             image_style_id="realistic",
             trait_changes=CharacterTraitsInput(mood="serious"),
         )
         assert req.variant_name == "Winter Look"
-        assert req.story_style_id == "manhwa"
 
 
 class TestImportActorRequestSchema:
@@ -300,7 +286,6 @@ class TestImportActorRequestSchema:
             display_name="Imported Hero",
             description="An imported character",
             traits=CharacterTraitsInput(gender="female"),
-            story_style_id="webtoon",
             image_style_id="anime",
         )
         assert req.description == "An imported character"
@@ -321,12 +306,10 @@ class TestCharacterModelActorFields:
             project_id=uuid.uuid4(),
             name="Test",
             display_name="Test Character",
-            default_story_style_id="webtoon",
             default_image_style_id="anime",
             is_library_saved=True,
         )
         assert char.display_name == "Test Character"
-        assert char.default_story_style_id == "webtoon"
         assert char.default_image_style_id == "anime"
         assert char.is_library_saved is True
 
@@ -338,7 +321,6 @@ class TestCharacterModelActorFields:
             is_library_saved=False,
         )
         assert char.display_name is None
-        assert char.default_story_style_id is None
         assert char.default_image_style_id is None
         assert char.is_library_saved is False
 
@@ -366,7 +348,6 @@ class TestCharacterVariantModelActorFields:
             variant_type="variant",
             variant_name="Summer Outfit",
             image_style_id="anime",
-            story_style_id="webtoon",
             traits={"mood": "happy", "hair_traits": "ponytail"},
             generated_image_ids=["img-1", "img-2"],
             is_default=False,
@@ -413,7 +394,6 @@ async def test_casting_generate_endpoint(client, mock_gemini_client, mock_storag
     resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "webtoon",
             "image_style_id": "anime",
             "traits": {
                 "gender": "female",
@@ -442,7 +422,6 @@ async def test_casting_save_endpoint(client, mock_gemini_client, mock_storage):
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "default",
             "image_style_id": "default",
             "traits": {"gender": "male"},
         },
@@ -457,7 +436,6 @@ async def test_casting_save_endpoint(client, mock_gemini_client, mock_storage):
             "display_name": "Hero Character",
             "description": "The main hero",
             "traits": {"gender": "male", "age_range": "adult"},
-            "story_style_id": "default",
             "image_style_id": "default",
         },
     )
@@ -485,7 +463,6 @@ async def test_casting_library_list_endpoint(client, mock_gemini_client, mock_st
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "default",
             "image_style_id": "default",
             "traits": {"gender": "female"},
         },
@@ -498,7 +475,6 @@ async def test_casting_library_list_endpoint(client, mock_gemini_client, mock_st
             "image_id": gen_data["image_id"],
             "display_name": "Actress",
             "traits": {"gender": "female"},
-            "story_style_id": "default",
             "image_style_id": "default",
         },
     )
@@ -521,7 +497,6 @@ async def test_casting_get_actor_endpoint(client, mock_gemini_client, mock_stora
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "default",
             "image_style_id": "default",
             "traits": {"gender": "male"},
         },
@@ -534,7 +509,6 @@ async def test_casting_get_actor_endpoint(client, mock_gemini_client, mock_stora
             "image_id": gen_data["image_id"],
             "display_name": "Test Actor",
             "traits": {"gender": "male"},
-            "story_style_id": "default",
             "image_style_id": "default",
         },
     )
@@ -570,7 +544,6 @@ async def test_casting_import_endpoint(client):
             "display_name": "Imported Hero",
             "description": "A hero imported from external source",
             "traits": {"gender": "female", "age_range": "teen"},
-            "story_style_id": "webtoon",
             "image_style_id": "anime",
         },
     )
@@ -592,7 +565,6 @@ async def test_casting_delete_actor_endpoint(client, mock_gemini_client, mock_st
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "default",
             "image_style_id": "default",
             "traits": {},
         },
@@ -605,7 +577,6 @@ async def test_casting_delete_actor_endpoint(client, mock_gemini_client, mock_st
             "image_id": gen_data["image_id"],
             "display_name": "To Delete",
             "traits": {},
-            "story_style_id": "default",
             "image_style_id": "default",
         },
     )
@@ -632,7 +603,6 @@ async def test_casting_generate_variant_endpoint(client, mock_gemini_client, moc
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "default",
             "image_style_id": "default",
             "traits": {"gender": "female", "hair_traits": "Long black hair"},
         },
@@ -645,7 +615,6 @@ async def test_casting_generate_variant_endpoint(client, mock_gemini_client, moc
             "image_id": gen_data["image_id"],
             "display_name": "Base Actor",
             "traits": {"gender": "female", "hair_traits": "Long black hair"},
-            "story_style_id": "default",
             "image_style_id": "default",
         },
     )
@@ -689,7 +658,6 @@ async def test_casting_delete_variant_endpoint(client, mock_gemini_client, mock_
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "default",
             "image_style_id": "default",
             "traits": {"gender": "male"},
         },
@@ -702,7 +670,6 @@ async def test_casting_delete_variant_endpoint(client, mock_gemini_client, mock_
             "image_id": gen_data["image_id"],
             "display_name": "Actor",
             "traits": {"gender": "male"},
-            "story_style_id": "default",
             "image_style_id": "default",
         },
     )
@@ -745,7 +712,6 @@ async def test_casting_cannot_delete_default_variant(client, mock_gemini_client,
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "default",
             "image_style_id": "default",
             "traits": {},
         },
@@ -758,7 +724,6 @@ async def test_casting_cannot_delete_default_variant(client, mock_gemini_client,
             "image_id": gen_data["image_id"],
             "display_name": "Actor",
             "traits": {},
-            "story_style_id": "default",
             "image_style_id": "default",
         },
     )
@@ -787,7 +752,6 @@ async def test_full_actor_creation_workflow(client, mock_gemini_client, mock_sto
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "webtoon",
             "image_style_id": "anime",
             "traits": {
                 "gender": "female",
@@ -819,7 +783,6 @@ async def test_full_actor_creation_workflow(client, mock_gemini_client, mock_sto
                 "hair_traits": "Long flowing hair",
                 "mood": "Determined",
             },
-            "story_style_id": "webtoon",
             "image_style_id": "anime",
         },
     )
@@ -848,7 +811,6 @@ async def test_variant_creation_preserves_identity(client, mock_gemini_client, m
     gen_resp = await client.post(
         f"/v1/casting/projects/{project['project_id']}/generate",
         json={
-            "story_style_id": "default",
             "image_style_id": "default",
             "traits": {"gender": "female"},
         },
@@ -861,7 +823,6 @@ async def test_variant_creation_preserves_identity(client, mock_gemini_client, m
             "image_id": gen_data["image_id"],
             "display_name": "Identity Actor",
             "traits": {"gender": "female"},
-            "story_style_id": "default",
             "image_style_id": "default",
         },
     )
@@ -915,7 +876,6 @@ async def test_multiple_actors_in_library(client, mock_gemini_client, mock_stora
         gen_resp = await client.post(
             f"/v1/casting/projects/{project['project_id']}/generate",
             json={
-                "story_style_id": "default",
                 "image_style_id": "default",
                 "traits": {"gender": "male" if name != "Sidekick" else "female"},
             },
@@ -928,7 +888,6 @@ async def test_multiple_actors_in_library(client, mock_gemini_client, mock_stora
                 "image_id": gen_data["image_id"],
                 "display_name": name,
                 "traits": {},
-                "story_style_id": "default",
                 "image_style_id": "default",
             },
         )

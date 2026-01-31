@@ -76,7 +76,6 @@ def _build_actor_variant_read(variant: CharacterVariant, db) -> ActorVariantRead
         variant_name=variant.variant_name,
         variant_type=variant.variant_type,
         image_style_id=variant.image_style_id,
-        story_style_id=variant.story_style_id,
         traits=variant.traits or {},
         is_default=variant.is_default,
         reference_image_url=ref_url,
@@ -108,7 +107,6 @@ def _build_actor_character_read(character: Character, db) -> ActorCharacterRead:
         description=character.description,
         gender=character.gender,
         age_range=character.age_range,
-        default_story_style_id=character.default_story_style_id,
         default_image_style_id=character.default_image_style_id,
         is_library_saved=character.is_library_saved,
         variants=variant_reads,
@@ -139,7 +137,6 @@ def generate_actor(
         result = generate_character_profile_sheet(
             db=db,
             project_id=None,  # Global actor - no project
-            story_style_id=payload.story_style_id,
             image_style_id=payload.image_style_id,
             traits=payload.traits.model_dump(exclude_none=True),
         )
@@ -181,7 +178,6 @@ def save_actor(
             display_name=payload.display_name,
             description=payload.description,
             traits=payload.traits.model_dump(exclude_none=True),
-            story_style_id=payload.story_style_id,
             image_style_id=payload.image_style_id,
         )
     except ValueError as e:
@@ -234,7 +230,6 @@ async def import_actor_file(
     display_name: str = Form(...),
     description: str | None = Form(None),
     traits: str | None = Form(None),  # JSON string
-    story_style_id: str | None = Form(None),
     image_style_id: str | None = Form(None),
     project_id: uuid.UUID | None = Form(None),
     file: UploadFile = File(...),
@@ -271,7 +266,6 @@ async def import_actor_file(
             display_name=display_name,
             description=description,
             traits=traits_dict,
-            story_style_id=story_style_id,
             image_style_id=image_style_id,
         )
         
@@ -310,7 +304,6 @@ def import_actor(
                 display_name=payload.display_name,
                 description=payload.description,
                 traits=traits,
-                story_style_id=payload.story_style_id,
                 image_style_id=payload.image_style_id,
             )
         else:
@@ -321,7 +314,6 @@ def import_actor(
                 display_name=payload.display_name,
                 description=payload.description,
                 traits=traits,
-                story_style_id=payload.story_style_id,
                 image_style_id=payload.image_style_id,
             )
     except FileNotFoundError as e:
@@ -410,7 +402,6 @@ def generate_actor_variant(
             character=character,
             base_variant=base_variant,
             trait_changes=payload.trait_changes.model_dump(exclude_none=True),
-            story_style_id=payload.story_style_id,
             image_style_id=payload.image_style_id,
             variant_name=payload.variant_name,
         )
@@ -485,7 +476,6 @@ def generate_actor_for_project(
         result = generate_character_profile_sheet(
             db=db,
             project_id=project_id,
-            story_style_id=payload.story_style_id,
             image_style_id=payload.image_style_id,
             traits=payload.traits.model_dump(exclude_none=True),
         )
@@ -531,7 +521,6 @@ def save_actor_to_project(
             display_name=payload.display_name,
             description=payload.description,
             traits=payload.traits.model_dump(exclude_none=True),
-            story_style_id=payload.story_style_id,
             image_style_id=payload.image_style_id,
         )
     except ValueError as e:
@@ -597,7 +586,6 @@ def import_actor_to_project(
                 display_name=payload.display_name,
                 description=payload.description,
                 traits=traits,
-                story_style_id=payload.story_style_id,
                 image_style_id=payload.image_style_id,
             )
         else:
@@ -608,7 +596,6 @@ def import_actor_to_project(
                 display_name=payload.display_name,
                 description=payload.description,
                 traits=traits,
-                story_style_id=payload.story_style_id,
                 image_style_id=payload.image_style_id,
             )
     except FileNotFoundError as e:

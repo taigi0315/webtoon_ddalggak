@@ -84,7 +84,6 @@ The character system extracts characters from story text, enriches them with vis
 
 **Actor Fields**:
 - `display_name` - Human-readable name for library browsing
-- `default_story_style_id` - Preferred story style
 - `default_image_style_id` - Preferred image style
 - `is_library_saved` - Whether actor is saved to library
 - `approved` - Whether actor is approved for use

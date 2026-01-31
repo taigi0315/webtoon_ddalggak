@@ -28,7 +28,6 @@ from ..utils import (
 def run_scene_intent_extractor(
     db: Session,
     scene_id: uuid.UUID,
-    genre: str | None = None,
     gemini: GeminiClient | None = None,
 ):
     """Extract scene intent including pacing, emotional arc, and visual motifs.
@@ -36,7 +35,6 @@ def run_scene_intent_extractor(
     Args:
         db: Database session
         scene_id: UUID of the scene to analyze
-        genre: Optional genre/style hint
         gemini: Optional GeminiClient for LLM-based extraction
 
     Returns:
@@ -44,16 +42,14 @@ def run_scene_intent_extractor(
     """
     with track_graph_node("scene_planning", "scene_intent_extractor"):
         with log_context(node_name="scene_intent_extractor", scene_id=scene_id):
-            with trace_span("graph.scene_intent_extractor", scene_id=str(scene_id), genre=genre):
+            with trace_span("graph.scene_intent_extractor", scene_id=str(scene_id)):
                 scene = _get_scene(db, scene_id)
-                story = db.get(Story, scene.story_id)
                 characters = _list_characters(db, scene.story_id)
                 character_names = [c.name for c in characters]
                 summary = _summarize_text(scene.source_text)
 
             payload = {
                 "summary": summary,
-                "genre": genre or (story.default_story_style if story else None),
                 "setting": _extract_setting(scene.source_text),
                 "beats": _extract_beats(scene.source_text, max_beats=3),
                 "characters": character_names,
@@ -66,7 +62,7 @@ def run_scene_intent_extractor(
             if gemini is not None:
                 llm = _maybe_json_from_gemini(
                     gemini,
-                    _prompt_scene_intent(scene.source_text, payload["genre"], character_names),
+                    _prompt_scene_intent(scene.source_text, character_names),
                 )
                 if isinstance(llm, dict):
                     payload = {**payload, **llm}

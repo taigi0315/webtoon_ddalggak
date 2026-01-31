@@ -14,7 +14,6 @@ def test_get_prompt_metadata_variables():
     meta = loader.get_prompt_metadata("prompt_scene_intent")
     vars_ = set(meta["variables"])
     # Should include variables referenced in the template
-    assert "genre_text" in vars_
     assert "scene_text" in vars_
     assert "char_list" in vars_
 
@@ -24,7 +23,6 @@ def test_render_prompt_includes_shared():
     rendered = loader.render_prompt(
         "prompt_scene_intent",
         scene_text="A brief scene",
-        genre_text="drama",
         char_list="[]",
     )
     assert "Constraints:" in rendered

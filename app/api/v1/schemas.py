@@ -17,7 +17,6 @@ class ProjectRead(BaseModel):
 
 class StoryCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    default_story_style: str = Field(default="default", min_length=1, max_length=64)
     default_image_style: str = Field(default="default", min_length=1, max_length=64)
 
 
@@ -25,7 +24,6 @@ class StoryRead(BaseModel):
     story_id: uuid.UUID
     project_id: uuid.UUID
     title: str
-    default_story_style: str
     default_image_style: str
     generation_status: str | None = None
     generation_error: str | None = None
@@ -115,7 +113,6 @@ class SceneRead(BaseModel):
     source_text: str
     scene_importance: str | None
     planning_locked: bool
-    story_style_override: str | None
     image_style_override: str | None
 
     model_config = {"from_attributes": True}
@@ -126,7 +123,6 @@ class ScenePlanningLockRequest(BaseModel):
 
 
 class SceneSetStyleRequest(BaseModel):
-    story_style_id: str | None = Field(default=None, min_length=1, max_length=64)
     image_style_id: str | None = Field(default=None, min_length=1, max_length=64)
 
 
@@ -140,7 +136,6 @@ class SceneAutoChunkRequest(BaseModel):
 
 
 class StorySetStyleDefaultsRequest(BaseModel):
-    default_story_style: str = Field(min_length=1, max_length=64)
     default_image_style: str = Field(min_length=1, max_length=64)
 
 
@@ -395,7 +390,6 @@ class ExportRead(BaseModel):
 
 class EpisodeCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    default_story_style: str = Field(default="default", min_length=1, max_length=64)
     default_image_style: str = Field(default="default", min_length=1, max_length=64)
 
 
@@ -403,7 +397,6 @@ class EpisodeRead(BaseModel):
     episode_id: uuid.UUID
     story_id: uuid.UUID
     title: str
-    default_story_style: str
     default_image_style: str
     status: str
     scene_ids_ordered: list[uuid.UUID]
@@ -416,7 +409,6 @@ class EpisodeScenesUpdate(BaseModel):
 
 
 class EpisodeSetStyleRequest(BaseModel):
-    default_story_style: str = Field(min_length=1, max_length=64)
     default_image_style: str = Field(min_length=1, max_length=64)
 
 
@@ -617,7 +609,6 @@ class CharacterTraitsInput(BaseModel):
 class GenerateActorRequest(BaseModel):
     """Request to generate a new character profile sheet."""
 
-    story_style_id: str = Field(description="Story style for generation")
     image_style_id: str = Field(description="Image style for generation")
     traits: CharacterTraitsInput
 
@@ -639,7 +630,6 @@ class SaveActorToLibraryRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=128)
     description: str | None = None
     traits: CharacterTraitsInput
-    story_style_id: str
     image_style_id: str
 
 
@@ -651,7 +641,6 @@ class ActorVariantRead(BaseModel):
     variant_name: str | None
     variant_type: str
     image_style_id: str | None
-    story_style_id: str | None
     traits: dict
     is_default: bool
     reference_image_url: str | None = None
@@ -671,7 +660,6 @@ class ActorCharacterRead(BaseModel):
     description: str | None
     gender: str | None
     age_range: str | None
-    default_story_style_id: str | None
     default_image_style_id: str | None
     is_library_saved: bool
     variants: list[ActorVariantRead] = Field(default_factory=list)
@@ -684,7 +672,6 @@ class GenerateActorVariantRequest(BaseModel):
 
     base_variant_id: uuid.UUID = Field(description="Variant to use as reference")
     variant_name: str | None = Field(default=None, max_length=128)
-    story_style_id: str | None = None  # Override style
     image_style_id: str | None = None  # Override style
     trait_changes: CharacterTraitsInput  # What to change
 
@@ -696,5 +683,4 @@ class ImportActorRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=128)
     description: str | None = None
     traits: CharacterTraitsInput | None = None
-    story_style_id: str | None = None
     image_style_id: str | None = None

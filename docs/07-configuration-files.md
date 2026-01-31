@@ -12,8 +12,6 @@ The system uses the following configuration files:
 - **`layout_templates_9x16_v1.json`** - Panel geometry templates for 9:16 vertical format
 - **`layout_selection_rules_v1.json`** - Decision rules for template matching
 - **`qc_rules_v1.json`** - Quality control thresholds and validation rules
-- **`genre_guidelines_v1.json`** - Genre-specific visual guidelines (shot preferences, lighting, atmosphere)
-- **`story_styles.json`** - Story-level style presets (tone, pacing)
 - **`image_styles.json`** - Image-level style presets (visual rendering styles)
 - **`grammar_to_prompt_mapping_v1.json`** - Maps grammar IDs to prompt templates
 - **`continuity_rules_v1.json`** - Character and environment continuity rules
@@ -118,48 +116,7 @@ Defines quality control thresholds and validation rules for panel plans.
 
 **Usage**: QC validation runs after panel plan creation. Failures generate warnings but don't block workflow.
 
-## Genre Guidelines
-
-**File**: `app/config/genre_guidelines_v1.json`
-
-Defines genre-specific visual guidelines for shot preferences, composition, lighting, and atmosphere.
-
-**Available Genres:**
-
-- `romance` - Warm intimate framing, soft lighting, emotional focus
-- `drama` - Emotional close-ups, dramatic natural lighting, contemplative atmosphere
-- `thriller` - Wide shots, harsh shadows, ominous atmosphere, off-kilter angles
-- `comedy` - Bright lighting, reaction shots, playful atmosphere, visual gags
-- `slice_of_life` - Wide establishing shots, natural lighting, everyday realism
-
-**Guideline Structure**: Each genre defines:
-- `shot_preferences` - Preferred shot types and framing
-- `composition` - Character-to-frame ratio guidelines
-- `camera` - Camera angle preferences
-- `lighting` - Lighting style and mood
-- `props` - Genre-appropriate props and objects
-- `atmosphere` - Overall mood and tone
-- `color_palette` - Color scheme guidelines
-- `shot_distribution` - Recommended distribution of shot types (establishing, medium, closeup, dynamic)
-
-**Usage**: Genre guidelines influence panel planning, visual descriptions, and image generation prompts.
-
 ## Style Presets
-
-### Story Styles
-
-**File**: `app/config/story_styles.json`
-
-Defines story-level style presets that affect tone, pacing, and narrative beats.
-
-**Available Styles:**
-
-- `default` - Balanced tone and pacing
-- `romance` - Warm, intimate, emotional beats
-- `horror` - Tense pacing, ominous mood, suspense beats
-- `comedy` - Light tone, comedic timing, playful beats
-- `action` - Fast pacing, dynamic beats, high energy
-- `slice_of_life` - Everyday pacing, grounded beats, calm tone
 
 ### Image Styles
 
@@ -190,8 +147,6 @@ Configuration files are loaded using Pydantic models with validation and caching
 - `load_layout_templates_9x16_v1()` - Load layout templates
 - `load_layout_selection_rules_v1()` - Load layout selection rules
 - `load_qc_rules_v1()` - Load QC rules
-- `load_genre_guidelines_v1()` - Load genre guidelines
-- `load_story_styles_v1()` - Load story styles
 - `load_image_styles_v1()` - Load image styles
 
 **Caching**: All loaders use `@lru_cache(maxsize=1)` for performance. Call `clear_config_cache()` to force reload.
@@ -201,8 +156,6 @@ Configuration files are loaded using Pydantic models with validation and caching
 - `get_grammar(grammar_id)` - Get specific grammar by ID
 - `get_layout_template(template_id)` - Get specific template by ID
 - `select_template(panel_plan, derived_features, excluded_template_ids)` - Select template using decision rules
-- `get_genre_guideline(genre)` - Get guidelines for specific genre
-- `get_shot_distribution(genre)` - Get shot distribution for genre
 
 ## Hot-Reload Support
 
@@ -241,7 +194,6 @@ stop_watcher()
 - `app/services/config_watcher.py` - Hot-reload service
 - `app/services/layout_selection.py` - Layout template selection logic
 - `app/graphs/nodes/planning/qc.py` - QC validation implementation
-- `app/graphs/nodes/genre_guidelines.py` - Genre guideline application
 
 ## Debugging Direction
 
@@ -263,11 +215,6 @@ stop_watcher()
   - Check `qc_report` artifact for specific violations
   - Verify panel plan grammar distribution
   - Check environment descriptions in establishing shots
-
-- **Genre guideline not applied**:
-  - Verify genre name matches key in `genre_guidelines_v1.json`
-  - Check Story.genre field in database
-  - Review prompt compilation logs for genre guideline inclusion
 
 - **Config changes not taking effect**:
   - Check if config watcher is running (`is_watching()`)

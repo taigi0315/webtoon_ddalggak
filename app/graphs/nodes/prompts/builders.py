@@ -3,7 +3,6 @@ import uuid
 
 from app.db.models import Character
 from app.graphs.nodes.constants import GLOBAL_CONSTRAINTS, SYSTEM_PROMPT_JSON
-from app.graphs.nodes.genre_guidelines import GENRE_VISUAL_GUIDELINES
 from app.graphs.nodes.helpers.character import get_character_style_prompt
 from app.graphs.nodes.helpers.dialogue import _dialogue_panel_ids
 from app.prompts.loader import render_prompt
@@ -52,15 +51,13 @@ def _prompt_variant_suggestions(
     )
 
 
-def _prompt_scene_intent(scene_text: str, genre: str | None, character_names: list[str] | None = None) -> str:
+def _prompt_scene_intent(scene_text: str, character_names: list[str] | None = None) -> str:
     """Production-grade scene intent extraction prompt."""
-    genre_text = genre or "general"
     char_list = ", ".join(character_names) if character_names else "unknown"
 
     return render_prompt(
         "prompt_scene_intent",
         global_constraints=GLOBAL_CONSTRAINTS,
-        genre_text=genre_text,
         char_list=char_list,
         scene_text=scene_text,
     )
@@ -119,9 +116,8 @@ def _prompt_panel_semantics(
     layout_template: dict,
     characters: list[Character],
     scene_intent: dict | None = None,
-    genre: str | None = None,
 ) -> str:
-    """Production-grade panel semantics prompt with grammar constraints and visual guidelines."""
+    """Production-grade panel semantics prompt with grammar constraints."""
     char_blocks = []
     for c in characters:
         identity = c.identity_line or f"{c.name}: {c.role or 'character'}"
@@ -161,25 +157,10 @@ Scene Context:
 - Visual motifs to include: {scene_intent.get('visual_motifs', [])}
 """
 
-    genre_key = (genre or "drama").lower().replace("-", "_").replace(" ", "_")
-    genre_guide = GENRE_VISUAL_GUIDELINES.get(genre_key, GENRE_VISUAL_GUIDELINES.get("drama", {}))
-
-    genre_block = f"""
-GENRE-SPECIFIC VISUAL GUIDELINES ({genre_key}):
-- Shot preferences: {genre_guide.get('shot_preferences', 'Medium shots with emotional focus')}
-- Composition: {genre_guide.get('composition', 'Characters 40% of frame')}
-- Camera angles: {genre_guide.get('camera', 'Eye-level, natural angles')}
-- Lighting style: {genre_guide.get('lighting', 'Natural ambient lighting')}
-- Atmosphere: {genre_guide.get('atmosphere', 'Appropriate to scene mood')}
-- Color palette: {genre_guide.get('color_palette', 'Natural tones')}
-- Props to include: {genre_guide.get('props', 'Scene-appropriate objects')}
-"""
-
     return render_prompt(
         "prompt_panel_semantics",
         global_constraints=GLOBAL_CONSTRAINTS,
         intent_block=intent_block.strip(),
-        genre_block=genre_block.strip(),
         char_section=char_section,
         plan_section=plan_section,
         layout_text=layout_template.get("layout_text", "vertical scroll"),
@@ -282,7 +263,6 @@ def _prompt_character_normalization(characters: list[dict], source_text: str) ->
 def _prompt_visual_plan(
     scenes: list[dict],
     characters: list[dict],
-    story_style: str | None,
 ) -> str:
     """Prompt for LLM-based visual plan compilation."""
     char_identities = []
@@ -298,7 +278,6 @@ def _prompt_visual_plan(
         "prompt_visual_plan",
         system_prompt_json=SYSTEM_PROMPT_JSON,
         global_constraints=GLOBAL_CONSTRAINTS,
-        story_style=story_style or "general",
         character_identities="\n".join(char_identities),
         scenes_block="\n".join(scenes_block),
     )
