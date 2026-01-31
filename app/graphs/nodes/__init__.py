@@ -16,6 +16,7 @@ from app.graphs.nodes.planning import (
     run_panel_semantic_filler,
     run_qc_checker,
     run_scene_intent_extractor,
+    run_webtoon_script_writer,
 )
 from app.graphs.nodes.rendering import (
     compute_prompt_compiler,
@@ -88,4 +89,5 @@ __all__ = [
     "run_prompt_compiler",
     "run_qc_checker",
     "run_scene_intent_extractor",
+    "run_webtoon_script_writer",
 ]

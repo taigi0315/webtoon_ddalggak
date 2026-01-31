@@ -13,8 +13,9 @@ The system uses three LangGraph state machines to orchestrate the webtoon genera
 **File**: `app/graphs/story_build.py`
 
 **Planning Modes**:
-- `full` - Complete processing with per-scene planning (8 steps)
-- `characters_only` - Extract characters and scenes only (5 steps)
+
+- `full` - Complete processing with per-scene planning (9 steps)
+- `characters_only` - Extract characters and scenes only (6 steps)
 
 ### ScenePlanningGraph (Scene-Level)
 
@@ -40,10 +41,12 @@ The system uses three LangGraph state machines to orchestrate the webtoon genera
 - **scene_splitter** - Split story text into scenes using LLM-based chunking
 - **llm_character_extractor** - Extract character profiles from story text
 - **llm_character_normalizer** - Add visual details (hair, face, build, outfit) to characters
-- **persist_story_bundle** - Save scenes and characters to database with deduplication
-- **llm_visual_plan_compiler** - Convert scenes to visual beats with importance ratings *(full mode only)*
-- **per_scene_planning** - Run ScenePlanningGraph for each scene with episode-level guardrails *(full mode only)*
-- **blind_test_runner** - Evaluate narrative coherence of panel plans *(full mode only)*
+- **webtoon_script_writer** - Translate raw story into a visual webtoon script with beats and SFX
+- **scene_splitter** - Split the newly generated webtoon script into scenes
+- **persist_story_bundle** - Save scenes, characters, and script to database with deduplication
+- **llm_visual_plan_compiler** - Convert scenes to visual beats with importance ratings _(full mode only)_
+- **per_scene_planning** - Run ScenePlanningGraph for each scene with episode-level guardrails _(full mode only)_
+- **blind_test_runner** - Evaluate narrative coherence of panel plans _(full mode only)_
 
 ### Episode-Level Guardrails
 
@@ -67,23 +70,25 @@ Implemented in `per_scene_planning` node:
 
 ```mermaid
 graph TD
-    A[validate_inputs] --> B[scene_splitter]
-    B --> C[llm_character_extractor]
-    C --> D[llm_character_normalizer]
-    D --> E[persist_story_bundle]
-    
-    E --> F{Planning Mode?}
-    F -->|characters_only| Z[END]
-    F -->|full| G[llm_visual_plan_compiler]
-    
-    G --> H[per_scene_planning]
-    H --> I[blind_test_runner]
-    I --> Z
+    A[validate_inputs] --> B[llm_character_extractor]
+    B --> C[llm_character_normalizer]
+    C --> D[webtoon_script_writer]
+    D --> E[scene_splitter]
+    E --> F[persist_story_bundle]
+
+    F --> G{Planning Mode?}
+    G -->|characters_only| Z[END]
+    G -->|full| H[llm_visual_plan_compiler]
+
+    H --> I[per_scene_planning]
+    I --> J[blind_test_runner]
+    J --> Z
 ```
 
 ### State Schema: StoryBuildState
 
 **Input Fields**:
+
 - `story_id` - UUID of story being processed
 - `story_text` - Raw story text input
 - `max_scenes` - Maximum scenes to create (1-30)
@@ -95,15 +100,19 @@ graph TD
 - `require_hero_single` - Enforce at least one single-panel scene
 
 **Output Fields**:
+
 - `scenes` - List of scene dictionaries (scene_index, title, summary, source_text)
 - `characters` - List of character profile dictionaries
 - `scene_ids` - List of created scene UUIDs
 - `character_ids` - List of created character UUIDs
-- `visual_plan_bundle` - List of visual plan payloads *(full mode)*
-- `visual_plan_artifact_ids` - List of visual plan artifact UUIDs *(full mode)*
-- `planning_artifact_ids` - List of planning artifact dictionaries per scene *(full mode)*
-- `blind_test_report_ids` - List of blind test artifact UUIDs *(full mode)*
+- `visual_plan_bundle` - List of visual plan payloads _(full mode)_
+- `visual_plan_artifact_ids` - List of visual plan artifact UUIDs _(full mode)_
+- `planning_artifact_ids` - List of planning artifact dictionaries per scene _(full mode)_
+- `blind_test_report_ids` - List of blind test artifact UUIDs _(full mode)_
 - `progress` - Progress tracking dictionary (current_node, message, step)
+- `webtoon_script` - Structured visual script with beats and dialogue
+- `feedback` - History of director/critic feedback for iteration
+- `script_drafts` - Versioned drafts of the webtoon script
 
 ## ScenePlanningGraph Details
 
@@ -118,12 +127,14 @@ graph TD
 ### Planning Lock Concept
 
 When `Scene.planning_locked = true`:
+
 - Graph execution is skipped
 - Returns existing artifacts from database
 - Raises error if required artifacts are missing
 - Preserves manual edits to panel plans
 
 **Required Artifacts for Locked Planning**:
+
 - `scene_intent`
 - `panel_plan`
 - `panel_plan_normalized`
@@ -144,11 +155,13 @@ graph TD
 ### State Schema: PlanningState
 
 **Input Fields**:
+
 - `scene_id` - UUID of scene being planned
 - `panel_count` - Number of panels to generate (1-12)
 - `genre` - Optional genre for style guidance
 
 **Output Fields**:
+
 - `scene_intent_artifact_id` - UUID of scene intent artifact
 - `panel_plan_artifact_id` - UUID of panel plan artifact
 - `panel_plan_normalized_artifact_id` - UUID of normalized panel plan artifact
@@ -187,12 +200,14 @@ graph TD
 ### State Schema: RenderState
 
 **Input Fields**:
+
 - `scene_id` - UUID of scene being rendered
 - `style_id` - Optional style preset ID (resolved if not provided)
 - `prompt_override` - Optional custom prompt text
 - `enforce_qc` - Whether to raise error on QC failure
 
 **Output Fields**:
+
 - `panel_semantics_artifact_id` - UUID of loaded panel semantics artifact
 - `layout_template_artifact_id` - UUID of loaded layout template artifact
 - `render_spec_artifact_id` - UUID of compiled render spec artifact
@@ -206,15 +221,18 @@ graph TD
 **File**: `app/graphs/pipeline.py` - `run_full_pipeline()` function
 
 **Fields**: Union of PlanningState and RenderState fields, plus:
+
 - `blind_test_report_artifact_id` - UUID of blind test evaluation artifact
 
 ## Key Files
 
 ### Graph Implementations
+
 - `app/graphs/story_build.py` - StoryBuildGraph implementation
 - `app/graphs/pipeline.py` - ScenePlanningGraph and SceneRenderGraph implementations
 
 ### Node Implementations
+
 - `app/graphs/nodes/__init__.py` - Node function exports
 - `app/graphs/nodes/planning.py` - Planning node implementations
 - `app/graphs/nodes/rendering.py` - Rendering node implementations
@@ -224,6 +242,7 @@ graph TD
 - `app/graphs/nodes/utils.py` - Shared utilities
 
 ### Supporting Services
+
 - `app/services/artifacts.py` - Artifact versioning and storage
 - `app/services/vertex_gemini.py` - Gemini API client with retry logic
 - `app/core/telemetry.py` - Graph execution tracing
@@ -242,13 +261,14 @@ graph TD
 - **Guardrail violations**: Check logs for template exclusion or hero single enforcement
 
 **Useful queries**:
+
 ```sql
 -- Check story progress
-SELECT story_id, generation_status, progress, generation_error 
+SELECT story_id, generation_status, progress, generation_error
 FROM stories WHERE story_id = ?;
 
 -- Review character assignments
-SELECT canonical_code, name, role, gender, age_range 
+SELECT canonical_code, name, role, gender, age_range
 FROM characters WHERE project_id = ?;
 ```
 
@@ -261,15 +281,16 @@ FROM characters WHERE project_id = ?;
 - **Layout resolution**: Check `layout_template` artifact for selected template ID
 
 **Useful queries**:
+
 ```sql
 -- Check planning lock status
 SELECT scene_id, planning_locked FROM scenes WHERE scene_id = ?;
 
 -- List planning artifacts
-SELECT type, version, created_at 
-FROM artifacts 
+SELECT type, version, created_at
+FROM artifacts
 WHERE scene_id = ? AND type IN (
-  'scene_intent', 'panel_plan', 'panel_plan_normalized', 
+  'scene_intent', 'panel_plan', 'panel_plan_normalized',
   'layout_template', 'panel_semantics'
 )
 ORDER BY type, version DESC;
@@ -284,6 +305,7 @@ ORDER BY type, version DESC;
 - **Gemini API errors**: Review logs for rate limits, content filtering, or quota issues
 
 **Useful queries**:
+
 ```sql
 -- Check style resolution
 SELECT s.scene_id, s.image_style_override, st.default_image_style
@@ -292,8 +314,8 @@ JOIN stories st ON s.story_id = st.story_id
 WHERE s.scene_id = ?;
 
 -- Review render artifacts
-SELECT type, version, payload 
-FROM artifacts 
+SELECT type, version, payload
+FROM artifacts
 WHERE scene_id = ? AND type IN (
   'render_spec', 'render_result', 'qc_report'
 )
@@ -309,6 +331,7 @@ ORDER BY type, version DESC;
 - **Node failures**: Check logs for exceptions in individual node functions
 
 **Key log patterns to search**:
+
 - `graph.story_build` - StoryBuildGraph execution traces
 - `graph.scene_planning` - ScenePlanningGraph execution traces
 - `graph.scene_render` - SceneRenderGraph execution traces

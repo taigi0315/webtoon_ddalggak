@@ -13,17 +13,21 @@ The system operates through three distinct processing levels:
 **Purpose**: Convert raw story text into structured scenes and characters
 
 **Key Operations**:
+
 - Split story text into scenes (max 30 scenes)
 - Extract and normalize character profiles with visual details
+- **Translate raw text into a visual webtoon script with beats, dialogue, and SFX**
 - Assign canonical codes (CHAR_A, CHAR_B, etc.) for character consistency
-- Persist scenes and characters to database
+- Persist scenes, characters, and script to database
 - Optionally run full planning pipeline for all scenes
 
 **Planning Modes**:
-- `full` - Complete episode processing including per-scene planning (8 steps)
-- `characters_only` - Extract characters and scenes only, skip planning (5 steps)
+
+- `full` - Complete episode processing including per-scene planning (9 steps)
+- `characters_only` - Extract characters and scenes only, skip planning (6 steps)
 
 **Episode-Level Guardrails**:
+
 - Prevents 3+ consecutive scenes with identical layout templates
 - Enforces at least one hero single-panel scene when requested
 - Deduplicates characters by name across stories
@@ -33,6 +37,7 @@ The system operates through three distinct processing levels:
 **Purpose**: Break scenes into panels with visual descriptions
 
 **Key Operations**:
+
 - Extract narrative intent (mood, pacing, key moments)
 - Generate panel plan with shot types (grammar IDs)
 - Normalize panel plan (validate grammar, fix structure)
@@ -46,6 +51,7 @@ The system operates through three distinct processing levels:
 **Purpose**: Generate final images from panel descriptions
 
 **Key Operations**:
+
 - Load active artifacts (panel semantics, layout template)
 - Resolve style hierarchy (scene override → story default → "default")
 - Compile render spec with prompts for each panel
@@ -63,6 +69,7 @@ The system operates through three distinct processing levels:
 **Why**: Enable resumable workflows, audit trails, and manual editing
 
 **Types**:
+
 - `scene_intent` - Narrative analysis (mood, pacing, key moments)
 - `panel_plan` - Panel breakdown with shot types
 - `panel_plan_normalized` - Validated and corrected panel plan
@@ -80,11 +87,13 @@ The system operates through three distinct processing levels:
 ### Synchronous vs Asynchronous Processing
 
 **Synchronous** (Scene-level and Render-level):
+
 - Direct API calls return results immediately
 - Used for single scene operations
 - Examples: `POST /v1/scenes/{id}/generate/intent`, `POST /v1/scenes/{id}/generate/render`
 
 **Asynchronous** (Episode-level):
+
 - Long-running operations processed in background
 - Job queue manages execution
 - Progress tracked in `Story.progress` JSON field
@@ -93,29 +102,29 @@ The system operates through three distinct processing levels:
 ## Workflow Diagram
 
 ```mermaid
-graph TD
     A[Story Text Input] --> B[Episode-Level: StoryBuildGraph]
-    B --> C[Scene Splitter]
-    C --> D[Character Extraction]
-    D --> E[Character Normalization]
-    E --> F[Persist Scenes & Characters]
-    
-    F --> G{Planning Mode?}
-    G -->|characters_only| Z[Complete]
-    G -->|full| H[Visual Plan Compiler]
-    
-    H --> I[Per-Scene Planning Loop]
-    I --> J[Scene-Level: ScenePlanningGraph]
-    
+    B --> C[Character Extraction]
+    C --> D[Character Normalization]
+    D --> E[Webtoon Script Writer]
+    E --> F[Scene Splitter]
+    F --> G[Persist Story Bundle]
+
+    G --> H{Planning Mode?}
+    H -->|characters_only| Z[Complete]
+    H -->|full| I[Visual Plan Compiler]
+
+    I --> J[Per-Scene Planning Loop]
+    J --> K[Scene-Level: ScenePlanningGraph]
+
     J --> K[Scene Intent Extraction]
     K --> L[Panel Plan Generation]
     L --> M[Panel Plan Normalization]
     M --> N[Layout Template Resolution]
     N --> O[Panel Semantics Filling]
-    
+
     I --> P[Blind Test Evaluation]
     P --> Z
-    
+
     O --> Q[Render-Level: SceneRenderGraph]
     Q --> R[Load Active Artifacts]
     R --> S[Compile Render Spec]
@@ -165,16 +174,16 @@ graph TD
 
 ```sql
 -- Check story progress
-SELECT story_id, generation_status, progress, generation_error 
+SELECT story_id, generation_status, progress, generation_error
 FROM stories WHERE story_id = ?;
 
 -- List all artifacts for a scene
-SELECT type, version, created_at 
-FROM artifacts WHERE scene_id = ? 
+SELECT type, version, created_at
+FROM artifacts WHERE scene_id = ?
 ORDER BY type, version DESC;
 
 -- Find scenes with planning locked
-SELECT scene_id, planning_locked 
+SELECT scene_id, planning_locked
 FROM scenes WHERE story_id = ?;
 ```
 

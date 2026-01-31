@@ -9,11 +9,13 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 **Storage**: All prompt templates are stored in `app/prompts/prompts.yaml` as YAML key-value pairs
 
 **Loading**: `app/prompts/loader.py` provides:
+
 - `get_prompt(name)` - Get raw template string
 - `render_prompt(name, **context)` - Compile template with Jinja2 variables
 - `get_prompt_data(name)` - Get non-string data (e.g., character_style_map)
 
 **Compilation**: Prompts use Jinja2 syntax for variable substitution:
+
 - `{{ variable }}` - Insert variable value
 - `{% if condition %}...{% endif %}` - Conditional blocks
 - Auto-includes shared prompts (`system_prompt_json`, `global_constraints`)
@@ -31,6 +33,7 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 
 - **prompt_character_extraction** - Extract important characters from story text with evidence quotes
 - **prompt_character_normalization** - Add visual details (hair, face, build, outfit) using Korean manhwa aesthetics
+- **prompt_script_writer** - Translate raw story into a visual webtoon script with beats, dialogue, and SFX
 - **prompt_visual_plan** - Convert scenes into visual beats with importance ratings
 
 ### Scene Planning Domain
@@ -59,6 +62,7 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 **Structure**: Nested dictionary with `gender` → `age_range` → `style_template`
 
 **Age Ranges**:
+
 - `child` / `kid` - Chibi proportions (1:3), round cherubic face, large expressive eyes
 - `teen` - Slender graceful build, flower-boy aesthetic (male), large doe eyes (female)
 - `young_adult` / `adult` - Korean male lead aesthetic (180-188cm, willowy proportions), statuesque figure (female, 165cm+)
@@ -74,6 +78,7 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 **Purpose**: 150-250 word structure for AI image generation prompts
 
 **Required Elements**:
+
 1. **Shot type** - establishing, medium, closeup, action, etc.
 2. **Environment details** - 5+ specific details (architecture, props, lighting, weather)
 3. **Character placement** - Position in frame with percentage (e.g., "occupies 40% of frame")
@@ -82,6 +87,7 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 6. **Style notes** - Korean manhwa style, rendering notes
 
 **Format Template**:
+
 ```
 {shot_type}, vertical 9:16 webtoon panel, {composition_note},
 {environment_with_5+_specific_details} + {style_lighting_description},
@@ -91,6 +97,7 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 ```
 
 **Grammar-Specific Requirements**:
+
 - `establishing` - Wide shot, characters 20-30% of frame, show the WORLD
 - `dialogue_medium` - Medium shot, characters 40-45%, space for speech bubbles
 - `emotion_closeup` - Extreme close-up, character 50%+, specific emotion with physical tells
@@ -103,12 +110,14 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 ## Prompt Compilation with Runtime Context
 
 **Compilation Process**:
+
 1. Load template from `prompts.yaml`
 2. Gather runtime context (scene text, character list, genre, etc.)
 3. Render template with Jinja2 using context variables
 4. Send compiled prompt to Gemini API
 
 **Common Context Variables**:
+
 - `scene_text` - Raw scene text input
 - `char_list` - Comma-separated character names
 - `genre_text` - Genre for style guidance
@@ -118,6 +127,7 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 - `char_section` - Character identity lines for consistency
 
 **Example Compilation**:
+
 ```python
 # File: app/graphs/nodes/prompts/builders.py
 
@@ -134,12 +144,14 @@ prompt = render_prompt(
 **Purpose**: Fix malformed JSON output from LLM responses
 
 **Common Issues Fixed**:
+
 - Markdown code fences (` ```json ... ``` `)
 - Trailing commas before closing brackets
 - Commentary before/after JSON
 - Missing brackets
 
 **Repair Process**:
+
 1. Strip markdown fences with regex
 2. Find outermost JSON object using bracket matching
 3. Remove trailing commas
@@ -149,6 +161,7 @@ prompt = render_prompt(
 **Implementation**: `app/graphs/nodes/json_parser.py`
 
 **Functions**:
+
 - `_strip_markdown_fences()` - Remove markdown code blocks
 - `_clean_json_text()` - Fix common formatting issues
 - `_extract_json_object()` - Extract JSON using bracket matching
@@ -197,23 +210,24 @@ prompt = render_prompt(
 
 ```sql
 -- Check character identity lines
-SELECT name, gender, age_range, identity_line 
+SELECT name, gender, age_range, identity_line
 FROM characters WHERE project_id = ?;
 
 -- Review panel semantics
-SELECT payload 
-FROM artifacts 
-WHERE scene_id = ? AND type = 'panel_semantics' 
+SELECT payload
+FROM artifacts
+WHERE scene_id = ? AND type = 'panel_semantics'
 ORDER BY version DESC LIMIT 1;
 
 -- Check render spec prompts
-SELECT payload 
-FROM artifacts 
-WHERE scene_id = ? AND type = 'render_spec' 
+SELECT payload
+FROM artifacts
+WHERE scene_id = ? AND type = 'render_spec'
 ORDER BY version DESC LIMIT 1;
 ```
 
 **Key log patterns to search**:
+
 - `prompt.compilation` - Prompt rendering traces
 - `json_parse_failure` - JSON repair attempts
 - `gemini.request` - Raw prompts sent to API

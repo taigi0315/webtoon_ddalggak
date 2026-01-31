@@ -31,6 +31,9 @@ from .visual_plan import (
     compute_scene_chunker,
 )
 
+# Script writing
+from .script_writer import run_webtoon_script_writer
+
 # Scene intent
 from .scene_intent import run_scene_intent_extractor
 
@@ -61,6 +64,7 @@ __all__ = [
     "compile_visual_plan_bundle",
     "compile_visual_plan_bundle_llm",
     "compute_scene_chunker",
+    "run_webtoon_script_writer",
     # Scene intent
     "run_scene_intent_extractor",
     # Panel plan

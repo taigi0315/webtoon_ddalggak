@@ -39,10 +39,13 @@ class StoryBuildState(TypedDict, total=False):
     blind_test_report_ids: list[str]
     progress: dict
     require_hero_single: bool
+    webtoon_script: dict | None
+    feedback: list[str]
+    script_drafts: list[dict]
 
 
 def _total_steps(planning_mode: str | None) -> int:
-    return 8 if planning_mode == "full" else 5
+    return 9 if planning_mode == "full" else 6
 
 
 def _persist_progress(state: StoryBuildState, progress: dict) -> None:
@@ -76,7 +79,6 @@ def _node_validate_inputs(state: StoryBuildState) -> dict[str, Any]:
         with session_scope() as db:
             story = db.get(Story, story_id)
             if story is not None:
-                story_style = story_style or story.default_story_style
                 image_style = image_style or story.default_image_style
 
     progress = {
@@ -92,24 +94,66 @@ def _node_validate_inputs(state: StoryBuildState) -> dict[str, Any]:
 
 
 def _node_scene_splitter(state: StoryBuildState) -> dict[str, Any]:
-    scenes_text = nodes.compute_scene_chunker(state.get("story_text", ""), max_scenes=state.get("max_scenes", 6))
-    scenes: list[dict] = []
-    for idx, text in enumerate(scenes_text, start=1):
-        summary = _summarize_text(text)
-        scenes.append(
-            {
-                "scene_index": idx,
-                "title": f"Scene {idx}",
-                "summary": summary,
-                "source_text": text,
-            }
-        )
+    script = state.get("webtoon_script")
+    max_scenes = state.get("max_scenes", 6)
+    
+    if script and script.get("visual_beats"):
+        # Group beats into scenes
+        beats = script["visual_beats"]
+        total_beats = len(beats)
+        beats_per_scene = max(1, (total_beats + max_scenes - 1) // max_scenes)
+        
+        scenes: list[dict] = []
+        for i in range(0, total_beats, beats_per_scene):
+            batch = beats[i : i + beats_per_scene]
+            idx = len(scenes) + 1
+            
+            # Format batch as source_text for backward compatibility
+            # and better context for downstream LLM nodes
+            text_parts = []
+            for b in batch:
+                part = f"BEAT: {b.get('visual_action', '')}"
+                if b.get("dialogue"):
+                    part += f"\nDIALOGUE: {b.get('dialogue')}"
+                if b.get("sfx"):
+                    part += f"\nSFX: {b.get('sfx')}"
+                text_parts.append(part)
+            
+            source_text = "\n\n".join(text_parts)
+            summary = batch[0].get("visual_action", "")[:100] # Use first beat as summary base
+            
+            scenes.append(
+                {
+                    "scene_index": idx,
+                    "title": f"Scene {idx}",
+                    "summary": summary,
+                    "source_text": source_text,
+                    "beats": batch, # Store original beats for downstream use
+                }
+            )
+            if len(scenes) >= max_scenes:
+                break
+    else:
+        # Fallback to old behavior if script writing failed
+        scenes_text = nodes.compute_scene_chunker(state.get("story_text", ""), max_scenes=max_scenes)
+        scenes: list[dict] = []
+        for idx, text in enumerate(scenes_text, start=1):
+            summary = _summarize_text(text)
+            scenes.append(
+                {
+                    "scene_index": idx,
+                    "title": f"Scene {idx}",
+                    "summary": summary,
+                    "source_text": text,
+                }
+            )
+
     progress = {
         "scenes": scenes,
         "progress": {
             "current_node": "SceneSplitter",
-            "message": f"Splitting story into scenes ({len(scenes)}/{state.get('max_scenes')})...",
-            "step": 2,
+            "message": f"Splitting story into scenes ({len(scenes)}/{max_scenes})...",
+            "step": 5,
         },
     }
     _persist_progress(state, progress["progress"])
@@ -124,7 +168,7 @@ def _node_llm_character_extractor(state: StoryBuildState, gemini: GeminiClient |
     )
     progress = {
         "characters": profiles,
-        "progress": {"current_node": "LLMCharacterExtractor", "message": "Extracting characters...", "step": 3},
+        "progress": {"current_node": "LLMCharacterExtractor", "message": "Extracting characters...", "step": 2},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -138,7 +182,29 @@ def _node_llm_character_normalizer(state: StoryBuildState, gemini: GeminiClient 
     )
     progress = {
         "characters": profiles,
-        "progress": {"current_node": "LLMCharacterProfileNormalizer", "message": "Normalizing characters...", "step": 4},
+        "progress": {"current_node": "LLMCharacterProfileNormalizer", "message": "Normalizing characters...", "step": 3},
+    }
+    _persist_progress(state, progress["progress"])
+    return progress
+
+
+def _node_webtoon_script_writer(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
+    script = nodes.run_webtoon_script_writer(
+        story_text=state.get("story_text", ""),
+        characters=state.get("characters", []),
+        story_style=state.get("story_style"),
+        feedback=state.get("feedback"),
+        history=state.get("script_drafts"),
+        gemini=gemini,
+    )
+    
+    drafts = state.get("script_drafts", [])
+    drafts.append(script)
+    
+    progress = {
+        "webtoon_script": script,
+        "script_drafts": drafts,
+        "progress": {"current_node": "WebtoonScriptWriter", "message": "Writing webtoon script...", "step": 4},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -257,7 +323,7 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
     progress = {
         "scene_ids": scene_ids,
         "character_ids": character_ids,
-        "progress": {"current_node": "PersistStoryBundle", "message": "Saving story bundle...", "step": 5},
+        "progress": {"current_node": "PersistStoryBundle", "message": "Saving story bundle...", "step": 6},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -286,7 +352,7 @@ def _node_llm_visual_plan_compiler(state: StoryBuildState, gemini: GeminiClient 
     progress = {
         "visual_plan_bundle": plans,
         "visual_plan_artifact_ids": plan_ids,
-        "progress": {"current_node": "LLMVisualPlanCompiler", "message": "Converting story to visual beats...", "step": 6},
+        "progress": {"current_node": "LLMVisualPlanCompiler", "message": "Converting story to visual beats...", "step": 7},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -347,7 +413,7 @@ def _node_per_scene_planning_loop(state: StoryBuildState, gemini: GeminiClient |
             state["progress"] = {
                 "current_node": "PerScenePlanningLoop",
                 "message": f"Planning scene {idx}/{total}...",
-                "step": 7,
+                "step": 8,
             }
             _persist_progress(state, state["progress"])
 
@@ -390,7 +456,7 @@ def _node_blind_test_runner(state: StoryBuildState, gemini: GeminiClient | None)
             report_ids.append(str(artifact.artifact_id))
     progress = {
         "blind_test_report_ids": report_ids,
-        "progress": {"current_node": "BlindTestRunner", "message": "Running blind tests...", "step": 8},
+        "progress": {"current_node": "BlindTestRunner", "message": "Running blind tests...", "step": 9},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -406,16 +472,18 @@ def _summarize_text(text: str, max_words: int = 32) -> str:
 def build_story_build_graph(planning_mode: str = "full", gemini: GeminiClient | None = None):
     graph = StateGraph(StoryBuildState)
     graph.add_node("validate_inputs", _node_validate_inputs)
-    graph.add_node("scene_splitter", _node_scene_splitter)
     graph.add_node("llm_character_extractor", partial(_node_llm_character_extractor, gemini=gemini))
     graph.add_node("llm_character_normalizer", partial(_node_llm_character_normalizer, gemini=gemini))
+    graph.add_node("webtoon_script_writer", partial(_node_webtoon_script_writer, gemini=gemini))
+    graph.add_node("scene_splitter", _node_scene_splitter)
     graph.add_node("persist_story_bundle", _node_persist_story_bundle)
 
     graph.set_entry_point("validate_inputs")
-    graph.add_edge("validate_inputs", "scene_splitter")
-    graph.add_edge("scene_splitter", "llm_character_extractor")
+    graph.add_edge("validate_inputs", "llm_character_extractor")
     graph.add_edge("llm_character_extractor", "llm_character_normalizer")
-    graph.add_edge("llm_character_normalizer", "persist_story_bundle")
+    graph.add_edge("llm_character_normalizer", "webtoon_script_writer")
+    graph.add_edge("webtoon_script_writer", "scene_splitter")
+    graph.add_edge("scene_splitter", "persist_story_bundle")
 
     if planning_mode == "full":
         graph.add_node("llm_visual_plan_compiler", partial(_node_llm_visual_plan_compiler, gemini=gemini))

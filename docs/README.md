@@ -103,6 +103,7 @@ The following legacy documentation files are available but may be outdated:
 - **Node**: A discrete processing step within a LangGraph workflow
 - **Scene**: A single narrative unit converted into one or more webtoon panels
 - **Panel**: An individual frame/image in the webtoon layout
+- **Webtoon Script**: A structured visual translation of the story with beats and SFX
 - **Character Variant**: A specific visual representation of a character (outfit, style, mood)
 - **Actor System**: Global character library allowing character reuse across stories
 - **Grammar ID**: Predefined shot type identifier (establishing, dialogue_medium, emotion_closeup, etc.)

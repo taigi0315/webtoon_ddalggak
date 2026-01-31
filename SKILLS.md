@@ -38,8 +38,11 @@ ssuljaengi_v4/
 │   ├── graphs/                    # LangGraph workflows
 │   │   ├── story_build.py         # Episode-level workflow
 │   │   ├── pipeline.py            # Scene planning + rendering
-│   │   └── nodes/                 # Node implementations
+│   │   ├── nodes/                 # Node implementations
 │   │       ├── planning/          # Planning nodes
+│   │       │   ├── character.py   # Character extraction
+│   │       │   ├── script_writer.py # Webtoon script writing
+│   │       │   └── ...
 │   │       ├── rendering/         # Rendering nodes
 │   │       ├── prompts/           # Prompt compilation
 │   │       └── constants.py       # Artifact type constants
@@ -93,16 +96,16 @@ def run_my_node(
     """Process scene and create artifact."""
     # 1. Load scene
     scene = db.query(Scene).filter(Scene.scene_id == scene_id).first()
-    
+
     # 2. Check for existing artifact (resumability)
     svc = ArtifactService(db)
     existing = svc.get_latest_artifact(scene_id, ARTIFACT_MY_TYPE)
     if existing and scene.planning_locked:
         return existing
-    
+
     # 3. Process data
     result = process_scene(scene.source_text)
-    
+
     # 4. Create versioned artifact
     payload = {"result": result, "metadata": {...}}
     return svc.create_artifact(scene_id, ARTIFACT_MY_TYPE, payload)
@@ -145,18 +148,18 @@ def perform_action(
 
 prompt_my_template: |
   {{ system_prompt_json }}
-  
+
   {{ global_constraints }}
-  
+
   # Task
   Process the following scene and extract key information.
-  
+
   # Scene Text
   {{ scene_text }}
-  
+
   # Characters
   {{ char_list }}
-  
+
   # Output Format
   Return JSON with the following structure:
   {
@@ -272,19 +275,22 @@ make clean
 ### Story Generation Issues
 
 **Check progress:**
+
 ```sql
-SELECT generation_status, progress, generation_error 
+SELECT generation_status, progress, generation_error
 FROM stories WHERE story_id = ?;
 ```
 
 **Check artifacts:**
+
 ```sql
-SELECT type, version, created_at 
-FROM artifacts WHERE scene_id = ? 
+SELECT type, version, created_at
+FROM artifacts WHERE scene_id = ?
 ORDER BY type, version DESC;
 ```
 
 **Check logs:**
+
 ```bash
 grep "story_id.*<uuid>" logs/*.log
 grep "request_id.*<uuid>" logs/*.log
@@ -293,15 +299,17 @@ grep "request_id.*<uuid>" logs/*.log
 ### Scene Planning Issues
 
 **Check planning lock:**
+
 ```sql
 SELECT scene_id, planning_locked FROM scenes WHERE scene_id = ?;
 ```
 
 **Check required artifacts:**
+
 ```sql
-SELECT type, version FROM artifacts 
+SELECT type, version FROM artifacts
 WHERE scene_id = ? AND type IN (
-  'scene_intent', 'panel_plan', 'panel_plan_normalized', 
+  'scene_intent', 'panel_plan', 'panel_plan_normalized',
   'layout_template', 'panel_semantics'
 );
 ```
@@ -309,14 +317,16 @@ WHERE scene_id = ? AND type IN (
 ### Character Consistency Issues
 
 **Check canonical codes:**
+
 ```sql
-SELECT canonical_code, name, role FROM characters 
+SELECT canonical_code, name, role FROM characters
 WHERE project_id = ? ORDER BY canonical_code;
 ```
 
 **Check active variants:**
+
 ```sql
-SELECT cv.variant_name, c.name 
+SELECT cv.variant_name, c.name
 FROM character_variants cv
 JOIN characters c ON cv.character_id = c.character_id
 WHERE cv.story_id = ? AND cv.is_active_for_story = true;
@@ -325,12 +335,14 @@ WHERE cv.story_id = ? AND cv.is_active_for_story = true;
 ### Gemini API Issues
 
 **Check circuit breaker status:**
+
 ```python
 from app.services.vertex_gemini import gemini_client
 print(gemini_client.get_circuit_breaker_status())
 ```
 
 **Check logs for errors:**
+
 ```bash
 grep "gemini.generate" logs/*.log
 grep "circuit breaker" logs/*.log
@@ -340,16 +352,19 @@ grep "rate_limit" logs/*.log
 ### API Endpoint Issues
 
 **Check request/response:**
+
 ```bash
 curl -v http://localhost:8000/v1/scenes/{scene_id}/status
 ```
 
 **Check OpenAPI docs:**
+
 ```
 http://localhost:8000/docs
 ```
 
 **Check metrics:**
+
 ```bash
 curl http://localhost:8000/metrics
 ```
@@ -368,6 +383,7 @@ curl http://localhost:8000/metrics
 - **Request ID** - Unique identifier (x-request-id) for tracing requests through system
 - **Visual Plan** - Character extraction and scene importance ratings for episode-level planning
 - **Blind Test** - Evaluation of narrative coherence by reconstructing story from panels only
+- **Webtoon Script** - Structured visual beat-by-beat translation of the raw story
 - **QC Rules** - Quality control thresholds (closeup_ratio_max, dialogue_ratio_max, etc.)
 - **Episode Guardrails** - Layout diversity enforcement and hero single-panel requirements
 - **Identity Line** - Compiled character description for prompts (e.g., "Alice: young adult female, long black hair")
@@ -423,7 +439,7 @@ def test_my_node(db_session):
     scene = Scene(source_text="Test scene")
     db_session.add(scene)
     db_session.commit()
-    
+
     artifact = run_my_node(db_session, scene.scene_id)
     assert artifact.type == "my_type"
     assert artifact.payload["result"] is not None
@@ -440,13 +456,13 @@ def extract_characters_with_custom_logic(story_text: str) -> list[dict]:
     """Extract characters using custom logic."""
     # 1. Use LLM extraction
     llm_characters = extract_via_llm(story_text)
-    
+
     # 2. Apply custom filtering
     filtered = [c for c in llm_characters if meets_criteria(c)]
-    
+
     # 3. Enrich with additional data
     enriched = [enrich_character(c) for c in filtered]
-    
+
     return enriched
 ```
 
@@ -457,7 +473,7 @@ def extract_characters_with_custom_logic(story_text: str) -> list[dict]:
 
 # Add new variant type to enum
 variant_type = Column(Enum(
-    "base", "outfit_change", "mood_change", "style_change", 
+    "base", "outfit_change", "mood_change", "style_change",
     "my_custom_type",  # Add here
     name="variant_type_enum"
 ))
@@ -519,10 +535,10 @@ def update_resource(db: Session, resource_id: uuid.UUID, new_data: dict):
     """Update resource with audit logging."""
     resource = db.query(Resource).get(resource_id)
     old_value = {"status": resource.status}
-    
+
     resource.status = new_data["status"]
     db.commit()
-    
+
     log_audit_entry(
         db=db,
         entity_type="resource",
