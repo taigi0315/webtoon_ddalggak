@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Iterable
 
 from ..utils import (
@@ -13,6 +14,23 @@ from ..utils import (
     _prompt_character_normalization,
     GeminiClient,
 )
+
+
+# Style keywords that should not appear in character descriptions
+FORBIDDEN_STYLE_KEYWORDS = [
+    "manhwa",
+    "webtoon",
+    "aesthetic",
+    "flower-boy",
+    "k-drama",
+    "korean male lead",
+    "romance female lead",
+    "naver webtoon",
+    "authentic",
+    "trending",
+    "statuesque",
+    "willowy",
+]
 
 
 def compute_character_profiles(source_text: str, max_characters: int = 6) -> list[dict]:
@@ -178,6 +196,9 @@ def normalize_character_profiles_llm(
                 continue
             seen.add(key)
 
+            # Sanitize character output to remove style keywords
+            char = _sanitize_character_output(char, name)
+
             # Build identity line if not provided
             identity_line = char.get("identity_line")
             if not identity_line:
@@ -211,3 +232,76 @@ def normalize_character_profiles_llm(
     # Fallback to heuristic
     logger.info("Falling back to heuristic character normalization")
     return normalize_character_profiles(profiles)
+
+
+def _sanitize_character_output(char: dict, name: str) -> dict:
+    """Remove forbidden style keywords from character output.
+    
+    Args:
+        char: Character dict from LLM output
+        name: Character name for logging
+        
+    Returns:
+        Sanitized character dict
+    """
+    def _remove_keywords(text: str | None) -> str | None:
+        """Remove forbidden keywords from text (case-insensitive)."""
+        if not text:
+            return text
+        
+        # Ensure text is a string
+        if not isinstance(text, str):
+            logger.warning(
+                f"Expected string for character '{name}', got {type(text).__name__}. Converting to string."
+            )
+            text = str(text)
+        
+        cleaned = text
+        found_keywords = []
+        
+        for keyword in FORBIDDEN_STYLE_KEYWORDS:
+            # Case-insensitive replacement
+            pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+            if pattern.search(cleaned):
+                found_keywords.append(keyword)
+                cleaned = pattern.sub("", cleaned)
+        
+        # Clean up extra spaces and punctuation
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        cleaned = re.sub(r"\s*,\s*,", ",", cleaned)  # Remove double commas
+        cleaned = re.sub(r"^[,\s]+|[,\s]+$", "", cleaned)  # Remove leading/trailing commas
+        
+        if found_keywords:
+            logger.warning(
+                f"Removed style keywords from character '{name}': {', '.join(found_keywords)}"
+            )
+        
+        return cleaned
+    
+    # Sanitize identity_line
+    if char.get("identity_line"):
+        char["identity_line"] = _remove_keywords(char["identity_line"])
+    
+    # Sanitize appearance fields
+    if isinstance(char.get("appearance"), dict):
+        appearance = char["appearance"]
+        for field in ["hair", "face", "build"]:
+            if appearance.get(field):
+                # Ensure the field value is a string before processing
+                if isinstance(appearance[field], str):
+                    appearance[field] = _remove_keywords(appearance[field])
+                else:
+                    logger.warning(
+                        f"Character '{name}' appearance.{field} is not a string (type: {type(appearance[field]).__name__}), skipping sanitization"
+                    )
+    
+    # Sanitize outfit
+    if char.get("outfit"):
+        char["outfit"] = _remove_keywords(char["outfit"])
+    
+    # Sanitize description
+    if char.get("description"):
+        char["description"] = _remove_keywords(char["description"])
+    
+    return char
+

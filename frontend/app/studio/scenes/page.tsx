@@ -171,7 +171,7 @@ export default function ScenesPage() {
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[260px,1fr,320px]">
-          <aside className="space-y-3">
+          <aside className="flex flex-col gap-2">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Scenes</p>
             {scenesQuery.isLoading && (
               <div className="text-sm text-slate-500">Loading scenes...</div>
@@ -184,7 +184,7 @@ export default function ScenesPage() {
             {scenesQuery.data?.map((scene, index) => (
               <button
                 key={scene.scene_id}
-                className={`w-full text-left rounded-xl border px-3 py-2 transition ${
+                className={`w-full text-left rounded-lg border px-3 py-2 transition ${
                   scene.scene_id === selectedSceneId
                     ? "border-indigo-400 bg-indigo-50"
                     : "border-slate-200 bg-white/70 hover:border-indigo-200"
@@ -192,7 +192,7 @@ export default function ScenesPage() {
                 onClick={() => setSelectedSceneId(scene.scene_id)}
               >
                 <p className="text-sm font-semibold text-ink">Scene {index + 1}</p>
-                <p className="mt-1 text-xs text-slate-500 line-clamp-3">
+                <p className="mt-0.5 text-xs text-slate-500 line-clamp-2">
                   {scene.source_text}
                 </p>
               </button>
