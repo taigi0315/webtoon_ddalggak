@@ -100,9 +100,8 @@ export default function DialogueEditorPage() {
     mutationFn: async () => {
       if (!selectedSceneId) return null;
       const validBubbles = bubbles.filter((bubble) => bubble.text.trim().length > 0);
-      if (validBubbles.length === 0) {
-        throw new Error("Add at least one dialogue bubble before saving.");
-      }
+      
+      // Allow saving with zero bubbles - dialogue is optional
       const payloadBubbles = validBubbles.map((bubble) => ({
         bubble_id: bubble.id,
         panel_id: bubble.panelId,
@@ -525,7 +524,7 @@ export default function DialogueEditorPage() {
                 }}
                 disabled={!activeBubbleId}
               >
-                <option value="chat">Speech</option>
+                <option value="chat">Dialogue</option>
                 <option value="thought">Thought</option>
                 <option value="narration">Narration</option>
                 <option value="sfx">SFX</option>
@@ -875,15 +874,29 @@ function SceneCanvas({
           event.preventDefault();
           const raw = event.dataTransfer.getData("application/x-dialogue");
           if (!raw || !canvasRef.current) return;
-          const data = JSON.parse(raw) as { text: string; speaker?: string };
+          const data = JSON.parse(raw) as { text: string; speaker?: string; type?: string };
           const rect = canvasRef.current.getBoundingClientRect();
           const x = (event.clientX - rect.left) / rect.width;
           const y = (event.clientY - rect.top) / rect.height;
           const clampedX = Math.max(0.02, Math.min(0.92, x));
           const clampedY = Math.max(0.02, Math.min(0.92, y));
+          
+          // Map suggestion type to bubbleType
+          let bubbleType = "chat";  // default
+          if (data.type) {
+            const typeMap: Record<string, string> = {
+              "SFX": "sfx",
+              "THOUGHT": "thought",
+              "NARRATION": "narration",
+              "DIALOGUE": "chat"
+            };
+            bubbleType = typeMap[data.type.toUpperCase()] || "chat";
+          }
+          
           onBubbleAdd({
             id: crypto.randomUUID(),
             panelId: 1,
+            bubbleType: bubbleType,  // Preserve type from suggestion
             text: data.text,
             speaker: data.speaker,
             position: { x: clampedX, y: clampedY },
@@ -919,6 +932,7 @@ function SceneCanvas({
           onBubbleAdd({
             id: crypto.randomUUID(),
             panelId: 1,
+            bubbleType: "chat",  // Default to chat bubble
             text: "New dialogue",
             position: { x: clampedX, y: clampedY },
             size: { w: 0.28, h: estimateBubbleHeight("New dialogue", 0.28) }
@@ -937,31 +951,35 @@ function SceneCanvas({
           // Get bubble type styling
           const bubbleType = bubble.bubbleType || "chat";
           let bubbleStyle = "";
-          let textColorClass = "text-slate-700";
+          let textColorClass = "text-slate-900";  // Default black
           
           switch (bubbleType) {
             case "thought":
-              bubbleStyle = "bg-blue-50/60 border-blue-300";
-              textColorClass = "text-blue-900";
+              // Circular style with gray border and gray text
+              bubbleStyle = "bg-blue-50/40 border-gray-500 rounded-full";
+              textColorClass = "text-gray-500";  // Gray text (matches #808080)
               break;
             case "narration":
-              bubbleStyle = "bg-slate-900/60 border-slate-700";
+              // Rectangle with black background and white text
+              bubbleStyle = "bg-slate-900/60 border-slate-700 rounded-md";
               textColorClass = "text-white";
               break;
             case "sfx":
-              bubbleStyle = "bg-transparent border-red-500 border-2";
-              textColorClass = "text-red-600 font-bold";
+              // Text only, no background or border (transparent), black text with Solarona font
+              bubbleStyle = "bg-transparent border-transparent";
+              textColorClass = "text-black font-bold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]";
               break;
             default: // chat
-              bubbleStyle = "bg-white/40 border-slate-200";
-              textColorClass = "text-slate-700";
+              // Regular speech bubble with white background and black text
+              bubbleStyle = "bg-white/40 border-slate-200 rounded-xl";
+              textColorClass = "text-slate-900";  // Black text
           }
           
           return (
           <div key={bubble.id}>
             <button
               type="button"
-              className={`absolute rounded-xl text-[11px] shadow-soft px-2 py-0.5 border hover:border-indigo-300 ${bubbleStyle} ${textColorClass}`}
+              className={`absolute text-[11px] shadow-soft px-2 py-0.5 border hover:border-indigo-300 ${bubbleStyle} ${textColorClass}`}
               style={{
                 left: `${bubble.position.x * 100}%`,
                 top: `${bubble.position.y * 100}%`,
@@ -1134,7 +1152,11 @@ function SceneDialogueList({ sceneId }: { sceneId: string }) {
               onDragStart={(event) => {
                 event.dataTransfer.setData(
                   "application/x-dialogue",
-                  JSON.stringify({ text: line.text, speaker: line.speaker })
+                  JSON.stringify({ 
+                    text: line.text, 
+                    speaker: line.speaker,
+                    type: line.type  // Preserve bubble type (SFX, thought, etc)
+                  })
                 );
                 event.dataTransfer.effectAllowed = "copy";
               }}

@@ -141,6 +141,7 @@ def finalize_export(export_id: uuid.UUID, db=DbSessionDep):
                     {
                         "text": bubble.get("text", ""),
                         "speaker": bubble.get("speaker", ""),
+                        "type": bubble.get("bubble_type", "chat"),  # Include bubble type for styling
                         "geometry": {
                             "x": bubble.get("position", {}).get("x", 0.1),
                             "y": bubble.get("position", {}).get("y", 0.1),
@@ -186,6 +187,7 @@ def finalize_export(export_id: uuid.UUID, db=DbSessionDep):
                         {
                             "text": bubble.get("text", ""),
                             "speaker": bubble.get("speaker", ""),
+                            "type": bubble.get("bubble_type", "chat"),  # Include bubble type for styling
                             "geometry": {
                                 "x": bubble.get("position", {}).get("x", 0.1),
                                 "y": bubble.get("position", {}).get("y", 0.1),

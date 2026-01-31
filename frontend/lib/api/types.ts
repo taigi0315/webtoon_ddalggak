@@ -176,10 +176,14 @@ export type DialogueLine = z.infer<typeof dialogueLineSchema>;
 export type DialoguePanel = z.infer<typeof dialoguePanelSchema>;
 export type DialogueSuggestions = z.infer<typeof dialogueSuggestionsSchema>;
 
+// Bubble type enum matching backend
+export const BubbleTypeEnum = z.enum(["chat", "thought", "narration", "sfx"]);
+export type BubbleType = z.infer<typeof BubbleTypeEnum>;
+
 export const dialogueBubbleSchema = z.object({
   bubble_id: z.string(),
   panel_id: z.number(),
-  bubble_type: z.string().default("chat"),  // chat, thought, narration, sfx
+  bubble_type: BubbleTypeEnum.default("chat"),  // Enum: chat, thought, narration, sfx
   speaker: z.string().nullable().optional(),
   text: z.string(),
   position: z.object({ x: z.number(), y: z.number() }),

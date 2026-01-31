@@ -284,6 +284,108 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+### Frontend-Backend UI Synchronization (CRITICAL)
+
+**⚠️ IMPORTANT: Preview UI must match Video Output**
+
+When making visual changes to dialogue bubbles, scenes, or any UI elements, **BOTH frontend preview and backend rendering MUST be updated** to maintain consistency.
+
+#### Synchronization Required For:
+
+1. **Dialogue Bubbles**
+   - Frontend: `frontend/app/studio/dialogue/page.tsx`
+   - Backend: `app/services/video.py`
+   - Config: `app/config/chat_bubble_config.json`
+
+2. **Scene Rendering**
+   - Frontend: Scene preview components
+   - Backend: Scene image generation in `app/services/`
+
+3. **Character Appearance**
+   - Frontend: Character display components
+   - Backend: Character image generation
+
+#### Update Checklist:
+
+When changing visual styling:
+
+- [ ] Update Frontend Preview UI
+  - Colors, shapes, sizes
+  - Text formatting
+  - Border styles
+- [ ] Update Backend Rendering Code
+  - Same colors, shapes, sizes
+  - Same text formatting
+  - Same border styles
+- [ ] Update Configuration Files
+  - `app/config/chat_bubble_config.json`
+  - `app/config/image_styles.json`
+- [ ] Test Both:
+  - Preview in dialogue editor
+  - Generated video output
+  - Compare visually for consistency
+
+#### Example: Chat Bubble Styling
+
+**Frontend** (`frontend/app/studio/dialogue/page.tsx`):
+
+```tsx
+case "thought":
+  bubbleStyle = "bg-blue-50/40 border-gray-500 rounded-full";
+  textColorClass = "text-gray-500";
+  break;
+```
+
+**Backend** (`app/services/video.py`):
+
+```python
+if bubble_type == "thought":
+    bg_color = "#F0F8FF"  # Light blue (matches bg-blue-50)
+    border_color = "#808080"  # Gray (matches border-gray-500)
+    bubble_shape = "ellipse"  # Circle (matches rounded-full)
+    text_color = "#808080"  # Gray (matches text-gray-500)
+```
+
+**Config** (`app/config/chat_bubble_config.json`):
+
+```json
+{
+  "thought": {
+    "background_color": "#F0F8FF",
+    "border_color": "#808080",
+    "bubble_shape": "ellipse",
+    "text_color": "#808080"
+  }
+}
+```
+
+#### Common Mistakes:
+
+❌ **Don't:**
+
+- Update only frontend without backend
+- Use different colors/shapes in preview vs output
+- Forget to update config files
+- Skip testing video output
+
+✅ **Do:**
+
+- Update all three layers (Frontend, Backend, Config)
+- Use same color values (convert Tailwind → HEX)
+- Test both preview and video output
+- Document changes in all affected files
+
+#### Color Conversion Reference:
+
+| Tailwind Class    | HEX Value               | Usage            |
+| ----------------- | ----------------------- | ---------------- |
+| `bg-white/40`     | `#FFFFFF` + 40% opacity | White background |
+| `bg-blue-50/40`   | `#F0F8FF` + 40% opacity | Light blue       |
+| `bg-slate-900/60` | `#0F172A` + 60% opacity | Dark background  |
+| `text-gray-500`   | `#808080`               | Gray text        |
+| `border-gray-500` | `#808080`               | Gray border      |
+| `text-black`      | `#000000`               | Black text       |
+
 ### Code Quality
 
 ```bash
@@ -589,7 +691,6 @@ def update_resource(db: Session, resource_id: uuid.UUID, new_data: dict):
 - **[docs/08-api-reference.md](docs/08-api-reference.md)** - Endpoint documentation
 - **[docs/09-error-handling-observability.md](docs/09-error-handling-observability.md)** - Debugging and monitoring
 
-
 ## Visual Responsibility Split Patterns
 
 ### Style Neutralization Pattern
@@ -607,17 +708,17 @@ FORBIDDEN_STYLE_KEYWORDS = [
 def _sanitize_character_output(text: str) -> str:
     """Remove style keywords from character descriptions."""
     import re
-    
+
     sanitized = text
     for keyword in FORBIDDEN_STYLE_KEYWORDS:
         # Case-insensitive removal
         pattern = re.compile(re.escape(keyword), re.IGNORECASE)
         sanitized = pattern.sub("", sanitized)
-    
+
     # Clean up extra spaces
     sanitized = re.sub(r'\s+', ' ', sanitized).strip()
     sanitized = re.sub(r'\s*([,;.])\s*', r'\1 ', sanitized).strip()
-    
+
     return sanitized
 ```
 
@@ -630,21 +731,21 @@ def _validate_compiled_prompt(prompt: str, style_id: str, style_desc: str) -> No
     """Validate compiled prompt for forbidden anchors."""
     import logging
     logger = logging.getLogger(__name__)
-    
+
     # Define forbidden anchors
     forbidden_anchors = [
         "korean webtoon", "korean manhwa", "naver webtoon",
         "manhwa art style", "webtoon art style",
     ]
-    
+
     prompt_lower = prompt.lower()
-    
+
     # Check for forbidden anchors
     detected_anchors = []
     for anchor in forbidden_anchors:
         if anchor in prompt_lower:
             detected_anchors.append(anchor)
-    
+
     if detected_anchors:
         error_msg = (
             f"Prompt validation failed: Forbidden hardcoded anchors detected: "
@@ -669,13 +770,13 @@ FORBIDDEN_STUDIO_DIRECTOR_KEYWORDS = [
 def _detect_style_keywords_in_studio_output(response: dict) -> list[str]:
     """Detect forbidden style keywords in Studio Director output."""
     detected_keywords = []
-    
+
     scenes = response.get("scenes", [])
     for scene in scenes:
         scene_emotion = scene.get("scene_emotion", "").lower()
         for keyword in FORBIDDEN_STUDIO_DIRECTOR_KEYWORDS:
             if keyword.lower() in scene_emotion:
                 detected_keywords.append(f"scene_emotion contains '{keyword}'")
-    
+
     return detected_keywords
 ```

@@ -12,13 +12,13 @@
     },
     "thought": {
       "type": "thought",
-      "description": "Thought bubble (cloud style)",
+      "description": "Thought bubble (circular style)",
       "background_color": "#F0F8FF",
-      "border_color": "#4682B4",
+      "border_color": "#808080",
       "border_width": 2,
       "opacity": 0.4,
       "font_name": "thought",
-      "bubble_shape": "cloud"
+      "bubble_shape": "ellipse"
     },
     "narration": {
       "type": "narration",
@@ -48,31 +48,41 @@
   },
   "fonts": {
     "dialogue": {
-      "path": "app/assets/fonts/cs-raving-drawn-font/CsravingdrawnRegularDemo-DYjD1.otf",
+      "path": "app/assets/fonts/cs-sullivan-drawn-font/CssullivandrawnRegularDemo-8OXG0.otf",
       "size": 16,
-      "scale": 1.8
+      "scale": 1.8,
+      "text_color": "#000000"
     },
     "thought": {
-      "path": "app/assets/fonts/cs-raving-drawn-font/CsravingdrawnRegularDemo-DYjD1.otf",
+      "path": "app/assets/fonts/cs-sullivan-drawn-font/CssullivandrawnRegularDemo-8OXG0.otf",
       "size": 14,
-      "scale": 1.6
+      "scale": 1.6,
+      "text_color": "#808080"
     },
     "narration": {
-      "path": "app/assets/fonts/cs-raving-drawn-font/CsravingdrawnRegularDemo-DYjD1.otf",
+      "path": "app/assets/fonts/cs-sullivan-drawn-font/CssullivandrawnRegularDemo-8OXG0.otf",
       "size": 14,
-      "scale": 1.5
+      "scale": 1.5,
+      "text_color": "#FFFFFF"
     },
     "sfx": {
-      "path": "app/assets/fonts/cs-raving-drawn-font/CsravingdrawnRegularDemo-DYjD1.otf",
+      "path": "app/assets/fonts/cs-sullivan-drawn-font/CssullivandrawnRegularDemo-8OXG0.otf",
       "size": 24,
       "scale": 2.5,
-      "bold": true
+      "bold": true,
+      "text_color": "#000000"
+    },
+    "default": {
+      "path": "app/assets/fonts/cs-sullivan-drawn-font/CssullivandrawnRegularDemo-8OXG0.otf",
+      "size": 16,
+      "scale": 1.8,
+      "text_color": "#000000"
     }
   },
   "animation": {
-    "min_stay_time": 2.0,
+    "min_stay_time": 0.8,
     "time_per_character": 0.05,
-    "transition_duration": 0.3,
+    "transition_duration": 0.2,
     "sequential": true
   }
 }

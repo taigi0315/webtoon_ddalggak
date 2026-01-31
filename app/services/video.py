@@ -91,8 +91,14 @@ def render_dialogue_bubble(
     border_color = type_config.get("border_color", "#000000")
     border_width = type_config.get("border_width", 2)
     opacity = type_config.get("opacity", 0.4)
-    text_color = type_config.get("text_color", "#000000")
     bubble_shape = type_config.get("bubble_shape", "ellipse")
+    
+    # Get font name first to check font-specific text color
+    font_name = type_config.get("font_name", "dialogue")
+    font_config = CHAT_BUBBLE_CONFIG.get("fonts", {}).get(font_name, {})
+    
+    # Text color priority: font config > type config > default
+    text_color = font_config.get("text_color") or type_config.get("text_color", "#000000")
     
     # Apply opacity to colors
     if bg_color and bg_color != "null":
@@ -100,14 +106,22 @@ def render_dialogue_bubble(
     else:
         bg_rgba = None
     
-    border_rgba = hex_to_rgba(border_color, 1.0) if border_color else None
+    # Check for valid border_color (not None, not "null", not empty)
+    if border_color and border_color != "null":
+        border_rgba = hex_to_rgba(border_color, 1.0)
+    else:
+        border_rgba = None
+    
     text_rgba = hex_to_rgba(text_color, 1.0)
 
     # Draw bubble background based on shape
     padding = VIDEO_DIALOGUE_CONFIG["padding"]
     bubble_rect = [x, y, x + w, y + h]
     
-    if bubble_shape == "rectangle":
+    # If bubble_shape is "none", we skip all background/border drawing
+    if bubble_shape == "none":
+        pass  # SFX style: just text
+    elif bubble_shape == "rectangle":
         if bg_rgba:
             draw.rectangle(bubble_rect, fill=bg_rgba, outline=border_rgba, width=border_width)
     elif bubble_shape == "cloud":
@@ -120,15 +134,14 @@ def render_dialogue_bubble(
                      x + offset_x + cloud_radius, y + offset_y + cloud_radius],
                     fill=bg_rgba, outline=border_rgba
                 )
-    elif bubble_shape != "none":
+    else:
         # Default ellipse/rounded rectangle for chat and thought
-        if bg_rgba:
+        # Only draw if we have something to draw
+        if bg_rgba or border_rgba:
             draw.rounded_rectangle(bubble_rect, radius=15, fill=bg_rgba, outline=border_rgba, width=border_width)
 
-    # Load font
+    # Load font (font_config already loaded above for text_color)
     if font is None:
-        font_name = type_config.get("font_name", "dialogue")
-        font_config = CHAT_BUBBLE_CONFIG.get("fonts", {}).get(font_name, {})
         font_path = font_config.get("path", VIDEO_DIALOGUE_CONFIG["font_path"])
         font_size = int(font_config.get("size", 16) * font_config.get("scale", 1.8))
         
@@ -441,7 +454,7 @@ def generate_video_from_export_data(
                     y=geometry.get("y", 0.1),
                     width=geometry.get("w", 0.3),
                     height=geometry.get("h", 0.15),
-                    bubble_type=obj.get("bubble_type", "chat"),
+                    bubble_type=obj.get("type", "chat"),
                 ))
 
         frames.append(SceneFrameData(

@@ -1,4 +1,5 @@
 import uuid
+from enum import Enum
 
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -331,10 +332,18 @@ class CharacterVariantGenerateRequest(BaseModel):
     character_id: uuid.UUID | None = None
 
 
+class BubbleType(str, Enum):
+    """Valid bubble types for dialogue rendering."""
+    CHAT = "chat"          # Regular dialogue/speech
+    THOUGHT = "thought"    # Internal thoughts
+    NARRATION = "narration"  # Narrative text boxes
+    SFX = "sfx"           # Sound effects
+
+
 class DialogueBubble(BaseModel):
     bubble_id: uuid.UUID
     panel_id: int = Field(ge=1)
-    bubble_type: str = Field(default="chat", min_length=1, max_length=32)  # chat, thought, narration, sfx
+    bubble_type: BubbleType = Field(default=BubbleType.CHAT)  # Enum: chat, thought, narration, sfx
     speaker: str | None = Field(default=None, max_length=255)
     text: str = Field(min_length=1)
     position: BubblePosition
@@ -343,11 +352,11 @@ class DialogueBubble(BaseModel):
 
 
 class DialogueLayerCreate(BaseModel):
-    bubbles: list[DialogueBubble] = Field(min_length=1)
+    bubbles: list[DialogueBubble] = Field(default_factory=list)  # Allow empty dialogue layers
 
 
 class DialogueLayerUpdate(BaseModel):
-    bubbles: list[DialogueBubble] = Field(min_length=1)
+    bubbles: list[DialogueBubble] = Field(default_factory=list)  # Allow empty dialogue layers
 
 
 class DialogueLayerRead(BaseModel):
