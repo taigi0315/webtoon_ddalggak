@@ -13,7 +13,6 @@ export const storySchema = z.object({
   story_id: z.string().uuid(),
   project_id: z.string().uuid(),
   title: z.string(),
-  default_story_style: z.string(),
   default_image_style: z.string(),
   generation_status: z.string().nullable().optional(),
   generation_error: z.string().nullable().optional()
@@ -26,7 +25,6 @@ export const sceneSchema = z.object({
   source_text: z.string(),
   scene_importance: z.string().nullable(),
   planning_locked: z.boolean(),
-  story_style_override: z.string().nullable(),
   image_style_override: z.string().nullable()
 });
 
@@ -202,7 +200,6 @@ export const episodeSchema = z.object({
   story_id: z.string().uuid(),
   title: z.string(),
   episode_number: z.number().nullable().optional(),
-  default_story_style: z.string().nullable().optional(),
   default_image_style: z.string().nullable().optional(),
   scene_ids_ordered: z.array(z.string().uuid()).default([]),
   created_at: z.string().nullable().optional()
@@ -345,7 +342,6 @@ export const actorVariantReadSchema = z.object({
   variant_name: z.string().nullable(),
   variant_type: z.string(),
   image_style_id: z.string().nullable(),
-  story_style_id: z.string().nullable(),
   traits: z.record(z.any()),
   is_default: z.boolean(),
   reference_image_url: z.string().nullable().optional(),
@@ -361,7 +357,6 @@ export const actorCharacterReadSchema = z.object({
   description: z.string().nullable(),
   gender: z.string().nullable().optional(),
   age_range: z.string().nullable().optional(),
-  default_story_style_id: z.string().nullable().optional(),
   default_image_style_id: z.string().nullable().optional(),
   is_library_saved: z.boolean().optional(),
   variants: z.array(actorVariantReadSchema).default([])

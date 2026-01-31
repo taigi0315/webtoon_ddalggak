@@ -206,7 +206,6 @@ export default function ScenesPage() {
             {selectedScene && (
               <SceneDetail
                 scene={selectedScene}
-                storyStyle={storyQuery.data?.default_story_style}
                 imageStyle={storyQuery.data?.default_image_style}
                 promptOverride={promptOverride}
               />
@@ -245,12 +244,10 @@ export default function ScenesPage() {
 
 function SceneDetail({
   scene,
-  storyStyle,
   imageStyle,
   promptOverride
 }: {
   scene: Scene;
-  storyStyle?: string;
   imageStyle?: string;
   promptOverride?: string | null;
 }) {
@@ -324,7 +321,6 @@ function SceneDetail({
         sceneId: scene.scene_id,
         panelCount: 4,
         styleId: scene.image_style_override ?? imageStyle ?? "default",
-        genre: scene.story_style_override ?? storyStyle ?? null,
         promptOverride: normalizedPromptOverride
       });
     } catch {

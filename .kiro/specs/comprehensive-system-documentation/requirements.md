@@ -118,7 +118,7 @@ This specification defines the requirements for creating comprehensive, accurate
 2. THE Documentation SHALL document layout_templates_9x16_v1.json and template structure
 3. THE Documentation SHALL document qc_rules_v1.json and quality control thresholds
 4. THE Documentation SHALL document genre_guidelines_v1.json for genre-specific visual styles
-5. THE Documentation SHALL document story_styles.json and image_styles.json
+5. THE Documentation SHALL document image_styles.json
 6. THE Documentation SHALL explain how configuration files are loaded and watched for changes
 7. THE Documentation SHALL document the layout selection rules and template matching logic
 

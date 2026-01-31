@@ -93,7 +93,6 @@ def _copy_local_file_to_media(file_path: str) -> str:
 def generate_character_profile_sheet(
     db: "Session",
     project_id: uuid.UUID | None,
-    story_style_id: str,
     image_style_id: str,
     traits: dict[str, Any],
 ) -> dict:
@@ -107,7 +106,6 @@ def generate_character_profile_sheet(
     Args:
         db: Database session
         project_id: Optional project ID (None for global actors)
-        story_style_id: Story style to use
         image_style_id: Image style to use
         traits: Character traits dictionary
 
@@ -124,12 +122,11 @@ def generate_character_profile_sheet(
         hair_traits=traits.get("hair_traits"),
         mood=traits.get("mood"),
         custom_prompt=traits.get("custom_prompt"),
-        story_style=story_style_id,
         image_style=image_style_id,
     )
 
     project_info = f"project {project_id}" if project_id else "global"
-    logger.info(f"Generating profile sheet for {project_info} with styles: {story_style_id}/{image_style_id}")
+    logger.info(f"Generating profile sheet for {project_info} with style: {image_style_id}")
 
     # Generate image
     client = _build_gemini_client()
@@ -144,7 +141,6 @@ def generate_character_profile_sheet(
         metadata_={
             "type": "profile_sheet",
             "project_id": str(project_id) if project_id else None,
-            "story_style": story_style_id,
             "image_style": image_style_id,
             "traits": traits,
         },
@@ -169,7 +165,6 @@ def save_actor_to_library(
     display_name: str,
     description: str | None,
     traits: dict[str, Any],
-    story_style_id: str,
     image_style_id: str,
 ) -> Character:
     """
@@ -187,7 +182,6 @@ def save_actor_to_library(
         display_name: Display name for the actor
         description: Optional description
         traits: Character traits dictionary
-        story_style_id: Story style used
         image_style_id: Image style used
 
     Returns:
@@ -206,7 +200,6 @@ def save_actor_to_library(
         description=description,
         gender=traits.get("gender"),
         age_range=traits.get("age_range"),
-        default_story_style_id=story_style_id,
         default_image_style_id=image_style_id,
         is_library_saved=True,
         approved=True,
@@ -239,7 +232,6 @@ def save_actor_to_library(
         variant_type="base",
         variant_name="Default",
         image_style_id=image_style_id,
-        story_style_id=story_style_id,
         traits=traits,
         reference_image_id=ref_image.reference_image_id,
         generated_image_ids=[str(image_id)],
@@ -259,7 +251,6 @@ def generate_variant_from_reference(
     character: Character,
     base_variant: CharacterVariant,
     trait_changes: dict[str, Any],
-    story_style_id: str | None,
     image_style_id: str | None,
     variant_name: str | None,
 ) -> CharacterVariant:
@@ -280,7 +271,6 @@ def generate_variant_from_reference(
         raise ValueError("Reference image not found")
 
     # Use base variant styles if not overridden
-    final_story_style = story_style_id or base_variant.story_style_id or character.default_story_style_id or "default"
     final_image_style = image_style_id or base_variant.image_style_id or character.default_image_style_id or "default"
 
     # Merge traits - start with base, apply changes
@@ -299,7 +289,6 @@ def generate_variant_from_reference(
         mood_changes=trait_changes.get("mood"),
         outfit_changes=trait_changes.get("custom_prompt"),  # Use custom_prompt for outfit changes
         custom_changes=None,
-        story_style=final_story_style,
         image_style=final_image_style,
     )
 
@@ -351,7 +340,6 @@ def generate_variant_from_reference(
         variant_type="variant",
         variant_name=variant_name or f"Variant {uuid.uuid4().hex[:6]}",
         image_style_id=final_image_style,
-        story_style_id=final_story_style,
         traits=merged_traits,
         reference_image_id=new_ref.reference_image_id,
         generated_image_ids=[str(image.image_id)],
@@ -409,7 +397,6 @@ def import_actor_from_image(
     display_name: str,
     description: str | None,
     traits: dict[str, Any] | None,
-    story_style_id: str | None,
     image_style_id: str | None,
 ) -> Character:
     """
@@ -425,7 +412,6 @@ def import_actor_from_image(
         display_name: Display name for the actor
         description: Optional description
         traits: Optional character traits
-        story_style_id: Optional story style
         image_style_id: Optional image style
 
     Returns:
@@ -441,7 +427,6 @@ def import_actor_from_image(
         description=description,
         gender=traits.get("gender"),
         age_range=traits.get("age_range"),
-        default_story_style_id=story_style_id,
         default_image_style_id=image_style_id,
         is_library_saved=True,
         approved=True,
@@ -474,7 +459,6 @@ def import_actor_from_image(
         variant_type="imported",
         variant_name="Imported",
         image_style_id=image_style_id,
-        story_style_id=story_style_id,
         traits=traits,
         reference_image_id=ref_image.reference_image_id,
         is_default=True,
@@ -495,7 +479,6 @@ def import_actor_from_local_file(
     display_name: str,
     description: str | None,
     traits: dict[str, Any] | None,
-    story_style_id: str | None,
     image_style_id: str | None,
 ) -> Character:
     """
@@ -511,7 +494,6 @@ def import_actor_from_local_file(
         display_name: Display name for the actor
         description: Optional description
         traits: Optional character traits
-        story_style_id: Optional story style
         image_style_id: Optional image style
 
     Returns:
@@ -533,7 +515,6 @@ def import_actor_from_local_file(
         description=description,
         gender=traits.get("gender"),
         age_range=traits.get("age_range"),
-        default_story_style_id=story_style_id,
         default_image_style_id=image_style_id,
         is_library_saved=True,
         approved=True,
@@ -567,7 +548,6 @@ def import_actor_from_local_file(
         variant_type="imported",
         variant_name="Imported",
         image_style_id=image_style_id,
-        story_style_id=story_style_id,
         traits=traits,
         reference_image_id=ref_image.reference_image_id,
         is_default=True,

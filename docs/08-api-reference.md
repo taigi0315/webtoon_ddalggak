@@ -86,7 +86,6 @@ The API is organized into the following resource categories:
 
 **Key Parameters**:
 - `panel_count` - Number of panels to generate (1-12)
-- `genre` - Optional genre for style guidance
 
 **Response**: Artifact IDs for scene_intent, panel_plan, panel_plan_normalized, layout_template, panel_semantics
 
@@ -128,7 +127,6 @@ The API is organized into the following resource categories:
 **Key Parameters**:
 - `panel_count` - Number of panels to generate (1-12)
 - `style_id` - Image style preset ID (required)
-- `genre` - Optional genre for style guidance
 - `prompt_override` - Optional custom prompt text
 
 **Response**: Artifact IDs for all planning and rendering artifacts, plus blind_test_report
@@ -411,8 +409,7 @@ The API is organized into the following resource categories:
 ### Request Validation Errors
 
 - **400 Bad Request**: Check request body against Pydantic schema in `app/api/v1/schemas.py`
-- **Invalid style_id**: Verify style exists in `app/config/story_styles.json` or `app/config/image_styles.json`
-- **Invalid genre**: Check genre exists in `app/config/genre_guidelines_v1.json`
+- **Invalid style_id**: Verify style exists in `app/config/image_styles.json`
 - **Panel count out of range**: Ensure panel_count is 1-12
 - **Max scenes/characters exceeded**: Check limits (max_scenes: 1-30, max_characters: 1-20)
 
@@ -498,8 +495,7 @@ curl -X POST http://localhost:8000/v1/stories/{story_id}/generate/blueprint \
 curl -X POST http://localhost:8000/v1/scenes/{scene_id}/plan \
   -H "Content-Type: application/json" \
   -d '{
-    "panel_count": 3,
-    "genre": "romance"
+    "panel_count": 3
   }'
 
 # Test scene rendering

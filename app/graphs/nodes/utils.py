@@ -37,7 +37,6 @@ from app.graphs.nodes.constants import (
     VALID_GRAMMAR_IDS,
     VISUAL_PROMPT_FORMULA,
 )
-from app.graphs.nodes.genre_guidelines import GENRE_VISUAL_GUIDELINES, SHOT_DISTRIBUTION_BY_GENRE
 from app.graphs.nodes.helpers.character import (
     CHARACTER_STYLE_MAP,
     _active_variant_reference_images,
@@ -288,7 +287,6 @@ def _heuristic_panel_semantics(
     panel_plan: dict,
     layout_template: dict,
     characters: list[Character],
-    story_style: str | None = None,
     scene_intent: dict | None = None,
 ) -> dict:
     panels = []
@@ -323,7 +321,6 @@ def _heuristic_panel_semantics(
                 "characters": names,
                 "dialogue": dialogue,
                 "layout_hint": layout_template.get("layout_text"),
-                "story_style": story_style,
             }
         )
 

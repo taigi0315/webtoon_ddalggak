@@ -120,7 +120,6 @@ curl -X POST http://localhost:8000/v1/projects/{project_id}/stories \
   -H "Content-Type: application/json" \
   -d '{
     "title": "My Story",
-    "default_story_style": "default",
     "default_image_style": "default"
   }'
 ```
@@ -215,7 +214,6 @@ ssuljaengi_v4/
 - `app/config/layout_templates_9x16_v1.json` - Vertical webtoon layout templates
 - `app/config/layout_selection_rules_v1.json` - Layout selection decision rules
 - `app/config/qc_rules_v1.json` - Quality control rules
-- `app/config/story_styles.json` - Story genre/mood styles
 - `app/config/image_styles.json` - Visual rendering styles
 - `app/prompts/prompts.yaml` - LLM prompt templates
 

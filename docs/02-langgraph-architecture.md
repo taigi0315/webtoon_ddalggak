@@ -90,7 +90,6 @@ graph TD
 - `max_characters` - Maximum characters to extract (1-20)
 - `panel_count` - Panels per scene (1-12)
 - `allow_append` - Allow adding scenes to existing story
-- `story_style` - Story generation style preset ID
 - `image_style` - Image generation style preset ID
 - `planning_mode` - "full" or "characters_only"
 - `require_hero_single` - Enforce at least one single-panel scene

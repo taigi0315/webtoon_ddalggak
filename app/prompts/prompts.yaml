@@ -275,7 +275,6 @@ prompt_scene_intent: |
   - Include character reactions, not just actions
   - Balance dialogue beats with action/reaction beats
 
-  Genre: {{ genre_text }}
   Known characters: {{ char_list }}
 
   Scene text:

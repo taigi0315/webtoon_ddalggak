@@ -1,7 +1,7 @@
 # Scene Intent Prompt
 # Version: 1.0
 # Description: Extract narrative intent from scene for webtoon adaptation
-# Required Variables: genre_text, char_list, scene_text
+# Required Variables: char_list, scene_text
 # Output Schema: { logline, pacing, emotional_arc, visual_motifs, summary, beats, setting, characters }
 
 prompt_scene_intent: |
@@ -37,7 +37,6 @@ prompt_scene_intent: |
   - Include character reactions, not just actions
   - Balance dialogue beats with action/reaction beats
 
-  Genre: {{ genre_text }}
   Known characters: {{ char_list }}
 
   Scene text:

@@ -3,7 +3,6 @@ import uuid
 
 from app.config import loaders
 from app.db.models import Character, CharacterVariant
-from app.graphs.nodes.genre_guidelines import GENRE_VISUAL_GUIDELINES
 from app.graphs.nodes.helpers.character import _character_codes, _inject_character_identities
 
 
@@ -13,12 +12,10 @@ def _compile_prompt(
     style_id: str,
     characters: list[Character],
     reference_char_ids: set[uuid.UUID] | None = None,
-    story_style: str | None = None,
     variants_by_character: dict[uuid.UUID, CharacterVariant] | None = None,
 ) -> str:
     """Compile a production-grade image generation prompt with rich visual details."""
     style_desc = _style_description(style_id)
-    story_desc = _story_style_description(story_style)
     layout_text = layout_template.get("layout_text", "")
     reference_char_ids = reference_char_ids or set()
     panel_semantics = _inject_character_identities(
@@ -76,9 +73,6 @@ def _compile_prompt(
                 char_lines.append(f"    Appearance: {c.description}")
         identity_lines.extend(char_lines)
 
-    genre_key = (story_style or "drama").lower().replace("-", "_").replace(" ", "_")
-    genre_guide = GENRE_VISUAL_GUIDELINES.get(genre_key, GENRE_VISUAL_GUIDELINES.get("drama", {}))
-
     mapping = loaders.load_grammar_to_prompt_mapping_v1().mapping
 
     lines = [
@@ -91,7 +85,7 @@ def _compile_prompt(
         "- Text descriptions are for role, action, emotion, and clothing ONLY.",
         "- Faces, hairstyles, glasses shape, and proportions must match reference images exactly.",
         "",
-        f"**STYLE & GENRE:** {style_desc} | {story_desc}",
+        f"**STYLE:** {style_desc}",
         "",
         "**PANEL COMPOSITION RULES:**",
         f"- Layout: {layout_text or f'{panel_count} panels, vertical flow'}",
@@ -100,11 +94,6 @@ def _compile_prompt(
         "- You may use one dominant panel with smaller inset panels.",
         "- Panels can vary in size and position if reading order is clear (top to bottom).",
         "- If there is a reveal/impact/emotional peak, make that panel dominant.",
-        "",
-        f"**GENRE VISUAL GUIDELINES ({genre_key}):**",
-        f"- Lighting: {genre_guide.get('lighting', 'natural ambient')}",
-        f"- Atmosphere: {genre_guide.get('atmosphere', 'appropriate to mood')}",
-        f"- Color palette: {genre_guide.get('color_palette', 'natural tones')}",
         "",
     ]
 
@@ -207,16 +196,6 @@ def _compile_prompt(
 
 def _style_description(style_id: str) -> str:
     styles = loaders.load_image_styles_v1().styles
-    for style in styles:
-        if style.id == style_id:
-            return f"{style.label}: {style.description}"
-    return style_id
-
-
-def _story_style_description(style_id: str | None) -> str:
-    if not style_id:
-        return "default"
-    styles = loaders.load_story_styles_v1().styles
     for style in styles:
         if style.id == style_id:
             return f"{style.label}: {style.description}"

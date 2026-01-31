@@ -12,7 +12,7 @@ from app.api.v1.schemas import (
     EpisodeScenesUpdate,
     EpisodeSetStyleRequest,
 )
-from app.config.loaders import has_image_style, has_story_style
+from app.config.loaders import has_image_style
 from app.db.models import Episode, EpisodeAsset, EpisodeScene, Scene, Story
 
 
@@ -46,15 +46,12 @@ def create_episode(story_id: uuid.UUID, payload: EpisodeCreate, db=DbSessionDep)
     story = db.get(Story, story_id)
     if story is None:
         raise HTTPException(status_code=404, detail="story not found")
-    if not has_story_style(payload.default_story_style):
-        raise HTTPException(status_code=400, detail="unknown default_story_style")
     if not has_image_style(payload.default_image_style):
         raise HTTPException(status_code=400, detail="unknown default_image_style")
 
     episode = Episode(
         story_id=story_id,
         title=payload.title,
-        default_story_style=payload.default_story_style,
         default_image_style=payload.default_image_style,
         status="draft",
     )
@@ -66,7 +63,6 @@ def create_episode(story_id: uuid.UUID, payload: EpisodeCreate, db=DbSessionDep)
         episode_id=episode.episode_id,
         story_id=episode.story_id,
         title=episode.title,
-        default_story_style=episode.default_story_style,
         default_image_style=episode.default_image_style,
         status=episode.status,
         scene_ids_ordered=[],
@@ -87,7 +83,6 @@ def list_story_episodes(story_id: uuid.UUID, db=DbSessionDep):
                 episode_id=episode.episode_id,
                 story_id=episode.story_id,
                 title=episode.title,
-                default_story_style=episode.default_story_style,
                 default_image_style=episode.default_image_style,
                 status=episode.status,
                 scene_ids_ordered=_scene_ids_ordered(db, episode.episode_id),
@@ -103,7 +98,6 @@ def get_episode(episode_id: uuid.UUID, db=DbSessionDep):
         episode_id=episode.episode_id,
         story_id=episode.story_id,
         title=episode.title,
-        default_story_style=episode.default_story_style,
         default_image_style=episode.default_image_style,
         status=episode.status,
         scene_ids_ordered=_scene_ids_ordered(db, episode_id),
@@ -132,7 +126,6 @@ def set_episode_scenes(episode_id: uuid.UUID, payload: EpisodeScenesUpdate, db=D
         episode_id=episode.episode_id,
         story_id=episode.story_id,
         title=episode.title,
-        default_story_style=episode.default_story_style,
         default_image_style=episode.default_image_style,
         status=episode.status,
         scene_ids_ordered=_scene_ids_ordered(db, episode_id),
@@ -142,12 +135,9 @@ def set_episode_scenes(episode_id: uuid.UUID, payload: EpisodeScenesUpdate, db=D
 @router.post("/episodes/{episode_id}/set-style", response_model=EpisodeRead)
 def set_episode_style(episode_id: uuid.UUID, payload: EpisodeSetStyleRequest, db=DbSessionDep):
     episode = _episode_or_404(db, episode_id)
-    if not has_story_style(payload.default_story_style):
-        raise HTTPException(status_code=400, detail="unknown default_story_style")
     if not has_image_style(payload.default_image_style):
         raise HTTPException(status_code=400, detail="unknown default_image_style")
 
-    episode.default_story_style = payload.default_story_style
     episode.default_image_style = payload.default_image_style
     db.add(episode)
     db.commit()
@@ -157,7 +147,6 @@ def set_episode_style(episode_id: uuid.UUID, payload: EpisodeSetStyleRequest, db
         episode_id=episode.episode_id,
         story_id=episode.story_id,
         title=episode.title,
-        default_story_style=episode.default_story_style,
         default_image_style=episode.default_image_style,
         status=episode.status,
         scene_ids_ordered=_scene_ids_ordered(db, episode_id),

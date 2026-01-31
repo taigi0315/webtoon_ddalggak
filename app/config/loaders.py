@@ -75,125 +75,20 @@ class QcRulesV1(BaseModel):
 class StyleItem(BaseModel):
     id: str = Field(min_length=1)
     label: str = Field(min_length=1)
-    description: str = Field(min_length=1)
+    description: str = Field(default="")
     image_url: str | None = None
 
 
-class StyleLibraryV1(BaseModel):
+class ImageStylesV1(BaseModel):
     version: str
     styles: list[StyleItem]
 
 
-class GenreGuideline(BaseModel):
-    shot_preferences: str
-    composition: str
-    camera: str
-    lighting: str
-    props: str
-    atmosphere: str
-    color_palette: str
+# Global config version counter (incremented on cache clear)
+_config_version = 0
 
 
-class ShotDistribution(BaseModel):
-    establishing: int | str
-    medium: int | str
-    closeup: int | str
-    dynamic: int | str
-
-
-class GenreGuidelinesV1(BaseModel):
-    version: str
-    description: str = ""
-    genres: dict[str, GenreGuideline]
-    shot_distribution: dict[str, ShotDistribution]
-
-
-# Config cache version tracking for hot-reload
-_config_version: int = 0
-
-
-def _config_dir() -> Path:
-    return Path(__file__).resolve().parent
-
-
-def _read_json(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-@lru_cache(maxsize=1)
-def load_grammar_library_v1() -> GrammarLibraryV1:
-    data = _read_json(_config_dir() / "panel_grammar_library_v1.json")
-    return GrammarLibraryV1.model_validate(data)
-
-
-@lru_cache(maxsize=1)
-def load_layout_templates_9x16_v1() -> LayoutTemplatesV1:
-    data = _read_json(_config_dir() / "layout_templates_9x16_v1.json")
-    return LayoutTemplatesV1.model_validate(data)
-
-
-@lru_cache(maxsize=1)
-def load_layout_selection_rules_v1() -> LayoutSelectionRulesV1:
-    data = _read_json(_config_dir() / "layout_selection_rules_v1.json")
-    return LayoutSelectionRulesV1.model_validate(data)
-
-
-@lru_cache(maxsize=1)
-def load_grammar_to_prompt_mapping_v1() -> GrammarToPromptMappingV1:
-    data = _read_json(_config_dir() / "grammar_to_prompt_mapping_v1.json")
-    return GrammarToPromptMappingV1.model_validate(data)
-
-
-@lru_cache(maxsize=1)
-def load_continuity_rules_v1() -> ContinuityRulesV1:
-    data = _read_json(_config_dir() / "continuity_rules_v1.json")
-    return ContinuityRulesV1.model_validate(data)
-
-
-@lru_cache(maxsize=1)
-def load_qc_rules_v1() -> QcRulesV1:
-    data = _read_json(_config_dir() / "qc_rules_v1.json")
-    return QcRulesV1.model_validate(data)
-
-
-@lru_cache(maxsize=1)
-def load_story_styles_v1() -> StyleLibraryV1:
-    data = _read_json(_config_dir() / "story_styles.json")
-    return StyleLibraryV1.model_validate(data)
-
-
-@lru_cache(maxsize=1)
-def load_image_styles_v1() -> StyleLibraryV1:
-    data = _read_json(_config_dir() / "image_styles.json")
-    return StyleLibraryV1.model_validate(data)
-
-
-@lru_cache(maxsize=1)
-def load_genre_guidelines_v1() -> GenreGuidelinesV1:
-    """Load genre visual guidelines from JSON config."""
-    data = _read_json(_config_dir() / "genre_guidelines_v1.json")
-    return GenreGuidelinesV1.model_validate(data)
-
-
-def get_genre_guideline(genre: str) -> GenreGuideline | None:
-    """Get visual guidelines for a specific genre."""
-    guidelines = load_genre_guidelines_v1()
-    return guidelines.genres.get(genre)
-
-
-def get_shot_distribution(genre: str) -> ShotDistribution | None:
-    """Get shot distribution for a specific genre."""
-    guidelines = load_genre_guidelines_v1()
-    return guidelines.shot_distribution.get(genre)
-
-
-def list_genres() -> list[str]:
-    """List all available genre names."""
-    return list(load_genre_guidelines_v1().genres.keys())
-
-
-def clear_config_cache() -> None:
+def clear_config_cache():
     """Clear all cached config data. Call this to force config reload."""
     global _config_version
     _config_version += 1
@@ -203,9 +98,7 @@ def clear_config_cache() -> None:
     load_grammar_to_prompt_mapping_v1.cache_clear()
     load_continuity_rules_v1.cache_clear()
     load_qc_rules_v1.cache_clear()
-    load_story_styles_v1.cache_clear()
     load_image_styles_v1.cache_clear()
-    load_genre_guidelines_v1.cache_clear()
 
 
 def get_config_version() -> int:
@@ -227,11 +120,6 @@ def get_layout_template(template_id: str) -> LayoutTemplate:
         if t.template_id == template_id:
             return t
     raise KeyError(f"Unknown template_id: {template_id}")
-
-
-def has_story_style(style_id: str) -> bool:
-    lib = load_story_styles_v1()
-    return any(s.id == style_id for s in lib.styles)
 
 
 def has_image_style(style_id: str) -> bool:
@@ -313,3 +201,73 @@ def select_template(panel_plan, derived_features: dict | None = None, excluded_t
 
     # As a final fallback, return the default (even if excluded)
     return get_layout_template(rules.default_template_id)
+
+
+# ============================================================================
+# Config Loaders
+# ============================================================================
+
+_CONFIG_DIR = Path(__file__).parent
+
+
+@lru_cache(maxsize=1)
+def load_grammar_library_v1() -> GrammarLibraryV1:
+    """Load panel grammar library."""
+    path = _CONFIG_DIR / "panel_grammar_library_v1.json"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return GrammarLibraryV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_layout_templates_9x16_v1() -> LayoutTemplatesV1:
+    """Load 9:16 layout templates."""
+    path = _CONFIG_DIR / "layout_templates_9x16_v1.json"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return LayoutTemplatesV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_layout_selection_rules_v1() -> LayoutSelectionRulesV1:
+    """Load layout selection rules."""
+    path = _CONFIG_DIR / "layout_selection_rules_v1.json"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return LayoutSelectionRulesV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_grammar_to_prompt_mapping_v1() -> GrammarToPromptMappingV1:
+    """Load grammar to prompt mapping."""
+    path = _CONFIG_DIR / "grammar_to_prompt_mapping_v1.json"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return GrammarToPromptMappingV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_continuity_rules_v1() -> ContinuityRulesV1:
+    """Load continuity rules."""
+    path = _CONFIG_DIR / "continuity_rules_v1.json"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return ContinuityRulesV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_qc_rules_v1() -> QcRulesV1:
+    """Load QC rules."""
+    path = _CONFIG_DIR / "qc_rules_v1.json"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return QcRulesV1.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_image_styles_v1() -> ImageStylesV1:
+    """Load image styles."""
+    path = _CONFIG_DIR / "image_styles.json"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return ImageStylesV1.model_validate(data)

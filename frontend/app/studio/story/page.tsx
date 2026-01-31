@@ -56,7 +56,6 @@ export default function StoryEditorPage() {
   const [projectId, setProjectId] = useState("");
   const [projectName, setProjectName] = useState("");
   const [storyTitle, setStoryTitle] = useState("");
-  const [storyStyle, setStoryStyle] = useState("default");
   const [imageStyle, setImageStyle] = useState("default");
   const [storyText, setStoryText] = useState("");
   const [storyTextTouched, setStoryTextTouched] = useState(false);
@@ -189,9 +188,7 @@ export default function StoryEditorPage() {
 
     const storedProjectId = window.localStorage.getItem("lastProjectId") ?? "";
     if (!paramProjectId && storedProjectId) setProjectId(storedProjectId);
-    const storedStoryStyle = window.localStorage.getItem("selectedStoryStyle") ?? "default";
     const storedImageStyle = window.localStorage.getItem("selectedImageStyle") ?? "default";
-    setStoryStyle(storedStoryStyle);
     setImageStyle(storedImageStyle);
   }, [searchParams]);
 
@@ -302,7 +299,6 @@ export default function StoryEditorPage() {
         const story = await createStoryMutation.mutateAsync({
           projectId: currentProjectId,
           title: storyTitle.trim(),
-          defaultStoryStyle: storyStyle,
           defaultImageStyle: imageStyle
         });
         currentStoryId = story.story_id;
@@ -438,11 +434,10 @@ export default function StoryEditorPage() {
             Styles are selected in the Style Select tab before story generation.
           </p>
           <div className="mt-6 rounded-xl border border-[rgba(17,24,39,0.12)] bg-white/70 p-4 text-sm text-slate-600">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Current Styles</p>
-            <p className="mt-2">Story style: <strong>{storyStyle}</strong></p>
-            <p>Image style: <strong>{imageStyle}</strong></p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Current Style</p>
+            <p className="mt-2">Image style: <strong>{imageStyle}</strong></p>
             <Link className="btn-ghost text-xs mt-3 inline-block" href={`/studio/styles?project_id=${projectId}`}>
-              Change styles
+              Change style
             </Link>
           </div>
 
@@ -486,11 +481,8 @@ export default function StoryEditorPage() {
                       const nextStoryId = e.target.value;
                       setStoryId(nextStoryId);
                       if (!nextStoryId) {
-                        const storedStoryStyle =
-                          window.localStorage.getItem("selectedStoryStyle") ?? "default";
                         const storedImageStyle =
                           window.localStorage.getItem("selectedImageStyle") ?? "default";
-                        setStoryStyle(storedStoryStyle);
                         setImageStyle(storedImageStyle);
                         return;
                       }
@@ -498,7 +490,6 @@ export default function StoryEditorPage() {
                         (story) => story.story_id === nextStoryId
                       );
                       if (selected) {
-                        setStoryStyle(selected.default_story_style ?? "default");
                         setImageStyle(selected.default_image_style ?? "default");
                       }
                     }}

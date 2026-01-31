@@ -135,7 +135,6 @@ export default function DialogueEditorPage() {
       return createEpisode({
         storyId,
         title: `${storyQuery.data.title} Episode`,
-        defaultStoryStyle: storyQuery.data.default_story_style,
         defaultImageStyle: storyQuery.data.default_image_style
       });
     },

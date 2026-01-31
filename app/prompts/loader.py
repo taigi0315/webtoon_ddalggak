@@ -20,7 +20,7 @@ Usage:
     template = get_prompt("prompt_scene_intent")
 
     # Render with variables
-    rendered = render_prompt("prompt_scene_intent", scene_text="...", genre_text="...")
+    rendered = render_prompt("prompt_scene_intent", scene_text="...", char_list="...")
 
     # Get non-string data (e.g., character_style_map)
     style_map = get_prompt_data("character_style_map")

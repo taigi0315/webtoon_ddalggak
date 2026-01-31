@@ -20,14 +20,12 @@ from ..utils import (
 def compile_visual_plan_bundle(
     scenes: list[dict],
     characters: list[dict],
-    story_style: str | None = None,
 ) -> list[dict]:
     """Compile visual plan bundle using heuristics.
 
     Args:
         scenes: List of scene dicts with source_text
         characters: List of character dicts
-        story_style: Optional story style/genre
 
     Returns:
         List of visual plan dicts for each scene
@@ -55,7 +53,6 @@ def compile_visual_plan_bundle(
             "must_show": _extract_must_show(scene.get("source_text", "")),
             "scene_importance": importance,
             "characters": [c.get("name") for c in characters if c.get("name")],
-            "story_style": story_style,
         }
         plans.append(plan)
 
@@ -65,7 +62,6 @@ def compile_visual_plan_bundle(
 def compile_visual_plan_bundle_llm(
     scenes: list[dict],
     characters: list[dict],
-    story_style: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> list[dict]:
     """LLM-enhanced visual plan compilation with beat extraction.
@@ -75,16 +71,15 @@ def compile_visual_plan_bundle_llm(
     Args:
         scenes: List of scene dicts with source_text
         characters: List of character dicts
-        story_style: Optional story style/genre
         gemini: Optional GeminiClient for LLM-based compilation
 
     Returns:
         List of visual plan dicts for each scene
     """
     if gemini is None:
-        return compile_visual_plan_bundle(scenes, characters, story_style)
+        return compile_visual_plan_bundle(scenes, characters)
 
-    prompt = _prompt_visual_plan(scenes, characters, story_style)
+    prompt = _prompt_visual_plan(scenes, characters)
     result = _maybe_json_from_gemini(gemini, prompt)
 
     if result and isinstance(result.get("scene_plans"), list):
@@ -103,7 +98,6 @@ def compile_visual_plan_bundle_llm(
                 "beats": scene_plan.get("beats", []),
                 "must_show": scene_plan.get("must_show", []),
                 "characters": [c.get("name") for c in characters if c.get("name")],
-                "story_style": story_style,
                 "global_environment_anchors": global_anchors,
             }
 
@@ -118,7 +112,7 @@ def compile_visual_plan_bundle_llm(
 
     # Fallback to heuristic
     logger.info("Falling back to heuristic visual plan compilation")
-    return compile_visual_plan_bundle(scenes, characters, story_style)
+    return compile_visual_plan_bundle(scenes, characters)
 
 
 def compute_scene_chunker(source_text: str, max_scenes: int = 6) -> list[str]:

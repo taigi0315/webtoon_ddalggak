@@ -1,7 +1,7 @@
 # Panel Semantics Prompt
 # Version: 1.0
 # Description: Fill detailed visual semantics for each panel
-# Required Variables: char_section, plan_section, layout_text, scene_text, intent_block (optional), genre_block (optional)
+# Required Variables: char_section, plan_section, layout_text, scene_text, intent_block (optional)
 # Output Schema: { panels: [{ panel_index, grammar_id, camera, character_frame_percentage, focus_on, description, characters, dialogue, environment, lighting, atmosphere_keywords }] }
 
 prompt_panel_semantics: |
@@ -11,9 +11,6 @@ prompt_panel_semantics: |
   This will be used for AI image generation - be SPECIFIC and VISUAL.
   {% if intent_block %}
   {{ intent_block }}
-  {% endif %}
-  {% if genre_block %}
-  {{ genre_block }}
   {% endif %}
   CHARACTERS (use these identity_lines for consistency):
   {{ char_section }}
