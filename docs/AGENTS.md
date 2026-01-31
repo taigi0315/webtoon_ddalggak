@@ -23,8 +23,11 @@ Agent design guidelines
 1. Roles & responsibilities
    - Panel Plan Agent: returns a `panel_plan` JSON (schema below). Should be idempotent and conservative.
    - Webtoon Script Writer Agent: translates raw story into visual beats, dialogue, and SFX. Focuses on "Show, Don't Tell" and character consistency via anchors.
+   - Tone Auditor Agent: Analyzes narrative beats for mood shifts (Mood Segments) and assigns importance weights to ensure critical moments aren't lost during optimization.
+   - Scene Optimizer Agent: Manages story budget by merging low-weight beats. Functions as a "Production Manager" that selects image styles per scene and triggers script rewrites if budget constraints compromise quality.
    - Layout Resolver Agent: picks layout templates based on `panel_plan` + derived features (weights, hero_count, pace, scene_importance).
    - Semantics Filler Agent: enriches panels with `text` and visual cues for image generation.
+   - Blind Test Critic Agent: Analyzes story reconstruction reports ("Blind Tests") to detect narrative gaps or visual inconsistencies, forcing iterative script improvements.
    - Repair Agent (LLM): invoked only for repairing malformed JSON outputs.
 
 2. Prompt engineering

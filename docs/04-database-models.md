@@ -11,30 +11,30 @@ erDiagram
     Project ||--o{ Story : contains
     Project ||--o{ Character : owns
     Project ||--o{ StylePreset : defines
-    
+
     Story ||--o{ Scene : contains
     Story ||--o{ Episode : organizes
     Story ||--o{ CharacterVariant : scopes
     Story }o--o{ Character : uses
-    
+
     Scene ||--o{ Artifact : produces
     Scene ||--o| DialogueLayer : has
     Scene ||--o{ Layer : contains
     Scene }o--o| EnvironmentAnchor : references
-    
+
     Character ||--o{ CharacterVariant : has
     Character ||--o{ CharacterReferenceImage : has
     Character ||--o{ StoryCharacter : links
-    
+
     CharacterVariant }o--o| CharacterReferenceImage : references
-    
+
     Artifact ||--o| Image : generates
     Artifact }o--o| Artifact : derives_from
-    
+
     Episode ||--o{ EpisodeScene : includes
     Episode ||--o{ EpisodeAsset : uses
     EpisodeScene }o--|| Scene : references
-    
+
     StylePreset }o--o| StylePreset : inherits_from
 ```
 
@@ -45,11 +45,13 @@ erDiagram
 **Purpose**: Top-level container for all content
 
 **Key Fields**:
+
 - `project_id` - UUID primary key
 - `name` - Project display name
 - `created_at` - Creation timestamp
 
 **Relationships**:
+
 - One-to-many with `Story`, `Character`, `StylePreset`
 
 ### Story
@@ -57,6 +59,7 @@ erDiagram
 **Purpose**: Narrative container with generation settings and progress tracking
 
 **Key Fields**:
+
 - `story_id` - UUID primary key
 - `project_id` - Foreign key to Project
 - `title` - Story display name
@@ -67,6 +70,7 @@ erDiagram
 - `progress_updated_at` - Last progress update timestamp
 
 **Relationships**:
+
 - Belongs to `Project`
 - One-to-many with `Scene`, `Episode`, `CharacterVariant`
 - Many-to-many with `Character` via `StoryCharacter`
@@ -76,6 +80,7 @@ erDiagram
 **Purpose**: Individual narrative unit that becomes one or more webtoon panels
 
 **Key Fields**:
+
 - `scene_id` - UUID primary key
 - `story_id` - Foreign key to Story
 - `source_text` - Raw scene text input
@@ -85,6 +90,7 @@ erDiagram
 - `environment_id` - Optional reference to reusable environment
 
 **Relationships**:
+
 - Belongs to `Story`
 - One-to-many with `Artifact`
 - One-to-one with `DialogueLayer`
@@ -98,6 +104,7 @@ erDiagram
 **Purpose**: Character definition with visual details and identity
 
 **Key Fields**:
+
 - `character_id` - UUID primary key
 - `project_id` - Foreign key to Project (nullable for global actors)
 - `canonical_code` - Sequential identifier (CHAR_A, CHAR_B, etc.)
@@ -115,17 +122,20 @@ erDiagram
 **Actor System**: Characters with `project_id = NULL` are global actors reusable across projects
 
 **Relationships**:
+
 - Belongs to `Project` (optional for actors)
 - Many-to-many with `Story` via `StoryCharacter`
 - One-to-many with `CharacterVariant`, `CharacterReferenceImage`
 
 ### StoryCharacter
 
-**Purpose**: Junction table linking characters to stories
+**Purpose**: Junction table linking characters to stories with story-specific descriptive metadata
 
 **Key Fields**:
+
 - `story_id` - Foreign key to Story (composite primary key)
 - `character_id` - Foreign key to Character (composite primary key)
+- `narrative_description` - Story-specific character bio or role description extraction
 - `created_at` - Link creation timestamp
 
 ### CharacterVariant
@@ -133,6 +143,7 @@ erDiagram
 **Purpose**: Specific appearance variation of a character (outfit change, mood change, etc.)
 
 **Key Fields**:
+
 - `variant_id` - UUID primary key
 - `character_id` - Foreign key to Character
 - `story_id` - Foreign key to Story (nullable for global variants)
@@ -148,6 +159,7 @@ erDiagram
 **Scoping**: Variants can be story-specific (`story_id` set) or global (`story_id = NULL`)
 
 **Relationships**:
+
 - Belongs to `Character`
 - Belongs to `Story` (optional for global variants)
 - References `CharacterReferenceImage` (optional)
@@ -157,6 +169,7 @@ erDiagram
 **Purpose**: Reference images for character consistency
 
 **Key Fields**:
+
 - `reference_image_id` - UUID primary key
 - `character_id` - Foreign key to Character
 - `image_url` - URL to reference image
@@ -166,6 +179,7 @@ erDiagram
 - `metadata_` - JSON field with additional metadata
 
 **Relationships**:
+
 - Belongs to `Character`
 
 ### CharacterVariantSuggestion
@@ -173,6 +187,7 @@ erDiagram
 **Purpose**: AI-generated suggestions for character variants based on story context
 
 **Key Fields**:
+
 - `suggestion_id` - UUID primary key
 - `story_id` - Foreign key to Story
 - `character_id` - Foreign key to Character
@@ -186,6 +201,7 @@ erDiagram
 **Purpose**: Versioned intermediate outputs from graph nodes
 
 **Key Fields**:
+
 - `artifact_id` - UUID primary key
 - `scene_id` - Foreign key to Scene
 - `type` - Artifact type (scene_intent, panel_plan, render_spec, etc.)
@@ -198,6 +214,7 @@ erDiagram
 **Versioning**: Each (scene_id, type) combination has independent version sequence starting at 1
 
 **Artifact Types**:
+
 - `scene_intent` - Narrative intent extraction
 - `panel_plan` - Panel breakdown with shot types
 - `panel_plan_normalized` - Validated and corrected panel plan
@@ -211,6 +228,7 @@ erDiagram
 - `visual_plan` - Visual beats with importance ratings
 
 **Relationships**:
+
 - Belongs to `Scene`
 - Self-referential parent-child relationship via `parent_id`
 - One-to-many with `Image`
@@ -220,12 +238,14 @@ erDiagram
 **Purpose**: Generated images linked to artifacts
 
 **Key Fields**:
+
 - `image_id` - UUID primary key
 - `artifact_id` - Foreign key to Artifact (nullable)
 - `image_url` - URL to generated image
 - `metadata_` - JSON field with generation metadata
 
 **Relationships**:
+
 - Belongs to `Artifact` (optional)
 
 ## Other Key Models
@@ -235,6 +255,7 @@ erDiagram
 **Purpose**: Custom style configurations for story/image generation
 
 **Key Fields**:
+
 - `preset_id` - UUID primary key
 - `project_id` - Foreign key to Project (nullable for system presets)
 - `parent_id` - Foreign key to parent StylePreset (for inheritance)
@@ -252,6 +273,7 @@ erDiagram
 **Purpose**: Speech bubbles and dialogue for a scene
 
 **Key Fields**:
+
 - `dialogue_id` - UUID primary key
 - `scene_id` - Foreign key to Scene (unique)
 - `bubbles` - JSON array of dialogue bubble definitions
@@ -261,6 +283,7 @@ erDiagram
 **Purpose**: Reusable environment descriptions for consistency
 
 **Key Fields**:
+
 - `environment_id` - UUID primary key
 - `description` - Environment description text
 - `usage_count` - Number of scenes using this environment
@@ -274,6 +297,7 @@ erDiagram
 **Purpose**: Compositing layers for scene rendering (future feature)
 
 **Key Fields**:
+
 - `layer_id` - UUID primary key
 - `scene_id` - Foreign key to Scene
 - `layer_type` - Type of layer (background, character, effects, etc.)
@@ -284,6 +308,7 @@ erDiagram
 **Purpose**: Multi-scene composition for episodic content
 
 **Key Fields**:
+
 - `episode_id` - UUID primary key
 - `story_id` - Foreign key to Story
 - `title` - Episode title
@@ -295,6 +320,7 @@ erDiagram
 **Purpose**: Junction table linking scenes to episodes with ordering
 
 **Key Fields**:
+
 - `episode_scene_id` - UUID primary key
 - `episode_id` - Foreign key to Episode
 - `scene_id` - Foreign key to Scene
@@ -305,6 +331,7 @@ erDiagram
 **Purpose**: Additional assets attached to episodes
 
 **Key Fields**:
+
 - `episode_asset_id` - UUID primary key
 - `episode_id` - Foreign key to Episode
 - `asset_type` - Type of asset
@@ -315,6 +342,7 @@ erDiagram
 **Purpose**: Asynchronous export job tracking
 
 **Key Fields**:
+
 - `export_id` - UUID primary key
 - `scene_id` - Foreign key to Scene (optional)
 - `episode_id` - Foreign key to Episode (optional)
@@ -327,6 +355,7 @@ erDiagram
 **Purpose**: Audit trail for all entity changes
 
 **Key Fields**:
+
 - `audit_id` - UUID primary key
 - `entity_type` - Type of entity changed
 - `entity_id` - UUID of entity changed
@@ -356,9 +385,10 @@ erDiagram
 - **Actor system**: Look for characters with `project_id = NULL` for global actors
 
 **Useful queries**:
+
 ```sql
 -- Check character assignments for a project
-SELECT canonical_code, name, role, gender, age_range 
+SELECT canonical_code, name, role, gender, age_range
 FROM characters WHERE project_id = ?;
 
 -- Review active variants for a story
@@ -379,10 +409,11 @@ FROM characters WHERE project_id IS NULL;
 - **Planning lock**: Check `Scene.planning_locked` to see if regeneration is blocked
 
 **Useful queries**:
+
 ```sql
 -- List all artifacts for a scene
 SELECT type, version, created_at, created_by
-FROM artifacts 
+FROM artifacts
 WHERE scene_id = ?
 ORDER BY type, version DESC;
 
@@ -412,6 +443,7 @@ SELECT * FROM lineage ORDER BY depth;
 - **Scene locking**: Verify `Scene.planning_locked` status
 
 **Useful queries**:
+
 ```sql
 -- Check story generation status
 SELECT story_id, title, generation_status, generation_error, progress
@@ -440,6 +472,7 @@ SELECT * FROM style_chain ORDER BY depth;
 - **Episode assets**: Verify `EpisodeAsset` records for required assets
 
 **Useful queries**:
+
 ```sql
 -- List scenes in episode order
 SELECT es.order_index, s.scene_id, s.source_text
@@ -459,6 +492,7 @@ FROM exports WHERE export_id = ?;
 - **Request correlation**: Use `request_id` to trace all changes from a single request
 
 **Useful queries**:
+
 ```sql
 -- Review entity change history
 SELECT action, timestamp, old_value, new_value

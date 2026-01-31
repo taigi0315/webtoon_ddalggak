@@ -42,10 +42,13 @@ class StoryBuildState(TypedDict, total=False):
     webtoon_script: dict | None
     feedback: list[str]
     script_drafts: list[dict]
+    tone_analysis: dict | None
+    retry_count: int
+    max_retries: int
 
 
 def _total_steps(planning_mode: str | None) -> int:
-    return 9 if planning_mode == "full" else 6
+    return 11 if planning_mode == "full" else 8
 
 
 def _persist_progress(state: StoryBuildState, progress: dict) -> None:
@@ -210,6 +213,98 @@ def _node_webtoon_script_writer(state: StoryBuildState, gemini: GeminiClient | N
     return progress
 
 
+def _node_tone_auditor(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
+    analysis = nodes.run_tone_auditor(
+        script=state.get("webtoon_script"),
+        gemini=gemini,
+    )
+    progress = {
+        "tone_analysis": analysis,
+        "progress": {"current_node": "ToneAuditor", "message": "Analyzing tone and mood shifts...", "step": 5},
+    }
+    _persist_progress(state, progress["progress"])
+    return progress
+
+
+def _node_scene_optimizer(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
+    result = nodes.run_scene_optimizer(
+        script=state.get("webtoon_script"),
+        tone_analysis=state.get("tone_analysis"),
+        max_scenes=state.get("max_scenes", 6),
+        gemini=gemini,
+    )
+    
+    # If optimization requires a script rewrite (feedback loop)
+    if result.get("action") == "rewrite":
+        feedback = state.get("feedback", [])
+        feedback.append(result.get("feedback", "Please optimize the script for better pacing."))
+        return {
+            "feedback": feedback,
+            "retry_count": state.get("retry_count", 0) + 1,
+            "optimized": False,
+        }
+
+    progress = {
+        "scenes": result.get("scenes"),
+        "progress": {"current_node": "SceneOptimizer", "message": "Optimizing scenes and merging beats...", "step": 6},
+    }
+    _persist_progress(state, progress["progress"])
+    return progress
+
+
+def _router_optimization(state: StoryBuildState) -> str:
+    """Decide whether to loop back for script rewrite or proceed."""
+    feedback = state.get("feedback")
+    retry_count = state.get("retry_count", 0)
+    max_retries = state.get("max_retries", 3)
+    
+    # If we have feedback but no scenes yet, and haven't exceeded retries
+    if feedback and retry_count < max_retries and not state.get("scenes"):
+        return "webtoon_script_writer"
+    return "persist_story_bundle"
+
+
+def _node_blind_test_critic(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
+    with session_scope() as db:
+        result = nodes.run_blind_test_critic(
+            db=db,
+            story_text=state.get("story_text", ""),
+            script=state.get("webtoon_script"),
+            scene_ids=state.get("scene_ids", []),
+            gemini=gemini,
+        )
+    
+    if result.get("action") == "rewrite":
+        feedback = state.get("feedback", [])
+        feedback.append(result.get("feedback", "Narrative gaps detected in blind test."))
+        return {
+            "feedback": feedback,
+            "retry_count": state.get("retry_count", 0) + 1,
+            "optimized": False, # Signal for router
+            "scene_ids": [], # Clear scene_ids if we decide to rewrite
+        }
+
+    progress = {
+        "progress": {"current_node": "BlindTestCritic", "message": "Analyzing blind test results...", "step": 11},
+    }
+    _persist_progress(state, progress["progress"])
+    return progress
+
+
+def _router_blind_test(state: StoryBuildState) -> str:
+    """Decide whether to loop back after blind test critic."""
+    feedback = state.get("feedback")
+    retry_count = state.get("retry_count", 0)
+    max_retries = state.get("max_retries", 3)
+    
+    # Check if a rewrite was requested and we have budget for retries
+    if feedback and retry_count < max_retries and not state.get("optimized", True):
+        # We need to loop back to the beginning of script writing
+        return "webtoon_script_writer"
+    
+    return END
+
+
 def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
     story_id = state.get("story_id")
     if story_id is None:
@@ -219,7 +314,13 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
         allow_append = bool(state.get("allow_append"))
         existing_scenes = list(db.execute(select(Scene).where(Scene.story_id == story_id)).scalars().all())
         if existing_scenes and not allow_append:
-            raise ValueError("story already has scenes; set allow_append to true to append more")
+            if state.get("retry_count", 0) > 0:
+                # Clear old scenes to make room for the optimized/corrected version
+                for scene in existing_scenes:
+                    db.delete(scene)
+                db.flush()
+            else:
+                raise ValueError("story already has scenes; set allow_append to true to append more")
 
         story = db.get(Story, story_id)
         if story is None:
@@ -285,7 +386,13 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
             if base_outfit and not existing_char.base_outfit:
                 existing_char.base_outfit = base_outfit
             if existing_char.character_id not in existing_story_links:
-                db.add(StoryCharacter(story_id=story_id, character_id=existing_char.character_id))
+                db.add(
+                    StoryCharacter(
+                        story_id=story_id,
+                        character_id=existing_char.character_id,
+                        narrative_description=profile.get("description"),
+                    )
+                )
                 existing_story_links.add(existing_char.character_id)
             character_ids.append(str(existing_char.character_id))
             continue
@@ -304,7 +411,13 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
         )
         db.add(character)
         db.flush()
-        db.add(StoryCharacter(story_id=story_id, character_id=character.character_id))
+        db.add(
+            StoryCharacter(
+                story_id=story_id,
+                character_id=character.character_id,
+                narrative_description=profile.get("description"),
+            )
+        )
         existing_story_links.add(character.character_id)
         character_ids.append(str(character.character_id))
 
@@ -313,6 +426,7 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
         row = Scene(
             story_id=story_id,
             source_text=scene.get("source_text") or "",
+            image_style_override=scene.get("image_style_id"),
         )
         db.add(row)
         db.flush()
@@ -475,24 +589,46 @@ def build_story_build_graph(planning_mode: str = "full", gemini: GeminiClient | 
     graph.add_node("llm_character_extractor", partial(_node_llm_character_extractor, gemini=gemini))
     graph.add_node("llm_character_normalizer", partial(_node_llm_character_normalizer, gemini=gemini))
     graph.add_node("webtoon_script_writer", partial(_node_webtoon_script_writer, gemini=gemini))
-    graph.add_node("scene_splitter", _node_scene_splitter)
+    graph.add_node("tone_auditor", partial(_node_tone_auditor, gemini=gemini))
+    graph.add_node("scene_optimizer", partial(_node_scene_optimizer, gemini=gemini))
     graph.add_node("persist_story_bundle", _node_persist_story_bundle)
 
     graph.set_entry_point("validate_inputs")
     graph.add_edge("validate_inputs", "llm_character_extractor")
     graph.add_edge("llm_character_extractor", "llm_character_normalizer")
     graph.add_edge("llm_character_normalizer", "webtoon_script_writer")
-    graph.add_edge("webtoon_script_writer", "scene_splitter")
-    graph.add_edge("scene_splitter", "persist_story_bundle")
+    graph.add_edge("webtoon_script_writer", "tone_auditor")
+    graph.add_edge("tone_auditor", "scene_optimizer")
+    
+    graph.add_conditional_edges(
+        "scene_optimizer",
+        _router_optimization,
+        {
+            "webtoon_script_writer": "webtoon_script_writer",
+            "persist_story_bundle": "persist_story_bundle",
+        },
+    )
+    graph.add_edge("persist_story_bundle", "llm_visual_plan_compiler") if planning_mode == "full" else graph.add_edge("persist_story_bundle", END)
 
     if planning_mode == "full":
         graph.add_node("llm_visual_plan_compiler", partial(_node_llm_visual_plan_compiler, gemini=gemini))
         graph.add_node("per_scene_planning", partial(_node_per_scene_planning_loop, gemini=gemini))
         graph.add_node("blind_test_runner", partial(_node_blind_test_runner, gemini=gemini))
+        graph.add_node("blind_test_critic", partial(_node_blind_test_critic, gemini=gemini))
+        
         graph.add_edge("persist_story_bundle", "llm_visual_plan_compiler")
         graph.add_edge("llm_visual_plan_compiler", "per_scene_planning")
         graph.add_edge("per_scene_planning", "blind_test_runner")
-        graph.add_edge("blind_test_runner", END)
+        graph.add_edge("blind_test_runner", "blind_test_critic")
+        
+        graph.add_conditional_edges(
+            "blind_test_critic",
+            _router_blind_test,
+            {
+                "webtoon_script_writer": "webtoon_script_writer",
+                "END": END,
+            },
+        )
     else:
         graph.add_edge("persist_story_bundle", END)
 
@@ -530,5 +666,9 @@ def run_story_build_graph(
             "image_style": image_style,
             "planning_mode": planning_mode,
             "require_hero_single": require_hero_single,
+            "retry_count": 0,
+            "max_retries": 3,
+            "feedback": [],
+            "script_drafts": [],
         }
         return app.invoke(state)

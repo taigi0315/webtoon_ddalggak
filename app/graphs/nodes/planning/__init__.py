@@ -31,8 +31,10 @@ from .visual_plan import (
     compute_scene_chunker,
 )
 
-# Script writing
+# Script writing and optimization
 from .script_writer import run_webtoon_script_writer
+from .tone_auditor import run_tone_auditor
+from .scene_optimizer import run_scene_optimizer
 
 # Scene intent
 from .scene_intent import run_scene_intent_extractor
@@ -53,6 +55,7 @@ from .dialogue import run_dialogue_extractor
 # QC and evaluation
 from .qc import run_qc_checker
 from .blind_test import run_blind_test_evaluator
+from .blind_test_critic import run_blind_test_critic
 
 __all__ = [
     # Character
@@ -65,6 +68,8 @@ __all__ = [
     "compile_visual_plan_bundle_llm",
     "compute_scene_chunker",
     "run_webtoon_script_writer",
+    "run_tone_auditor",
+    "run_scene_optimizer",
     # Scene intent
     "run_scene_intent_extractor",
     # Panel plan
@@ -78,4 +83,5 @@ __all__ = [
     # QC and evaluation
     "run_qc_checker",
     "run_blind_test_evaluator",
+    "run_blind_test_critic",
 ]

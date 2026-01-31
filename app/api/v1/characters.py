@@ -154,11 +154,17 @@ def list_characters(story_id: uuid.UUID, db=DbSessionDep):
         raise HTTPException(status_code=404, detail="story not found")
 
     stmt = (
-        select(Character)
+        select(Character, StoryCharacter.narrative_description)
         .join(StoryCharacter, StoryCharacter.character_id == Character.character_id)
         .where(StoryCharacter.story_id == story_id)
     )
-    return list(db.execute(stmt).scalars().all())
+    results = db.execute(stmt).all()
+    characters = []
+    for char, narrative_desc in results:
+        char_read = CharacterRead.model_validate(char)
+        char_read.narrative_description = narrative_desc
+        characters.append(char_read)
+    return characters
 
 
 @router.get(

@@ -10,27 +10,30 @@ The system operates through three distinct processing levels:
 
 ### 1. Episode-Level Processing (StoryBuildGraph)
 
-**Purpose**: Convert raw story text into structured scenes and characters
+**Purpose**: Convert raw story text into structured scenes and characters with budget-aware optimization.
 
 **Key Operations**:
 
-- Split story text into scenes (max 30 scenes)
 - Extract and normalize character profiles with visual details
-- **Translate raw text into a visual webtoon script with beats, dialogue, and SFX**
-- Assign canonical codes (CHAR_A, CHAR_B, etc.) for character consistency
-- Persist scenes, characters, and script to database
-- Optionally run full planning pipeline for all scenes
+- **Webtoon Script Writing**: Translate raw text into a visual script with narrative beats, dialogue, and SFX.
+- **Tone Auditing**: Analyze mood shifts and assign narrative weights (0.0 to 1.0) to beats.
+- **Scene Optimization**: Intelligently merge lower-weight beats into scenes to meet the scene budget (`max_scenes`) while preserving emotional peaks.
+- **Iterative Feedback**: If optimization is impossible, loop back to rewrite the script with specific production feedback.
+- **Style Assignment**: Detection of mood shifts (e.g., Gag, Action) to assign specific image styles to scenes.
+- Persist scenes, characters, and optimized script to database.
 
 **Planning Modes**:
 
-- `full` - Complete episode processing including per-scene planning (9 steps)
-- `characters_only` - Extract characters and scenes only, skip planning (6 steps)
+- `full` - Complete episode processing including per-scene planning and iterative narrative validation (11+ steps).
+- `characters_only` - Extract characters and scenes only, skip advanced planning (6 steps).
 
 **Episode-Level Guardrails**:
 
-- Prevents 3+ consecutive scenes with identical layout templates
-- Enforces at least one hero single-panel scene when requested
-- Deduplicates characters by name across stories
+- **Budget Management**: Forced beat merging based on narrative weight to stay within scene limits.
+- **Narrative Criticism**: `BlindTestCritic` analyzes narrative flow and can trigger script rewrites if gaps are detected.
+- Prevents 3+ consecutive scenes with identical layout templates.
+- Enforces at least one hero single-panel scene when requested.
+- Deduplicates characters by name across stories.
 
 ### 2. Scene-Level Processing (ScenePlanningGraph)
 
@@ -106,31 +109,32 @@ The system operates through three distinct processing levels:
     B --> C[Character Extraction]
     C --> D[Character Normalization]
     D --> E[Webtoon Script Writer]
-    E --> F[Scene Splitter]
-    F --> G[Persist Story Bundle]
+    E --> F[Tone Auditor]
+    F --> G[Scene Optimizer]
+    G -->|Budget Risk| E
+    G -->|Passed| H[Persist Story Bundle]
 
-    G --> H{Planning Mode?}
-    H -->|characters_only| Z[Complete]
-    H -->|full| I[Visual Plan Compiler]
+    H --> I{Planning Mode?}
+    I -->|characters_only| Z[Complete]
+    I -->|full| J[Visual Plan Compiler]
 
-    I --> J[Per-Scene Planning Loop]
-    J --> K[Scene-Level: ScenePlanningGraph]
+    J --> K[Per-Scene Planning Loop]
+    K --> L[Scene Intent Extraction]
+    L --> M[Panel Plan Generation]
+    M --> N[Panel Plan Normalization]
+    N --> O[Layout Template Resolution]
+    O --> P[Panel Semantics Filling]
 
-    J --> K[Scene Intent Extraction]
-    K --> L[Panel Plan Generation]
-    L --> M[Panel Plan Normalization]
-    M --> N[Layout Template Resolution]
-    N --> O[Panel Semantics Filling]
+    P --> Q[Blind Test Evaluation]
+    Q --> R[Blind Test Critic]
+    R -->|Narrative Gap| E
+    R -->|Passed| S[Render-Level: SceneRenderGraph]
 
-    I --> P[Blind Test Evaluation]
-    P --> Z
-
-    O --> Q[Render-Level: SceneRenderGraph]
-    Q --> R[Load Active Artifacts]
-    R --> S[Compile Render Spec]
-    S --> T[Generate Images]
-    T --> U[QC Check]
-    U --> V[Final Webtoon Panels]
+    S --> T[Load Active Artifacts]
+    T --> U[Compile Render Spec]
+    U --> V[Generate Images]
+    V --> W[QC Check]
+    W --> Z
 ```
 
 ## Key Files

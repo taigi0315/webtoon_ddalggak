@@ -12,7 +12,7 @@ def _compile_prompt(
     style_id: str,
     characters: list[Character],
     reference_char_ids: set[uuid.UUID] | None = None,
-    variants_by_character: dict[uuid.UUID, CharacterVariant] | None = None,
+    variants_by_character: dict[tuple[uuid.UUID, str], CharacterVariant] | dict[uuid.UUID, CharacterVariant] | None = None,
 ) -> str:
     """Compile a production-grade image generation prompt with rich visual details."""
     style_desc = _style_description(style_id)
@@ -23,6 +23,7 @@ def _compile_prompt(
         characters=characters,
         reference_char_ids=reference_char_ids,
         variants_by_character=variants_by_character,
+        style_id=style_id,
     )
     panels = panel_semantics.get("panels", []) or []
     panel_count = len(panels)
@@ -41,7 +42,22 @@ def _compile_prompt(
     for c in characters:
         code = codes.get(c.character_id)
         role = c.role or "character"
-        variant = variants_by_character.get(c.character_id) if variants_by_character else None
+        
+        # Resolve variant for identity block
+        variant = None
+        if isinstance(variants_by_character, dict):
+            if style_id:
+                variant = variants_by_character.get((c.character_id, style_id.lower()))
+            if not variant:
+                variant = variants_by_character.get((c.character_id, "default"))
+            if not variant:
+                variant = variants_by_character.get(c.character_id)
+                if not variant:
+                    for (cid, vtype), v in variants_by_character.items():
+                        if cid == c.character_id:
+                            variant = v
+                            break
+
         variant_outfit = None
         if variant and isinstance(variant.override_attributes, dict):
             variant_outfit = variant.override_attributes.get("outfit") or variant.override_attributes.get("clothing")

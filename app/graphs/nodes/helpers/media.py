@@ -30,6 +30,7 @@ def _load_character_reference_images(
     db: Session,
     story_id: uuid.UUID,
     max_images: int = 6,
+    style_id: str | None = None,
 ) -> list[tuple[bytes, str]]:
     variant_refs = _active_variant_reference_images(db, story_id)
     stmt = (
@@ -49,10 +50,33 @@ def _load_character_reference_images(
 
     refs = list(db.execute(stmt).scalars().all())
     picked: dict[uuid.UUID, CharacterReferenceImage] = {}
-    for character_id, ref in variant_refs.items():
-        picked[character_id] = ref
-        if len(picked) >= max_images:
-            break
+    
+    # 1. First priority: Variants matching the current scene style
+    if style_id:
+        s_id = style_id.lower()
+        for (cid, vtype), ref in variant_refs.items():
+            if cid not in picked and vtype == s_id:
+                picked[cid] = ref
+                if len(picked) >= max_images:
+                    break
+
+    # 2. Second priority: Default variants
+    if len(picked) < max_images:
+        for (cid, vtype), ref in variant_refs.items():
+            if cid not in picked and vtype == "default":
+                picked[cid] = ref
+                if len(picked) >= max_images:
+                    break
+
+    # 3. Third priority: Any active variant for this character if still not picked
+    if len(picked) < max_images:
+        for (cid, vtype), ref in variant_refs.items():
+            if cid not in picked:
+                picked[cid] = ref
+                if len(picked) >= max_images:
+                    break
+
+    # 4. Final priority: Base reference images
     for ref in refs:
         if ref.character_id in picked:
             continue

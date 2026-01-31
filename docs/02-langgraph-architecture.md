@@ -14,7 +14,7 @@ The system uses three LangGraph state machines to orchestrate the webtoon genera
 
 **Planning Modes**:
 
-- `full` - Complete processing with per-scene planning (9 steps)
+- `full` - Complete processing with per-scene planning, tone auditing, and iterative narrative validation (11+ steps)
 - `characters_only` - Extract characters and scenes only (6 steps)
 
 ### ScenePlanningGraph (Scene-Level)
@@ -38,15 +38,16 @@ The system uses three LangGraph state machines to orchestrate the webtoon genera
 ### Key Nodes
 
 - **validate_inputs** - Validate and normalize input parameters (max_scenes, max_characters, panel_count)
-- **scene_splitter** - Split story text into scenes using LLM-based chunking
 - **llm_character_extractor** - Extract character profiles from story text
-- **llm_character_normalizer** - Add visual details (hair, face, build, outfit) to characters
-- **webtoon_script_writer** - Translate raw story into a visual webtoon script with beats and SFX
-- **scene_splitter** - Split the newly generated webtoon script into scenes
-- **persist_story_bundle** - Save scenes, characters, and script to database with deduplication
+- **llm_character_normalizer** - Add visual details (hair, face, build, outfit) and narrative descriptions to characters
+- **webtoon_script_writer** - Translate raw story into a visual script with narrative beats, dialogue, and SFX
+- **tone_auditor** - Analyze mood shifts and assign narrative weights to beats
+- **scene_optimizer** - Optimize beats into final scenes based on budget and tone weights
+- **persist_story_bundle** - Save optimized scenes, characters, and script to database
 - **llm_visual_plan_compiler** - Convert scenes to visual beats with importance ratings _(full mode only)_
-- **per_scene_planning** - Run ScenePlanningGraph for each scene with episode-level guardrails _(full mode only)_
+- **per_scene_planning** - Run ScenePlanningGraph for each scene with level guardrails _(full mode only)_
 - **blind_test_runner** - Evaluate narrative coherence of panel plans _(full mode only)_
+- **blind_test_critic** - Analyze blind test reports for narrative gaps and trigger rewrites if needed _(full mode only)_
 
 ### Episode-Level Guardrails
 
@@ -73,16 +74,21 @@ graph TD
     A[validate_inputs] --> B[llm_character_extractor]
     B --> C[llm_character_normalizer]
     C --> D[webtoon_script_writer]
-    D --> E[scene_splitter]
-    E --> F[persist_story_bundle]
+    D --> E[tone_auditor]
+    E --> F[scene_optimizer]
 
-    F --> G{Planning Mode?}
-    G -->|characters_only| Z[END]
-    G -->|full| H[llm_visual_plan_compiler]
+    F -->|Budget Risk| D
+    F -->|Passed| G[persist_story_bundle]
 
-    H --> I[per_scene_planning]
-    I --> J[blind_test_runner]
-    J --> Z
+    G --> H{Planning Mode?}
+    H -->|characters_only| Z[END]
+    H -->|full| I[llm_visual_plan_compiler]
+
+    I --> J[per_scene_planning]
+    J --> K[blind_test_runner]
+    K --> L[blind_test_critic]
+    L -->|Narrative Gap| D
+    L -->|Passed| Z
 ```
 
 ### State Schema: StoryBuildState
@@ -113,6 +119,9 @@ graph TD
 - `webtoon_script` - Structured visual script with beats and dialogue
 - `feedback` - History of director/critic feedback for iteration
 - `script_drafts` - Versioned drafts of the webtoon script
+- `tone_analysis` - Mood segments and beat-level importance weights
+- `retry_count` - Current iteration number for optimization/critic loops
+- `max_retries` - Hard limit on rewrite attempts
 
 ## ScenePlanningGraph Details
 

@@ -47,7 +47,10 @@ ssuljaengi_v4/
 │   │       ├── prompts/           # Prompt compilation
 │   │       └── constants.py       # Artifact type constants
 │   ├── prompts/                   # Prompt templates
-│   │   ├── prompts.yaml           # All prompt templates
+│   │   ├── v1/                    # Versioned directory structure
+│   │   │   ├── story_build/       # Script/Optimization prompts
+│   │   │   ├── scene_planning/    # Scene intent/panel prompts
+│   │   │   └── shared/            # Common constraints/styles
 │   │   └── loader.py              # Jinja2 compilation
 │   ├── services/                  # Business logic
 │   │   ├── vertex_gemini.py       # Gemini API client

@@ -93,7 +93,7 @@ def _handle_full_generation_job(job: job_queue.JobRecord) -> dict | None:
     try:
         _scene_or_404(db, scene_id)
         if not has_image_style(payload.style_id):
-            raise ValueError("unknown style_id")
+            payload.style_id = "default"
         gemini = _build_gemini_client()
         out = run_full_pipeline(
             db=db,
@@ -134,7 +134,7 @@ def plan_scene(scene_id: uuid.UUID, payload: ScenePlanRequest, db=DbSessionDep):
 def render_scene(scene_id: uuid.UUID, payload: SceneRenderRequest, db=DbSessionDep):
     _scene_or_404(db, scene_id)
     if payload.style_id and not has_image_style(payload.style_id):
-        raise HTTPException(status_code=400, detail="unknown style_id")
+        payload.style_id = "default"
     gemini = _build_gemini_client()
     out = run_scene_render(
         db=db,
@@ -204,7 +204,8 @@ def get_scene_status(scene_id: uuid.UUID, db=DbSessionDep):
 def generate_full(scene_id: uuid.UUID, payload: GenerateFullRequest, db=DbSessionDep):
     _scene_or_404(db, scene_id)
     if not has_image_style(payload.style_id):
-        raise HTTPException(status_code=400, detail="unknown style_id")
+        # Fallback to default instead of crashing if style is unknown
+        payload.style_id = "default"
 
     gemini = _build_gemini_client()
 
@@ -240,7 +241,7 @@ def generate_full_async(
 ):
     _scene_or_404(db, scene_id)
     if not has_image_style(payload.style_id):
-        raise HTTPException(status_code=400, detail="unknown style_id")
+        payload.style_id = "default"
 
     job = job_queue.enqueue_job(
         "scene_full",

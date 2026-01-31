@@ -6,45 +6,42 @@ The system uses Jinja2-templated prompts stored in `app/prompts/prompts.yaml` to
 
 ## Prompt Loading Mechanism
 
-**Storage**: All prompt templates are stored in `app/prompts/prompts.yaml` as YAML key-value pairs
+**Storage**: Prompts are stored in a versioned directory structure under `app/prompts/v1/`, organized by domain:
 
-**Loading**: `app/prompts/loader.py` provides:
+- `shared/`: System prompts, constraints, and style maps.
+- `story_build/`: Script writing and character normalization.
+- `scene_planning/`: Scene intent and panel-level planning.
+- `evaluation/`: Blind test and criticism prompts.
+- `dialogue/`: Dialogue generation and variant suggestions.
+- `utility/`: JSON repair.
 
-- `get_prompt(name)` - Get raw template string
-- `render_prompt(name, **context)` - Compile template with Jinja2 variables
-- `get_prompt_data(name)` - Get non-string data (e.g., character_style_map)
+**Loading**: `app/prompts/loader.py` manages loading and Jinja2 compilation, with versioned prompts taking precedence over the legacy `prompts.yaml`.
 
-**Compilation**: Prompts use Jinja2 syntax for variable substitution:
+**Key Features**:
 
-- `{{ variable }}` - Insert variable value
-- `{% if condition %}...{% endif %}` - Conditional blocks
-- Auto-includes shared prompts (`system_prompt_json`, `global_constraints`)
-
-**Caching**: Prompts are cached with `@lru_cache` for performance
+- **Automatic JSON Repair**: Integrated logic to fix malformed LLM outputs.
+- **Syntax Validation**: Built-in Jinja2 parsing checks to catch errors at load time.
+- **Context Management**: Auto-inclusion of global constraints and system rules.
 
 ## Key Prompt Templates
 
-### System and Constraints
+### Episode Planning & Optimization (Story Build)
 
-- **system_prompt_json** - JSON generation rules (strict format, no markdown, no commentary)
-- **global_constraints** - Universal rules (don't invent characters, keep outputs concise, respect limits)
+- **prompt_character_normalization**: Adds visual details and narrative descriptions to extracted characters using manhwa aesthetics.
+- **prompt_script_writer**: Translates raw story text into a visual multi-beat script.
+- **prompt_tone_auditor**: Detects mood shifts (Action, Gag, Emotional) and assigns importance weights to narrative beats.
+- **prompt_scene_optimizer**: Merges low-weight beats into high-weight scenes to stay within budget (`max_scenes`) while assigning appropriate image styles.
 
-### Story Build Domain
+### Scene Planning & Semantics
 
-- **prompt_character_extraction** - Extract important characters from story text with evidence quotes
-- **prompt_character_normalization** - Add visual details (hair, face, build, outfit) using Korean manhwa aesthetics
-- **prompt_script_writer** - Translate raw story into a visual webtoon script with beats, dialogue, and SFX
-- **prompt_visual_plan** - Convert scenes into visual beats with importance ratings
+- **prompt_scene_intent**: Extracts narrative intent, visual motifs, and required transitions.
+- **prompt_panel_plan**: Generates a panel-by-panel breakdown using standard webtoon shot types (grammar IDs).
+- **prompt_panel_semantics**: Fills exhaustive visual descriptions (100-150 words) for each panel to ensure AI generation consistency.
 
-### Scene Planning Domain
+### Validation & Criticism
 
-- **prompt_scene_intent** - Extract narrative intent (mood, pacing, emotional arc, visual motifs)
-- **prompt_panel_plan** - Generate panel breakdown with shot types (grammar IDs) and story functions
-- **prompt_panel_semantics** - Fill detailed 100-150 word visual descriptions for each panel
-
-### Evaluation Domain
-
-- **prompt_blind_test** - Evaluate narrative coherence by reconstructing story from panel descriptions only
+- **prompt_blind_test**: Reconstructs the story from panel descriptions to verify visual storytelling coherence.
+- **prompt_blind_test_critic**: Analyzes blind test reports for narrative gaps or logical inconsistencies and triggers necessary rewrites.
 
 ### Dialogue Domain
 

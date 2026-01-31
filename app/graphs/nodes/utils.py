@@ -454,7 +454,8 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
 
 
 def _character_ids_with_reference_images(db: Session, story_id: uuid.UUID) -> set[uuid.UUID]:
-    variant_ids = _active_variant_reference_images(db, story_id).keys()
+    variant_mapping = _active_variant_reference_images(db, story_id)
+    variant_char_ids = {cid for (cid, vtype) in variant_mapping.keys()}
     stmt = (
         select(CharacterReferenceImage.character_id)
         .join(StoryCharacter, CharacterReferenceImage.character_id == StoryCharacter.character_id)
@@ -465,7 +466,7 @@ def _character_ids_with_reference_images(db: Session, story_id: uuid.UUID) -> se
         )
         .distinct()
     )
-    return set(db.execute(stmt).scalars().all()).union(set(variant_ids))
+    return set(db.execute(stmt).scalars().all()).union(variant_char_ids)
 
 
 def _render_image_from_prompt(

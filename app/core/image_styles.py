@@ -296,5 +296,27 @@ realistic skin tones with soft blush nuance, warm highlights with cool shadows
 [FINISHER: Editorial-Grade Finish]
 film-inspired color grading, soft vignette, subtle bloom highlights,
 backgrounds simplified with depth haze, polished high-resolution finish
+""",
+
+"CUTE_CHIBI_SCHOOL_ROMANCE_MANHWA": """
+cute chibi school romance manhwa style, bright playful pastel color palette, dominant soft pinks, mint greens, light blues, warm beiges, cherry blossom accents, bubbly speech bubbles with polka dots and stars, low saturation for gentle feel with selective vibrant pops on cheeks, eyes, and effects, high contrast only on emotional focal points like blushes and sparkles,
+
+chibi proportions with large sparkling eyes, oversized heads, tiny bodies, exaggerated expressions—wide open mouths for surprise/laughter, heavy blushing gradients from pink to deep red with steam lines or sweat drops, teary sparkles, hiccups with wavy breath effects, dynamic action lines like speed streaks, impact stars, pat-pat motions, onomatopoeia in bold Korean/English text integrated into panels,
+
+linework is clean medium-thin digital lines, smooth and rounded with soft curves, minimal detail on backgrounds—simple locker rooms, classrooms, home interiors in flat pastel washes, heavy use of white outlines on characters for pop against colored fills, glossy highlights in eyes with multiple catchlights, cute accessories like bows, glasses, frilly dresses, school uniforms simplified to chibi scale,
+
+shading is soft cel-style with gentle gradients, strong rim lighting and back glows for dreamy cuteness, frequent sparkles, floating hearts, petals, stars, or cloud effects around heads for emotion emphasis, pink steam clouds for embarrassment, dramatic purple shadows in fantasy hiccup scenes, bubbly borders with polka dots or floral frames,
+
+intense comedic-romantic tension through chibi antics—awkward hugs, surprise tackles, blushing confrontations, hiccup panic, playful teasing, school hallway chaos with effect lines exploding outward, immersive lighthearted Korean webtoon chibi mood, adorable exaggerated cuteness, masterpiece, best quality, vibrant yet soft composition, highly expressive faces, dynamic panel energy
+""",
+
+"MYSTICAL_SILVER_HAIRED_ROMANCE_MANHWA": """
+mystical silver-haired romance manhwa style, dreamy ethereal-aquamarine color palette with soft teal-cyan glows, dominant hues of pale turquoise, icy lavender, shimmering pearl white, warm muted rose for skin and lips, deep midnight blue accents for hair shadows, accented by subtle gold flecks and sparkling highlights, moderate-to-low saturation with high luminous iridescence and magical sparkle effects, skin rendered in translucent porcelain-peach bases with radiant inner glow, delicate starry freckles or glowing markings on forehead, never flat or dull tones,
+
+shading is ultra-soft multi-layered airbrush gradient, shadows dissolve into gentle cyan-purple haze, heavy use of sparkling particle effects, floating motes, bokeh circles, and rainbow prism glows around hair and faces, signature glossy iridescent highlights on ultra-long flowing silver-white hair with subtle teal-blue undertones and wind-swept ethereal strands, soft diffused backlighting creating halo aura, gentle rim lighting with magical shimmer, ambient sparkling dust and star-like glints for otherworldly romance atmosphere, tear glints with prism refraction, soft breath glows during kisses,
+
+linework is extremely fine and delicate, almost invisible thin lines with glossy polished finish, outlines frequently absent or fully blended into glowing shading especially around hair edges, cheeks, and neck for dreamy floaty softness, facial features rendered with minimal structure—large luminous blue/teal eyes filled with multiple layered catchlights, subtle reflections, and starry sparkles, nose and lips softly implied through highlight and shadow, long silver hair drawn in sweeping layered translucent strands with fluid ribbon-like motion and scattered light particles, hands elegant, elongated, fingers gently curled with soft glow,
+
+overall aesthetic is magical romantic fantasy, intense emotional closeness through tender embraces, forehead-to-forehead touches, passionate close-up kisses with parted lips and sparkling breath effects, protective hugs from behind, longing profile gazes, mystical forehead markings that glow softly, modern-casual clothing (hoodies, simple dresses) contrasted with ethereal hair and aura, softly blurred dreamy backgrounds (starry teal gradients, floating bubbles, faint floral motifs) to keep characters luminous and dominant, glossy wet shine on lips, hair, skin, and delicate fabric textures, immersive enchanting yet heartfelt romance mood with subtle supernatural beauty, masterpiece, best quality, highly detailed luminous ethereal composition, emotionally charged magical intimacy, soft sparkling dreamy atmosphere
 """
 }

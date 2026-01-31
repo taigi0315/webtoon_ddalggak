@@ -51,6 +51,10 @@ def run_prompt_compiler(
 
                 scene = _get_scene(db, scene_id)
                 story = db.get(Story, scene.story_id)
+                
+                # Check for scene-level style override
+                effective_style_id = style_id or scene.image_style_override or (story.default_image_style if story else "default") or "default"
+                
                 characters = _list_characters(db, scene.story_id)
                 reference_char_ids = _character_ids_with_reference_images(db, scene.story_id)
                 variants_by_character = _active_variants_by_character(db, scene.story_id)
@@ -67,15 +71,15 @@ def run_prompt_compiler(
                     prompt = _compile_prompt(
                         panel_semantics=panel_semantics.payload,
                         layout_template=layout.payload,
-                        style_id=style_id,
+                        style_id=effective_style_id,
                         characters=characters,
                         reference_char_ids=reference_char_ids,
                         variants_by_character=variants_by_character,
                     )
-
+                
                 payload = {
                     "prompt": prompt,
-                    "style_id": style_id,
+                    "style_id": effective_style_id,
                     "layout_template_id": layout.payload.get("template_id"),
                     "panel_count": panel_count,
                     "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
@@ -324,7 +328,10 @@ def run_image_renderer(
                 reference_images = None
                 if gemini is not None:
                     scene = _get_scene(db, scene_id)
-                    reference_images = _load_character_reference_images(db, scene.story_id)
+                    style_id = render_spec.payload.get("style_id")
+                    reference_images = _load_character_reference_images(
+                        db, scene.story_id, style_id=style_id
+                    )
 
                 image_bytes, mime_type, metadata = _render_image_from_prompt(
                     prompt,

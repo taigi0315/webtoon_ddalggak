@@ -26,7 +26,8 @@ def get_character_style_prompt(gender: str | None, age_range: str | None) -> str
 def _active_variants_by_character(
     db: Session,
     story_id: uuid.UUID,
-) -> dict[uuid.UUID, CharacterVariant]:
+) -> dict[uuid.UUID | tuple[uuid.UUID, str], CharacterVariant]:
+    """Get mapping of (character_id, variant_type) to variant."""
     variants = list(
         db.execute(
             select(CharacterVariant)
@@ -38,14 +39,22 @@ def _active_variants_by_character(
         .scalars()
         .all()
     )
-    return {variant.character_id: variant for variant in variants}
+    results = {}
+    for variant in variants:
+        # Default by character_id
+        if variant.character_id not in results:
+            results[variant.character_id] = variant
+        # Specific key by (character_id, type)
+        results[(variant.character_id, variant.variant_type.lower())] = variant
+    return results
 
 
 def _active_variant_reference_images(
     db: Session,
     story_id: uuid.UUID,
-) -> dict[uuid.UUID, CharacterReferenceImage]:
-    variants = _active_variants_by_character(db, story_id).values()
+) -> dict[tuple[uuid.UUID, str], CharacterReferenceImage]:
+    """Get mapping of (character_id, variant_type) to reference image."""
+    variants = list(_active_variants_by_character(db, story_id).values())
     if not variants:
         return {}
 
@@ -61,12 +70,12 @@ def _active_variant_reference_images(
         .all()
     )
     ref_lookup = {ref.reference_image_id: ref for ref in refs}
-    results: dict[uuid.UUID, CharacterReferenceImage] = {}
+    results: dict[tuple[uuid.UUID, str], CharacterReferenceImage] = {}
     for variant in variants:
         ref = ref_lookup.get(variant.reference_image_id)
         if ref is None:
             continue
-        results[variant.character_id] = ref
+        results[(variant.character_id, variant.variant_type.lower())] = ref
     return results
 
 
@@ -103,7 +112,8 @@ def _inject_character_identities(
     panel_semantics: dict,
     characters: list[Character],
     reference_char_ids: set[uuid.UUID],
-    variants_by_character: dict[uuid.UUID, CharacterVariant] | None = None,
+    variants_by_character: dict[tuple[uuid.UUID, str], CharacterVariant] | dict[uuid.UUID, CharacterVariant] | None = None,
+    style_id: str | None = None,
 ) -> dict:
     if not panel_semantics or not characters:
         return panel_semantics
@@ -111,14 +121,33 @@ def _inject_character_identities(
     codes = _character_codes(characters)
     name_map: dict[str, dict[str, str]] = {}
     variants_by_character = variants_by_character or {}
+    
     for c in characters:
         code = codes.get(c.character_id, "CHAR_X")
         base = f"{code} ({c.name})"
         dialogue_label = base
-        variant = variants_by_character.get(c.character_id)
+        
+        # Resolve variant: style-specific -> default -> any
+        variant = None
+        if isinstance(variants_by_character, dict):
+            if style_id:
+                variant = variants_by_character.get((c.character_id, style_id.lower()))
+            if not variant:
+                variant = variants_by_character.get((c.character_id, "default"))
+            if not variant:
+                # Fallback to simple lookup if the map is {character_id: variant}
+                variant = variants_by_character.get(c.character_id)
+                if not variant:
+                    # Fallback to searching first variant for this character if it's a tuple map
+                    for (cid, vtype), v in variants_by_character.items():
+                        if cid == c.character_id:
+                            variant = v
+                            break
+
         variant_outfit = None
         if variant and isinstance(variant.override_attributes, dict):
             variant_outfit = variant.override_attributes.get("outfit") or variant.override_attributes.get("clothing")
+        
         if c.character_id in reference_char_ids:
             parts = [base, "matching reference image"]
             if variant_outfit:

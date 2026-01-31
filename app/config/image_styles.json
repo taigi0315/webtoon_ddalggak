@@ -84,6 +84,12 @@
       "label": "Cinematic Modern Manhwa",
       "description": "Semi-realistic modern manhwa, cinematic tone.",
       "image_url": "/image_styles/CINEMATIC_MODERN_MANHWA.png"
+    },
+    {
+      "id": "CUTE_CHIBI_SCHOOL_ROMANCE_MANHWA",
+      "label": "Cute Chibi Romance",
+      "description": "Adorable chibi proportions, playful pastel colors, bubbly romantic mood.",
+      "image_url": "/image_styles/CUTE_CHIBI.png"
     }
   ]
 }

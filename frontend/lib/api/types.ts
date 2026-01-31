@@ -47,6 +47,7 @@ export const characterSchema = z.object({
   identity_line: z.string().nullable(),
   generation_prompt: z.string().nullable().optional(),
   is_library_saved: z.boolean().optional().default(false),
+  narrative_description: z.string().nullable().optional(),
   approved: z.boolean()
 });
 

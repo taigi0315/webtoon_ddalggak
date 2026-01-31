@@ -131,6 +131,7 @@ class StoryCharacter(Base):
     character_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("characters.character_id", ondelete="CASCADE"), primary_key=True
     )
+    narrative_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     story: Mapped[Story] = relationship(back_populates="character_links")

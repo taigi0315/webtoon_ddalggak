@@ -326,6 +326,7 @@ function CharacterDetail({
       queryClient.invalidateQueries({ queryKey: ["character-variant-suggestions", storyId] });
       queryClient.invalidateQueries({ queryKey: ["characterRefs", character.character_id] });
       queryClient.invalidateQueries({ queryKey: ["characterVariants", storyId, character.character_id] });
+      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
     }
   });
 
@@ -335,6 +336,7 @@ function CharacterDetail({
       queryClient.invalidateQueries({
         queryKey: ["characterVariants", storyId, character.character_id]
       });
+      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
     }
   });
 
@@ -344,6 +346,7 @@ function CharacterDetail({
       queryClient.invalidateQueries({
         queryKey: ["characterVariants", storyId, character.character_id]
       });
+      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
     }
   });
 
@@ -351,7 +354,7 @@ function CharacterDetail({
     mutationFn: approveCharacterRef,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["characterRefs", character.character_id] });
-      queryClient.invalidateQueries({ queryKey: ["characters"] });
+      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
     }
   });
 
@@ -359,14 +362,14 @@ function CharacterDetail({
     mutationFn: setPrimaryCharacterRef,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["characterRefs", character.character_id] });
-      queryClient.invalidateQueries({ queryKey: ["characters"] });
+      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
     }
   });
 
   const approveCharacterMutation = useMutation({
     mutationFn: approveCharacter,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["characters"] });
+      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
     }
   });
 
@@ -380,7 +383,7 @@ function CharacterDetail({
   const updateCharacterMutation = useMutation({
     mutationFn: updateCharacter,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["characters"] });
+      queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
     }
   });
 
@@ -435,7 +438,6 @@ function CharacterDetail({
     setZoom(1);
     setVariantOutfit("");
     setVariantRefId(null);
-    setPreviewRefId(null);
   }, [character.character_id, character.description, character.identity_line]);
 
   useEffect(() => {
@@ -450,16 +452,27 @@ function CharacterDetail({
     }
   }, [character.character_id, suggestions, variantOutfit, variantType]);
 
+  const hasNarrativeDiff = character.narrative_description && 
+    character.narrative_description.toLowerCase().trim() !== character.description?.toLowerCase().trim();
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr,320px]">
       <div className={`card ${hasApprovedRef ? "ring-2 ring-green-500" : ""}`}>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-ink">{character.name}</h3>
+            <div className="flex items-center gap-2">
+               <h3 className="text-lg font-semibold text-ink">{character.name}</h3>
+               {hasNarrativeDiff && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 animate-pulse font-bold">
+                    Context Warning
+                  </span>
+               )}
+            </div>
             <p className="text-xs text-slate-500 capitalize">{character.role}</p>
             {activeVariant && (
-              <p className="mt-1 text-[11px] text-indigo-600">
-                Active variant: {activeVariant.variant_type.replace("_", " ")}
+              <p className="mt-1 text-[11px] text-indigo-600 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+                Using Variant: {activeVariant.variant_type.replace("_", " ")}
               </p>
             )}
           </div>
@@ -470,7 +483,7 @@ function CharacterDetail({
                targetCharacterId={character.character_id}
                onCharacterLoaded={() => {
                   queryClient.invalidateQueries({ queryKey: ["characterRefs", character.character_id] });
-                  queryClient.invalidateQueries({ queryKey: ["characters"] });
+                  queryClient.invalidateQueries({ queryKey: ["characters", storyId] });
                }}
                buttonLabel="Import from Library"
                buttonStyle="btn-secondary text-xs px-3 py-2"
@@ -496,6 +509,38 @@ function CharacterDetail({
             Add a description or identity line before generating images.
           </p>
         )}
+        
+        {/* Narrative Comparison Alert */}
+        {hasNarrativeDiff && (
+          <div className="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50/50">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div className="flex-1">
+                <p className="text-xs font-bold text-amber-900">Narrative Inconsistency Detected</p>
+                <p className="mt-1 text-xs text-amber-800 leading-relaxed">
+                   The story planner extracted a different look for this character in this story. 
+                   Consider creating a <span className="underline font-bold">Story Variant</span> to maintain visual consistency.
+                </p>
+                
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Project Base</p>
+                    <p className="text-[11px] text-slate-600 line-clamp-4 bg-white/50 p-2 rounded border border-slate-100 italic">
+                      {character.description}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider text-amber-500 font-bold">Story Context</p>
+                    <p className="text-[11px] text-amber-900 line-clamp-4 bg-amber-100/50 p-2 rounded border border-amber-200 font-medium">
+                      {character.narrative_description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 rounded-2xl bg-white/80 p-4 shadow-soft">
           <div className="mb-3 flex items-center justify-end gap-2">
             <button
@@ -533,10 +578,15 @@ function CharacterDetail({
         </div>
 
         {refsQuery.data && refsQuery.data.length > 0 && (
-          <div className="mt-6">
-            <p className="text-xs text-slate-500 mb-3">
-              Click an image to select it as the reference for this character.
-            </p>
+          <div className="mt-6 border-t border-slate-100 pt-6">
+            <div className="flex items-center justify-between mb-3">
+               <p className="text-xs text-slate-500">
+                 Reference Gallery
+               </p>
+               <span className="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded italic">
+                 Note: Selecting a primary image updates it for the ENTIRE PROJECT.
+               </span>
+            </div>
             <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
               {refsQuery.data.map((ref) => (
                 <div key={ref.reference_image_id} className="relative group">

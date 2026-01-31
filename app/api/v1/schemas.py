@@ -173,6 +173,7 @@ class CharacterRead(BaseModel):
     identity_line: str | None
     generation_prompt: str | None = None
     is_library_saved: bool = False
+    narrative_description: str | None = None
     approved: bool
 
     model_config = {"from_attributes": True}

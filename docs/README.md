@@ -104,6 +104,8 @@ The following legacy documentation files are available but may be outdated:
 - **Scene**: A single narrative unit converted into one or more webtoon panels
 - **Panel**: An individual frame/image in the webtoon layout
 - **Webtoon Script**: A structured visual translation of the story with beats and SFX
+- **Iterative Optimization**: Budget-aware process of merging beats and refining scripts via Tone Auditing and Critic feedback loops.
+- **Blind Test Critic**: Narrative quality control agent that reconstructs stories from visual plans to detect gaps.
 - **Character Variant**: A specific visual representation of a character (outfit, style, mood)
 - **Actor System**: Global character library allowing character reuse across stories
 - **Grammar ID**: Predefined shot type identifier (establishing, dialogue_medium, emotion_closeup, etc.)
