@@ -179,7 +179,7 @@ class GeminiClient:
         self._timeout_seconds = timeout_seconds
         self._max_retries = max_retries
         self._initial_backoff_seconds = initial_backoff_seconds
-        self._rate_limit_backoff_seconds = rate_limit_backoff_seconds or [10, 30, 180, 600]
+        self._rate_limit_backoff_seconds = rate_limit_backoff_seconds or [5, 10, 30, 60, 120, 300]
 
         self.last_request_id: str | None = None
         self.last_model: str | None = None

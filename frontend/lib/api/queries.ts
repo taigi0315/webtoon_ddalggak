@@ -11,7 +11,9 @@ import {
   storySchema,
   styleItemsSchema,
   charactersSchema,
+
   storyGenerateResponseSchema,
+
   storyProgressSchema,
   jobStatusSchema,
   sceneGenerateFullSchema,
@@ -219,6 +221,25 @@ export async function generateSceneFull(params: {
   return sceneGenerateFullSchema.parse(payload);
 }
 
+export async function generateSceneFullAsync(params: {
+  sceneId: string;
+  panelCount?: number;
+  styleId: string;
+  genre?: string | null;
+  promptOverride?: string | null;
+}) {
+  const payload = await fetchJson(`/v1/scenes/${params.sceneId}/generate/full_async`, {
+    method: "POST",
+    body: JSON.stringify({
+      panel_count: params.panelCount ?? 4,
+      style_id: params.styleId,
+      genre: params.genre ?? null,
+      prompt_override: params.promptOverride ?? null
+    })
+  });
+  return jobStatusSchema.parse(payload);
+}
+
 export async function fetchScenes(storyId: string) {
   const payload = await fetchJson(`/v1/stories/${storyId}/scenes`);
   return scenesSchema.parse(payload);
@@ -285,6 +306,8 @@ export async function generateStoryBlueprint(params: {
   });
   return storyGenerateResponseSchema.parse(payload);
 }
+
+
 
 export async function generateStoryBlueprintAsync(params: {
   storyId: string;
