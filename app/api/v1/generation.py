@@ -4,10 +4,13 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.api.deps import DbSessionDep
-from app.api.v1.schemas import JobStatusRead
+from app.api.v1.schemas import (
+    JobStatusRead,
+)
 from app.config.loaders import has_image_style
 from app.db.session import get_sessionmaker
-from app.db.models import Scene
+from app.db.models import Scene, Story
+from sqlalchemy import select
 from app.graphs import nodes
 from app.graphs.pipeline import run_full_pipeline, run_scene_planning, run_scene_render
 from app.services.artifacts import ArtifactService
@@ -260,3 +263,6 @@ def generate_full_async(
         result=job.result,
         error=job.error,
     )
+
+
+

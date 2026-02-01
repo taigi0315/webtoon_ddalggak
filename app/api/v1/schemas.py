@@ -209,6 +209,9 @@ class StoryGenerateResponse(BaseModel):
     characters: list[CharacterRead]
 
 
+
+
+
 class CharacterRefCreate(BaseModel):
     image_url: str = Field(min_length=1)
     ref_type: str = Field(default="face", min_length=1, max_length=32)

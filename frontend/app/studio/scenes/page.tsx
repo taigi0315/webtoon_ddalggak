@@ -11,7 +11,9 @@ import {
   fetchScenes,
   fetchSceneArtifacts,
   fetchSceneRenders,
-  generateSceneFull
+
+
+  generateSceneFullAsync
 } from "@/lib/api/queries";
 import type { Scene, Artifact } from "@/lib/api/types";
 
@@ -26,6 +28,35 @@ export default function ScenesPage() {
   const [storyId, setStoryId] = useState("");
   const [selectedSceneId, setSelectedSceneId] = useState("");
   const [promptOverride, setPromptOverride] = useState<string | null>(null);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleGenerateAll = async () => {
+    if (!storyId || !scenesQuery.data) return;
+    if (!confirm("This will regenerate images for ALL scenes in the story. Continue?")) return;
+    setIsGeneratingAll(true);
+    
+    // Default values if not specified
+    const styleId = storyQuery.data?.default_image_style ?? "default";
+    const panelCount = 4; // Or fetch from scene settings if available
+
+    try {
+      const promises = scenesQuery.data.map((scene) =>
+        generateSceneFullAsync({
+          sceneId: scene.scene_id,
+          styleId: scene.image_style_override ?? styleId,
+          panelCount: panelCount
+        })
+      );
+      
+      await Promise.all(promises);
+      alert(`Started generation for ${scenesQuery.data.length} scenes.`);
+    } catch (err) {
+      alert("Failed to start batch generation: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setIsGeneratingAll(false);
+    }
+  };
 
   // Queries
   const projectsQuery = useQuery({
@@ -167,6 +198,13 @@ export default function ScenesPage() {
                 </option>
               ))}
             </select>
+            <button
+              className="btn-secondary text-sm"
+              onClick={handleGenerateAll}
+              disabled={isGeneratingAll || !storyId}
+            >
+               {isGeneratingAll ? "Queuing..." : "Generate All"}
+            </button>
           </div>
         </div>
 
@@ -256,9 +294,12 @@ function SceneDetail({
   const [error, setError] = useState("");
   const [imageLoadError, setImageLoadError] = useState("");
   const [waitingForImage, setWaitingForImage] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+
   const [zoom, setZoom] = useState(1);
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [selectedPromptVersion, setSelectedPromptVersion] = useState<number | null>(null);
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 
   // Fetch renders for this scene
   const rendersQuery = useQuery({
@@ -272,17 +313,33 @@ function SceneDetail({
     queryFn: () => fetchSceneArtifacts(scene.scene_id)
   });
 
+  // Polling for job status
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (waitingForImage && jobId) {
+      interval = setInterval(() => {
+        // We can check job status endpoint if we had one, but checking artifacts is easier
+        // or re-fetch renders
+        queryClient.invalidateQueries({ queryKey: ["renders", scene.scene_id] });
+        queryClient.invalidateQueries({ queryKey: ["artifacts", scene.scene_id] });
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [waitingForImage, jobId, scene.scene_id, queryClient]);
+
   const renderMutation = useMutation({
-    mutationFn: generateSceneFull,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["renders", scene.scene_id] });
-      queryClient.invalidateQueries({ queryKey: ["artifacts", scene.scene_id] });
+    mutationFn: generateSceneFullAsync,
+    onSuccess: (data) => {
+      // Data contains job_id
+      setJobId(data.job_id);
       setIsGenerating(false);
       setWaitingForImage(true);
+      setError("");
     },
     onError: (err) => {
       setError(err instanceof Error ? err.message : "Generation failed");
       setIsGenerating(false);
+      setWaitingForImage(false);
     }
   });
 
@@ -293,6 +350,14 @@ function SceneDetail({
     ? getLatestArtifact(artifactsQuery.data, "render_result")
     : null;
   const latestRender = latestRenderFromRenders ?? latestRenderFromArtifacts;
+
+  const currentRender = useMemo(() => {
+    if (selectedArtifactId && rendersQuery.data) {
+      const found = rendersQuery.data.find((r) => r.artifact_id === selectedArtifactId);
+      if (found) return found;
+    }
+    return latestRender;
+  }, [rendersQuery.data, selectedArtifactId, latestRender]);
 
   const hasSemantics = artifactsQuery.data
     ? !!getLatestArtifact(artifactsQuery.data, "panel_semantics")
@@ -353,7 +418,7 @@ function SceneDetail({
     );
   };
 
-  const rawImageUrl = extractImageUrl(latestRender?.payload);
+  const rawImageUrl = extractImageUrl(currentRender?.payload);
 
   const imageUrl = rawImageUrl ? getImageUrl(String(rawImageUrl)) : null;
 
@@ -365,7 +430,25 @@ function SceneDetail({
     setZoom(1);
     setSelectedPrompt(null);
     setSelectedPromptVersion(null);
+    setSelectedPromptVersion(null);
+    setSelectedArtifactId(null);
+    setJobId(null);
   }, [scene.scene_id]);
+
+  useEffect(() => {
+    // If we have a new image that matches our timeframe or just a new image on top
+    // Stop waiting.
+    if (waitingForImage && latestRender && !isGenerating) {
+       // Simple check: if we have a render created AFTER we started? 
+       // For now, just checking if we have a render url?
+       // Actually, we should check if the render job is done. 
+       // Since we don't have a job status polling endpoint easily accessible here without more code,
+       // checking if a new render exists is a reasonable proxy if we assume the user isn't clicking frantically.
+       
+       // BUT, the existing logic `if (waitingForImage && imageUrl)` handles checking if we have an image URL.
+       // We just need to ensure `latestRender` updates. (which polling above does).
+    }
+  }, [waitingForImage, latestRender, isGenerating]);
 
   useEffect(() => {
     if (waitingForImage && imageUrl) {
@@ -505,7 +588,9 @@ function SceneDetail({
                         ? render.payload.prompt
                         : null;
                     setSelectedPrompt(prompt);
+
                     setSelectedPromptVersion(render.version);
+                    setSelectedArtifactId(render.artifact_id);
                   }}
                 >
                   <img
@@ -528,7 +613,9 @@ function SceneDetail({
                   className="text-[11px] font-semibold text-slate-400 hover:text-slate-500"
                   onClick={() => {
                     setSelectedPrompt(null);
+
                     setSelectedPromptVersion(null);
+                    setSelectedArtifactId(null);
                   }}
                 >
                   Hide

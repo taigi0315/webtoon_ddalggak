@@ -82,6 +82,8 @@ export const storyGenerateResponseSchema = z.object({
   characters: charactersSchema
 });
 
+
+
 export const storyProgressSchema = z.object({
   story_id: z.string().uuid(),
   status: z.string(),
@@ -100,6 +102,8 @@ export const jobStatusSchema = z.object({
   result: z.record(z.any()).nullable().optional(),
   error: z.string().nullable().optional()
 });
+
+
 
 export const sceneGenerateFullSchema = z.object({
   scene_intent_artifact_id: z.string().uuid(),
@@ -169,6 +173,7 @@ export type ArtifactIdResponse = z.infer<typeof artifactIdSchema>;
 export type Artifact = z.infer<typeof artifactSchema>;
 export type StyleItem = z.infer<typeof styleItemSchema>;
 export type StoryGenerateResponse = z.infer<typeof storyGenerateResponseSchema>;
+
 export type CharacterRef = z.infer<typeof characterRefSchema>;
 export type CharacterVariant = z.infer<typeof characterVariantSchema>;
 export type CharacterGenerateRefsResponse = z.infer<typeof characterGenerateRefsResponseSchema>;
