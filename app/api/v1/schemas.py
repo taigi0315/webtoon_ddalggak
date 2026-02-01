@@ -95,8 +95,8 @@ class JobStatusRead(BaseModel):
     job_id: uuid.UUID
     job_type: str
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: str | datetime
+    updated_at: str | datetime
     progress: dict | None = None
     result: dict | None = None
     error: str | None = None

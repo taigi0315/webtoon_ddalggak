@@ -10,4 +10,4 @@ bug fix: currently generate scene image is taking really long, analyze what caus
 
 fine tune: current retry set up is bit too long wait, try to set up a retry waiting time bit shorter
 
-feature update: Add button to create all scene images at once to the page
+feature update: Add button to create all scene images at once to the page [DONE]

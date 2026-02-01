@@ -13,7 +13,8 @@ import {
   fetchSceneRenders,
 
 
-  generateSceneFullAsync
+  generateSceneFullAsync,
+  fetchJob
 } from "@/lib/api/queries";
 import type { Scene, Artifact } from "@/lib/api/types";
 
@@ -29,7 +30,52 @@ export default function ScenesPage() {
   const [selectedSceneId, setSelectedSceneId] = useState("");
   const [promptOverride, setPromptOverride] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [activeJobs, setActiveJobs] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
+
+  // Global polling for active jobs
+  useEffect(() => {
+    const jobIds = Object.values(activeJobs);
+    if (jobIds.length === 0) return;
+
+    const interval = setInterval(async () => {
+      // Create a copy to modify
+      let updatedJobs = { ...activeJobs };
+      let changed = false;
+
+      await Promise.all(
+        Object.entries(activeJobs).map(async ([sceneId, jobId]) => {
+          try {
+            const status = await fetchJob(jobId);
+            if (["completed", "failed", "cancelled"].includes(status.status)) {
+              // Job finished
+              delete updatedJobs[sceneId];
+              changed = true;
+              // Invalidate queries for this scene
+              queryClient.invalidateQueries({ queryKey: ["renders", sceneId] });
+              queryClient.invalidateQueries({ queryKey: ["artifacts", sceneId] });
+            }
+          } catch (e) {
+            console.error(`Failed to poll job ${jobId}`, e);
+            // If checking fails repeatedly, maybe remove it? For now, keep trying.
+          }
+        })
+      );
+
+      if (changed) {
+        setActiveJobs(updatedJobs);
+        // If we were generating all and now jobs are empty, assuming we are done?
+        // But activeJobs might be empty if all finished. 
+        // We set isGeneratingAll to false in handleGenerateAll finally block anyway.
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeJobs, queryClient]);
+
+  const handleJobStarted = (sceneId: string, jobId: string) => {
+    setActiveJobs((prev) => ({ ...prev, [sceneId]: jobId }));
+  };
 
   const handleGenerateAll = async () => {
     if (!storyId || !scenesQuery.data) return;
@@ -41,13 +87,18 @@ export default function ScenesPage() {
     const panelCount = 4; // Or fetch from scene settings if available
 
     try {
-      const promises = scenesQuery.data.map((scene) =>
-        generateSceneFullAsync({
-          sceneId: scene.scene_id,
-          styleId: scene.image_style_override ?? styleId,
-          panelCount: panelCount
-        })
-      );
+      const promises = scenesQuery.data.map(async (scene) => {
+        try {
+          const res = await generateSceneFullAsync({
+            sceneId: scene.scene_id,
+            styleId: scene.image_style_override ?? styleId,
+            panelCount: panelCount
+          });
+          handleJobStarted(scene.scene_id, res.job_id);
+        } catch (e) {
+          console.error(`Failed to start job for scene ${scene.scene_id}`, e);
+        }
+      });
       
       await Promise.all(promises);
       alert(`Started generation for ${scenesQuery.data.length} scenes.`);
@@ -246,6 +297,8 @@ export default function ScenesPage() {
                 scene={selectedScene}
                 imageStyle={storyQuery.data?.default_image_style}
                 promptOverride={promptOverride}
+                activeJobId={activeJobs[selectedScene.scene_id]}
+                onJobStarted={handleJobStarted}
               />
             )}
           </div>
@@ -283,18 +336,23 @@ export default function ScenesPage() {
 function SceneDetail({
   scene,
   imageStyle,
-  promptOverride
+  promptOverride,
+  activeJobId,
+  onJobStarted
 }: {
   scene: Scene;
   imageStyle?: string;
   promptOverride?: string | null;
+  activeJobId?: string;
+  onJobStarted: (sceneId: string, jobId: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
   const [imageLoadError, setImageLoadError] = useState("");
-  const [waitingForImage, setWaitingForImage] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
+  
+  // Derived state from prop
+  const isGenerating = !!activeJobId;
 
   const [zoom, setZoom] = useState(1);
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
@@ -314,32 +372,24 @@ function SceneDetail({
   });
 
   // Polling for job status
+  // Polling is now handled by parent via activeJobId
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (waitingForImage && jobId) {
-      interval = setInterval(() => {
-        // We can check job status endpoint if we had one, but checking artifacts is easier
-        // or re-fetch renders
-        queryClient.invalidateQueries({ queryKey: ["renders", scene.scene_id] });
-        queryClient.invalidateQueries({ queryKey: ["artifacts", scene.scene_id] });
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [waitingForImage, jobId, scene.scene_id, queryClient]);
+    // Reset transient errors when scene changes
+    setError("");
+    setImageLoadError("");
+    setIsStarting(false);
+  }, [scene.scene_id]);
 
   const renderMutation = useMutation({
     mutationFn: generateSceneFullAsync,
     onSuccess: (data) => {
-      // Data contains job_id
-      setJobId(data.job_id);
-      setIsGenerating(false);
-      setWaitingForImage(true);
+      onJobStarted(scene.scene_id, data.job_id);
+      setIsStarting(false);
       setError("");
     },
     onError: (err) => {
       setError(err instanceof Error ? err.message : "Generation failed");
-      setIsGenerating(false);
-      setWaitingForImage(false);
+      setIsStarting(false);
     }
   });
 
@@ -377,7 +427,7 @@ function SceneDetail({
 
   const handleGenerate = async () => {
     setError("");
-    setIsGenerating(true);
+    setIsStarting(true);
     const normalizedPromptOverride = promptOverride?.trim()
       ? promptOverride.trim()
       : null;
@@ -423,39 +473,20 @@ function SceneDetail({
   const imageUrl = rawImageUrl ? getImageUrl(String(rawImageUrl)) : null;
 
   useEffect(() => {
-    setImageLoadError("");
-    setError("");
-    setIsGenerating(false);
-    setWaitingForImage(false);
     setZoom(1);
     setSelectedPrompt(null);
     setSelectedPromptVersion(null);
-    setSelectedPromptVersion(null);
     setSelectedArtifactId(null);
-    setJobId(null);
   }, [scene.scene_id]);
 
+  // waitingForImage logic removed in favor of isGenerating from prop
   useEffect(() => {
-    // If we have a new image that matches our timeframe or just a new image on top
-    // Stop waiting.
-    if (waitingForImage && latestRender && !isGenerating) {
-       // Simple check: if we have a render created AFTER we started? 
-       // For now, just checking if we have a render url?
-       // Actually, we should check if the render job is done. 
-       // Since we don't have a job status polling endpoint easily accessible here without more code,
-       // checking if a new render exists is a reasonable proxy if we assume the user isn't clicking frantically.
-       
-       // BUT, the existing logic `if (waitingForImage && imageUrl)` handles checking if we have an image URL.
-       // We just need to ensure `latestRender` updates. (which polling above does).
+    if (isGenerating && imageUrl) {
+      // If we see an image URL but we think we are generating,
+      // it means the image is from BEFORE this job started.
+      // We keep showing generating state until the job finishes (prop updates).
     }
-  }, [waitingForImage, latestRender, isGenerating]);
-
-  useEffect(() => {
-    if (waitingForImage && imageUrl) {
-      setWaitingForImage(false);
-      setImageLoadError("");
-    }
-  }, [waitingForImage, imageUrl]);
+  }, [isGenerating, imageUrl]);
 
   return (
     <div className="card">
@@ -471,9 +502,9 @@ function SceneDetail({
         <button
           className="btn-primary text-sm"
           onClick={handleGenerate}
-          disabled={isGenerating || waitingForImage}
+          disabled={isGenerating || isStarting}
         >
-          {isGenerating || waitingForImage
+          {isGenerating || isStarting
             ? "Generating..."
             : imageUrl
               ? "Generate Another"
@@ -512,14 +543,13 @@ function SceneDetail({
                 onError={() => setImageLoadError("Unable to load render image.")}
                 onLoad={() => {
                   setImageLoadError("");
-                  setWaitingForImage(false);
                 }}
               />
             </div>
           ) : (
             <div className="flex h-[520px] w-full items-center justify-center rounded-xl bg-slate-100 text-slate-400">
               {imageLoadError ||
-                (waitingForImage
+                (isGenerating
                   ? "Generating image... This can take a minute."
                   : "No scene image yet. Click Generate Image to run planning + render.")}
             </div>

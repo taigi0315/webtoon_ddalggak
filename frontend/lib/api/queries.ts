@@ -99,6 +99,11 @@ export async function fetchStory(storyId: string) {
   return storySchema.parse(payload);
 }
 
+export async function fetchJob(jobId: string) {
+  const payload = await fetchJson(`/v1/jobs/${jobId}`);
+  return jobStatusSchema.parse(payload);
+}
+
 export async function fetchStoryProgress(storyId: string) {
   const payload = await fetchJson(`/v1/stories/${storyId}/progress`);
   return storyProgressSchema.parse(payload);
