@@ -127,11 +127,11 @@ graph TD
 
 ### Key Nodes
 
-- **llm_scene_intent** - Extract narrative intent (mood, pacing, key moments)
-- **llm_panel_plan** - Generate panel breakdown with shot types (grammar IDs)
-- **rule_panel_plan_normalize** - Validate and correct panel plan structure
-- **rule_layout** - Resolve layout template based on panel count
-- **llm_panel_semantics** - Fill detailed visual descriptions for each panel
+- **`scene_intent`**: Narrative analysis including `cinematic_mode`, `continuity_preference`, and `shot_variety_preference`
+- **`panel_plan`**: Panel breakdown with `grammar_id`, `importance_weight`, and `recommended_focus`
+- **`panel_plan_normalized`**: Validated panel plan (creative layouts preferred)
+- **rule_layout** - Resolve layout template based on panel count and emphasis
+- **llm_panel_semantics** - Fill detailed visual descriptions for each panel using cinematographer principles
 
 ### Planning Lock Concept
 
@@ -309,8 +309,8 @@ ORDER BY type, version DESC;
 
 - **Style resolution**: Check `Scene.image_style_override` and `Story.default_image_style`
 - **Missing artifacts**: Verify `panel_semantics` and `layout_template` artifacts exist
-- **QC enforcement**: Review `qc_report` artifact for validation failures
-- **Render failures**: Check `render_result` artifact for error messages
+- **QC enforcement**: Review **`qc_report`**: Visual storytelling checking (soft guidelines instead of hard rules)
+- **`blind_test_report`**: Evaluation of narrative clarity and emotional delivery (`emotional_takeaway`, `visual_storytelling_observations`)
 - **Gemini API errors**: Review logs for rate limits, content filtering, or quota issues
 
 **Useful queries**:

@@ -55,13 +55,13 @@
     },
     "thought": {
       "path": "app/assets/fonts/cs-sullivan-drawn-font/CssullivandrawnRegularDemo-8OXG0.otf",
-      "size": 14,
+      "size": 16,
       "scale": 1.6,
       "text_color": "#808080"
     },
     "narration": {
       "path": "app/assets/fonts/cs-sullivan-drawn-font/CssullivandrawnRegularDemo-8OXG0.otf",
-      "size": 14,
+      "size": 19,
       "scale": 1.5,
       "text_color": "#FFFFFF"
     },

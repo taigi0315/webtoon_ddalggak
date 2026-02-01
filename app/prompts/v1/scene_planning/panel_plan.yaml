@@ -7,7 +7,19 @@
 prompt_panel_plan: |
   {{ global_constraints }}
 
-  Create a panel plan for a {{ panel_count }}-panel webtoon sequence.
+  Create a flexible panel plan for a webtoon scene.
+  This is NOT a storyboard and NOT animation frames.
+
+  Your task is to suggest a sequence of visual moments that best communicate:
+
+  - story
+  - emotion
+  - rhythm
+
+  You may vary panel sizes and importance.
+  Panels do NOT need to be equal.
+
+  INPUT CONTEXT:
   {% if intent_block %}
   {{ intent_block }}
   {% endif %}
@@ -18,41 +30,45 @@ prompt_panel_plan: |
   {% if qc_block %}
   {{ qc_block }}
   {% endif %}
-  VALID GRAMMAR IDs (use ONLY these):
-  1. establishing - Wide shot showing environment and context (REQUIRED for panel 1)
-  2. dialogue_medium - Two-shot or medium shot for conversation
-  3. emotion_closeup - Close-up on face for emotional impact (use sparingly)
-  4. action - Dynamic movement or physical action
-  5. reaction - Character responding to prior event
-  6. object_focus - Important object or detail in focus
-  7. reveal - Dramatic reveal of character, object, or information
-  8. impact_silence - Dramatic pause with minimal elements, powerful negative space
 
-  STORY FUNCTION OPTIONS:
-  - setup: establishes context or situation
-  - dialogue: conversation or verbal exchange
-  - emotion: emotional beat or reaction
-  - action: physical action or movement
-  - reaction: response to prior event
-  - focus: draws attention to important element
-  - climax: peak dramatic moment
-  - transition: bridges between scenes or beats
+  AVAILABLE GRAMMAR IDs (choose what makes sense, do NOT force variety):
+
+  - establishing (map from: establishing)
+  - dialogue_medium (map from: dialogue)
+  - emotion_closeup (map from: emotion_focus)
+  - action
+  - reaction
+  - object_focus
+  - reveal
+  - impact_silence
 
   OUTPUT SCHEMA:
   {
+    "panel_count": number,
+    "layout_strategy": "uniform | dominant_with_insets | mixed | freeform",
     "panels": [
       {
-        "panel_index": 1,
-        "grammar_id": "establishing",
-        "story_function": "setup",
-        "panel_role": "main|inset",
-        "panel_purpose": "dialogue|reaction|reveal|action|establishing|silent_beat",
-        "has_dialogue": true,
-        "utility_score": 0.0,
-        "beat_summary": "Brief description of what happens in this panel"
+        "panel_index": number,
+        "grammar_id": "establishing | dialogue_medium | emotion_closeup | action | reaction | object_focus | reveal | impact_silence",
+        "importance_weight": 0.0-1.0,
+        "recommended_focus": "what the reader should visually focus on",
+        "notes": "why this panel exists in the story (emotion, pacing, transition, etc)"
       }
     ]
   }
+
+  RULES (IMPORTANT):
+
+  - You are allowed to use multiple similar panels IF continuity_preference is high
+  - You are allowed to skip close-ups or object shots entirely if not useful
+  - If there is an emotional peak, at least ONE panel should have high importance_weight
+  - Do NOT force balance — imbalance is allowed and encouraged
+
+  DO NOT:
+
+  - Do NOT evenly divide panels by default
+  - Do NOT assume every panel shows full characters
+  - Do NOT design animation-like frame sequences unless continuity is clearly preferred
 
   Scene text:
   {{ scene_text }}

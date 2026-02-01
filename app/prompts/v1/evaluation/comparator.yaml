@@ -7,32 +7,38 @@
 prompt_comparator: |
   {{ system_prompt_json }}
 
-  Compare the blind reader's reconstruction to the original story.
+  Compare the blind reader’s reconstruction with the original story.
 
   ORIGINAL STORY:
   {{ original_text }}
 
-  BLIND READER'S RECONSTRUCTION:
-  {{ reconstructed_story }}
-
-  IDENTIFIED CHARACTERS: {{ identified_characters }}
-  PLOT POINTS UNDERSTOOD: {{ plot_points }}
-  UNCLEAR ELEMENTS: {{ unclear_elements }}
+  BLIND READER RESULT:
+  Story: {{ reconstructed_story }}
+  Emotional Takeaway: {{ emotional_takeaway }}
+  Observations: {{ visual_storytelling_observations }}
+  Confusing Elements: {{ confusing_or_weak_elements }}
+  Identified Characters: {{ identified_characters }}
 
   SCORING RUBRIC:
-  - plot_recall (40%): Did the reader understand the main events?
+
+  - plot_recall (30%): Did the reader understand the main events?
   - emotional_alignment (30%): Did the reader feel the intended emotions?
-  - character_identifiability (30%): Could the reader identify who is who?
+  - visual_delivery (25%): Did the panels use visual storytelling effectively?
+  - character_identifiability (15%): Could the reader distinguish characters?
 
   OUTPUT SCHEMA:
   {
     "scores": {
       "plot_recall": 0.0-1.0,
       "emotional_alignment": 0.0-1.0,
+      "visual_delivery": 0.0-1.0,
       "character_identifiability": 0.0-1.0
     },
     "weighted_score": 0.0-1.0,
-    "comparison": "Brief comparison of original vs reconstruction",
-    "failure_points": ["List specific panels or elements that failed to communicate"],
-    "repair_suggestions": ["Specific actionable fixes for failed panels"]
+    "failure_points": [
+      "specific panels or patterns that weakened storytelling"
+    ],
+    "repair_suggestions": [
+      "concrete, actionable fixes (e.g., reduce repetition, add visual implication)"
+    ]
   }

@@ -176,7 +176,7 @@ export default function CharacterStudioPage() {
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[260px,1fr]">
-          <aside className="space-y-3">
+          <aside className="flex flex-col gap-3 self-start">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Characters</p>
             {charactersQuery.isLoading && (
               <div className="text-sm text-slate-500">Loading characters...</div>

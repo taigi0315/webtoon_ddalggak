@@ -79,6 +79,10 @@ Scene Intent:
 - Logline: {scene_intent.get('logline', 'N/A')}
 - Pacing: {scene_intent.get('pacing', 'normal')}
 - Emotional arc: {scene_intent.get('emotional_arc', {})}
+- Cinematic Mode: {scene_intent.get('cinematic_mode', 'continuity')}
+- Continuity Pref: {scene_intent.get('continuity_preference', 0.5)}
+- Shot Variety: {scene_intent.get('shot_variety_preference', 0.5)}
+- Visual Motifs: {scene_intent.get('visual_motifs', [])}
 """
     importance_block = ""
     if scene_importance:
@@ -86,17 +90,8 @@ Scene Intent:
 
     char_list = ", ".join(character_names) if character_names else "unknown characters"
 
+    # QC block removed to allow soft preferences logic
     qc_block = ""
-    if qc_rules:
-        qc_block = f"""
-QC HARD CONSTRAINTS (you MUST follow these):
-- Max closeup ratio: {qc_rules.get('closeup_ratio_max', 0.5)} (no more than {int(panel_count * qc_rules.get('closeup_ratio_max', 0.5))} emotion_closeup panels)
-- No more than 2 consecutive panels with the same grammar_id
-- First panel MUST be 'establishing'
-- Last panel SHOULD be 'reaction' or 'reveal' for closure
-- Inset panels must be meaningful (dialogue, reveal, reaction, action, or intentional silent beat)
-- Max inset panels: 2
-"""
 
     return render_prompt(
         "prompt_panel_plan",
@@ -105,7 +100,7 @@ QC HARD CONSTRAINTS (you MUST follow these):
         intent_block=intent_block.strip(),
         importance_block=importance_block.strip(),
         char_list=char_list,
-        qc_block=qc_block.strip(),
+        qc_block=qc_block,
         scene_text=scene_text,
     )
 
@@ -154,6 +149,7 @@ def _prompt_panel_semantics(
 Scene Context:
 - Logline: {scene_intent.get('logline', 'N/A')}
 - Pacing: {scene_intent.get('pacing', 'normal')}
+- Cinematic Mode: {scene_intent.get('cinematic_mode', 'continuity')}
 - Visual motifs to include: {scene_intent.get('visual_motifs', [])}
 """
 
@@ -211,9 +207,10 @@ def _prompt_comparator(original_text: str, blind_reading: dict) -> str:
         system_prompt_json=SYSTEM_PROMPT_JSON,
         original_text=original_text,
         reconstructed_story=blind_reading.get("reconstructed_story", "N/A"),
+        emotional_takeaway=blind_reading.get("emotional_takeaway", "N/A"),
+        visual_storytelling_observations=blind_reading.get("visual_storytelling_observations", []),
+        confusing_or_weak_elements=blind_reading.get("confusing_or_weak_elements", []),
         identified_characters=blind_reading.get("identified_characters", []),
-        plot_points=blind_reading.get("plot_points", []),
-        unclear_elements=blind_reading.get("unclear_elements", []),
     )
 
 

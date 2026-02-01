@@ -57,6 +57,10 @@ def run_blind_test_evaluator(
                 failure_points = []
                 repair_suggestions = []
 
+                # New fields for visual storytelling evaluation
+                emotional_takeaway = None
+                visual_observations = []
+
                 if gemini is not None:
                     # Try two-stage blind test process
                     two_stage_success = False
@@ -69,6 +73,8 @@ def run_blind_test_evaluator(
 
                     if blind_reading and isinstance(blind_reading, dict):
                         reconstructed = blind_reading.get("reconstructed_story", reconstructed)
+                        emotional_takeaway = blind_reading.get("emotional_takeaway")
+                        visual_observations = blind_reading.get("visual_storytelling_observations", [])
 
                         # Stage 2: Comparator scores the reconstruction
                         comparison_result = _maybe_json_from_gemini(
@@ -101,6 +107,8 @@ def run_blind_test_evaluator(
                 payload = {
                     "reconstructed_story": reconstructed,
                     "comparison": comparison,
+                    "emotional_takeaway": emotional_takeaway,
+                    "visual_storytelling_observations": visual_observations,
                     "score": score,
                     "passed": score >= 0.25,
                     "scores": scores,

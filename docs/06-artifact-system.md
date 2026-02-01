@@ -13,6 +13,7 @@ Artifacts serve three key purposes:
 - **Manual Editing**: Users can edit artifacts (e.g., panel plans) and lock them to prevent regeneration
 
 Each artifact is:
+
 - **Scene-scoped**: Tied to a specific `scene_id`
 - **Type-specific**: Identified by a `type` string (e.g., `scene_intent`, `panel_plan`)
 - **Auto-versioned**: Version increments automatically per `(scene_id, type)` combination
@@ -22,15 +23,15 @@ Each artifact is:
 
 The system defines 11 artifact types representing different pipeline stages:
 
-- **`scene_intent`**: Narrative analysis extracting mood, pacing, and key beats from scene text
-- **`panel_plan`**: Panel breakdown with grammar IDs, weights, and must-show elements
+- **`scene_intent`**: Narrative analysis including `cinematic_mode`, `continuity_preference`, and `shot_variety_preference`
+- **`panel_plan`**: Panel breakdown with `grammar_id`, `importance_weight`, and `recommended_focus`
 - **`panel_plan_normalized`**: Validated and normalized panel plan with QC checks applied
 - **`layout_template`**: Selected layout template with panel geometry (x, y, w, h coordinates)
 - **`panel_semantics`**: Visual descriptions for each panel with character, environment, and dialogue details
 - **`render_spec`**: Complete image generation prompt with style, characters, and reference images
 - **`render_result`**: Generated image URL, metadata, and generation parameters
-- **`qc_report`**: Quality control validation results with issues and metrics
-- **`blind_test_report`**: Blind reader evaluation of narrative clarity
+- **`qc_report`**: Visual storytelling checking (soft guidelines instead of hard rules)
+- **`blind_test_report`**: Evaluation of narrative clarity and emotional delivery (`emotional_takeaway`, `visual_storytelling_observations`)
 - **`dialogue_suggestions`**: Extracted dialogue lines with speaker and emotion hints
 - **`visual_plan`**: Character extraction and normalization with visual details
 
@@ -44,6 +45,7 @@ Artifacts use automatic versioning with conflict resolution:
 - **Request Tracking**: Each artifact includes `request_id` for correlation across system
 
 Example version history:
+
 ```
 scene_intent v1 (parent_id: null)
   └─ scene_intent v2 (parent_id: v1.artifact_id)
@@ -72,24 +74,26 @@ Graphs use artifacts to enable resumable execution:
 4. **Generate New**: Create new versioned artifact only if needed
 
 Example pattern:
+
 ```python
 # File: app/graphs/nodes/planning/scene_intent.py
 
 def run_scene_intent_extractor(db: Session, scene_id: uuid.UUID) -> Artifact:
     """Extract narrative intent from scene text."""
     svc = ArtifactService(db)
-    
+
     # Check for existing artifact
     existing = svc.get_latest_artifact(scene_id, ARTIFACT_SCENE_INTENT)
     if existing and scene.planning_locked:
         return existing  # Skip regeneration
-    
+
     # Generate new version
     payload = extract_intent(scene.source_text)
     return svc.create_artifact(scene_id, ARTIFACT_SCENE_INTENT, payload)
 ```
 
 This pattern allows:
+
 - **Partial regeneration**: Regenerate only specific artifacts
 - **Manual editing**: Users can edit and lock artifacts
 - **Debugging**: Inspect intermediate outputs at any stage
@@ -98,7 +102,7 @@ This pattern allows:
 
 - `app/services/artifacts.py` - ArtifactService implementation with versioning logic
 - `app/db/models.py` - Artifact model definition with parent-child relationship
-- `app/graphs/nodes/constants.py` - Artifact type constants (ARTIFACT_*)
+- `app/graphs/nodes/constants.py` - Artifact type constants (ARTIFACT\_\*)
 - `app/api/v1/artifacts.py` - Artifact retrieval endpoints
 - `app/graphs/nodes/utils.py` - Artifact type constant imports and usage
 
@@ -116,13 +120,13 @@ This pattern allows:
 
 ```sql
 -- List all artifacts for a scene
-SELECT type, version, created_at FROM artifacts 
-WHERE scene_id = 'uuid-here' 
+SELECT type, version, created_at FROM artifacts
+WHERE scene_id = 'uuid-here'
 ORDER BY type, version;
 
 -- Get latest artifact of each type
 SELECT DISTINCT ON (type) type, version, artifact_id, created_at
-FROM artifacts 
+FROM artifacts
 WHERE scene_id = 'uuid-here'
 ORDER BY type, version DESC;
 

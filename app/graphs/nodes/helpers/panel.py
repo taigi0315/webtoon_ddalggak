@@ -47,43 +47,15 @@ def _normalize_panel_plan(panel_plan: dict) -> dict:
         grammar_id = panel.get("grammar_id")
         if grammar_id not in VALID_GRAMMAR_IDS:
             panel["grammar_id"] = "dialogue_medium"
-            panel["story_function"] = _grammar_story_function("dialogue_medium")
+            if not panel.get("story_function"):
+                panel["story_function"] = _grammar_story_function("dialogue_medium")
+        
+        # Ensure story_function is populated
+        if not panel.get("story_function"):
+            panel["story_function"] = _grammar_story_function(panel.get("grammar_id", "dialogue_medium"))
 
-    if len(panels) == 1:
-        panels[0]["grammar_id"] = "establishing"
-        panels[0]["story_function"] = _grammar_story_function("establishing")
-        return {"panels": panels}
-
-    # First panel must be establishing
-    if panels[0].get("grammar_id") != "establishing":
-        panels[0]["grammar_id"] = "establishing"
-        panels[0]["story_function"] = _grammar_story_function("establishing")
-
-    # Last panel should be a closing grammar (reaction, reveal, or impact_silence)
-    valid_endings = {"reaction", "reveal", "impact_silence"}
-    if panels[-1].get("grammar_id") not in valid_endings:
-        panels[-1]["grammar_id"] = "reaction"
-        panels[-1]["story_function"] = _grammar_story_function("reaction")
-
-    # Limit closeups to max 50% of panels
-    closeups = [p for p in panels if p.get("grammar_id") == "emotion_closeup"]
-    max_closeups = max(1, math.floor(len(panels) * 0.5))
-    if len(closeups) > max_closeups:
-        for p in closeups[max_closeups:]:
-            p["grammar_id"] = "reaction"
-            p["story_function"] = _grammar_story_function("reaction")
-
-    # Prevent 3+ consecutive identical grammar_ids
-    run_len = 1
-    for idx in range(1, len(panels)):
-        if panels[idx].get("grammar_id") == panels[idx - 1].get("grammar_id"):
-            run_len += 1
-            if run_len >= 3:
-                panels[idx]["grammar_id"] = "reaction"
-                panels[idx]["story_function"] = _grammar_story_function("reaction")
-                run_len = 1
-        else:
-            run_len = 1
+    # We removed strict constraints (establishing start, max closeups, repeated framing)
+    # to allow the LLM's visual intent to drive the plan.
 
     return {"panels": panels}
 
@@ -173,11 +145,32 @@ def _evaluate_and_prune_panel_plan(panel_plan: dict) -> dict:
 
 
 def _assign_panel_weights(panel_plan: dict, scene_importance: str | None = None) -> dict:
-    """Add `weight` (0.1-1.0) and `must_be_large` to each panel based on utility and scene importance."""
+    """Add `weight` (0.1-1.0) and `must_be_large` to each panel based on importance or utility."""
     panels = list(panel_plan.get("panels") or [])
     if not panels:
         return panel_plan
 
+    # Check for explicit importance_weight from LLM
+    has_explicit = any(p.get("importance_weight") is not None for p in panels)
+
+    if has_explicit:
+        for p in panels:
+            w = p.get("importance_weight")
+            try:
+                weight = float(w) if w is not None else 0.5
+            except (ValueError, TypeError):
+                weight = 0.5
+            
+            p["weight"] = round(min(max(weight, 0.1), 1.0), 3)
+            
+            # Simple heuristic for dominant panels if scene is critical
+            must = bool(p.get("must_be_large", False))
+            if not must and scene_importance in {"climax", "cliffhanger"} and weight > 0.75:
+                must = True
+            p["must_be_large"] = must
+        return {"panels": panels}
+
+    # Fallback: Utility-based weight assignment
     utilities = [p.get("utility_score", 0.3) for p in panels]
     min_u = min(utilities)
     max_u = max(utilities)

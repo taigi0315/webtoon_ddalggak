@@ -356,6 +356,10 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
             "summary": "QC failed: no panels detected.",
         }
 
+    # NOTE: We have removed strict checks for 'too_many_closeups' and 'repeated_framing'
+    # to support the new "Cinematic Intent" system where layout is driven by soft preferences
+    # rather than hard constraints.
+
     closeups = [p for p in panels if p.get("grammar_id") == "emotion_closeup"]
     closeup_count = len(closeups)
     closeup_ratio = closeup_count / total
@@ -367,6 +371,7 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
         dialogue_count = len(dialogue_panels)
         dialogue_ratio = dialogue_count / total
 
+    # Check for repeated framing (metric only, no fail)
     run_len = 1
     max_run = 1
     for idx in range(1, total):
@@ -377,12 +382,9 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
             run_len = 1
 
     issues: list[str] = []
-    if closeup_ratio > rules.closeup_ratio_max:
-        issues.append("too_many_closeups")
-    if dialogue_ratio > rules.dialogue_ratio_max:
+    # Relaxed dialogue check: only flag if > 85% panels have dialogue (readability risk)
+    if dialogue_ratio > 0.85:
         issues.append("too_much_dialogue")
-    if max_run >= rules.repeated_framing_run_length:
-        issues.append("repeated_framing")
 
     if rules.require_environment_on_establishing:
         first = panels[0].get("grammar_id")
@@ -393,30 +395,13 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
 
     issue_details: list[dict[str, str]] = []
     for code in issues:
-        if code == "too_many_closeups":
-            allowed = max(1, int(total * rules.closeup_ratio_max))
-            issue_details.append(
-                {
-                    "code": code,
-                    "message": f"Too many close-up panels ({closeup_count}/{total}). Max {allowed}.",
-                    "hint": "Reduce close-ups or mix in wider shots to balance framing.",
-                }
-            )
-        elif code == "too_much_dialogue":
-            allowed = max(1, int(total * rules.dialogue_ratio_max))
+        if code == "too_much_dialogue":
+            allowed = max(1, int(total * 0.85))
             issue_details.append(
                 {
                     "code": code,
                     "message": f"Too many dialogue panels ({dialogue_count}/{total}). Max {allowed}.",
                     "hint": "Move some dialogue to narration or spread it across fewer panels.",
-                }
-            )
-        elif code == "repeated_framing":
-            issue_details.append(
-                {
-                    "code": code,
-                    "message": f"Repeated framing detected ({max_run} panels in a row).",
-                    "hint": "Vary camera distance or angle between adjacent panels.",
                 }
             )
         elif code == "missing_environment_on_establishing":

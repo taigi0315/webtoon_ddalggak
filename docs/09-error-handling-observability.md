@@ -38,11 +38,13 @@ All exceptions include `request_id` and `model` attributes for debugging.
 **Purpose**: Prevent cascading failures by temporarily blocking requests after repeated failures
 
 **Thresholds**:
+
 - `failure_threshold: 5` - Open circuit after 5 consecutive failures
 - `recovery_timeout: 60s` - Wait 60 seconds before allowing test requests
 - `half_open_success_threshold: 2` - Close circuit after 2 successful test requests
 
 **States**:
+
 - **Closed** - Normal operation, all requests allowed
 - **Open** - Too many failures, all requests blocked
 - **Half-Open** - Testing recovery, limited requests allowed
@@ -50,6 +52,7 @@ All exceptions include `request_id` and `model` attributes for debugging.
 **Per-Operation**: Separate circuit breakers for `generate_text` and `generate_image`
 
 **Management**:
+
 - `get_circuit_breaker_status()` - Check circuit breaker state
 - `reset_circuit_breaker(operation_type)` - Manually reset circuit breaker
 
@@ -62,12 +65,14 @@ All exceptions include `request_id` and `model` attributes for debugging.
 **Usage**: Automatically tries fallback model on primary model failure
 
 **Configuration**:
+
 - `fallback_text_model` - Fallback for text generation
 - `fallback_image_model` - Fallback for image generation
 
 ### Error Classification
 
 The client automatically classifies errors by type:
+
 - **rate_limit** - RESOURCE_EXHAUSTED, 429 errors
 - **content_filter** - SAFETY blocks, content filtering
 - **timeout** - Timeout, deadline exceeded
@@ -109,6 +114,7 @@ with log_context(node_name="scene_intent", scene_id=scene_id):
 ### Propagation
 
 Request IDs are propagated through:
+
 - **HTTP headers** - `x-request-id` header in API requests/responses
 - **Logs** - Included in all structured log records
 - **Artifacts** - Stored in artifact metadata
@@ -126,6 +132,7 @@ The system integrates with OpenTelemetry for distributed tracing and observabili
 **Configuration**: Set `PHOENIX_OTEL_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable
 
 **Instrumentation**:
+
 - **FastAPI** - Automatic HTTP request tracing
 - **LangChain** - LangGraph node execution tracing (if available)
 
@@ -170,6 +177,7 @@ The `Story.progress` field tracks story blueprint generation progress and errors
 ```
 
 **Fields**:
+
 - `status` - Generation status (queued, running, succeeded, failed)
 - `current_node` - Current LangGraph node being executed
 - `message` - Human-readable progress message
@@ -183,6 +191,7 @@ The `Story.progress` field tracks story blueprint generation progress and errors
 **API Endpoint**: `GET /v1/stories/{story_id}/progress`
 
 **Database Query**:
+
 ```sql
 SELECT generation_status, progress, progress_updated_at, generation_error
 FROM stories
@@ -200,6 +209,7 @@ The audit logging system tracks entity lifecycle events (create, update, delete)
 ### AuditLog Model
 
 **Fields**:
+
 - `entity_type` - Type of entity (story, scene, character, etc.)
 - `entity_id` - UUID of the entity
 - `action` - Action performed (create, update, delete, generation_start, etc.)
@@ -238,27 +248,33 @@ The system exposes Prometheus-compatible metrics for monitoring and alerting.
 ### Available Metrics
 
 **Graph Node Duration**:
+
 - `ssuljaengi_graph_node_duration_seconds` - Histogram of node execution time
 - Labels: `graph`, `node`
 
 **JSON Parse Failures**:
+
 - `ssuljaengi_json_parse_failures_total` - Counter of JSON parsing failures
 - Labels: `tier` (scene_intent, panel_plan, etc.)
 
 **Gemini API Calls**:
+
 - `ssuljaengi_gemini_call_duration_seconds` - Histogram of API call latency
 - `ssuljaengi_gemini_calls_total` - Counter of API calls by status
 - Labels: `operation` (generate_text, generate_image), `status` (success, error)
 
 **Blind Test Results**:
+
 - `ssuljaengi_blind_test_results_total` - Counter of blind test outcomes
 - Labels: `result` (pass, fail)
 
 **QC Failures**:
-- `ssuljaengi_qc_issues_total` - Counter of QC validation failures
-- Labels: `issue` (closeup_ratio_exceeded, repeated_framing, etc.)
+
+- `ssuljaengi_qc_issues_total` - Counter of QC visual storytelling checks (note: some are soft warnings)
+- Labels: `issue` (too_many_closeups, repeated_framing - now relaxed)
 
 **Artifact Creations**:
+
 - `ssuljaengi_artifact_creations_total` - Counter of artifacts created
 - Labels: `type` (scene_intent, panel_plan, render_spec, etc.)
 
@@ -288,16 +304,19 @@ record_artifact_creation(artifact_type="scene_intent")
 ## Key Files
 
 ### Error Handling
+
 - `app/services/vertex_gemini.py` - GeminiClient with retry logic and circuit breaker
 - `app/core/request_context.py` - Request correlation context variables
 - `app/core/logging.py` - Structured logging with request ID injection
 
 ### Observability
+
 - `app/core/telemetry.py` - OpenTelemetry tracing setup
 - `app/core/metrics.py` - Prometheus metrics collection
 - `app/services/audit.py` - Audit logging service
 
 ### Models
+
 - `app/db/models.py` - Story model with `progress` field, AuditLog model
 
 ## Debugging Direction
@@ -375,9 +394,9 @@ record_artifact_creation(artifact_type="scene_intent")
 
 - **High error rates**:
   - Check `ssuljaengi_gemini_calls_total{status="error"}` for API failures
-  - Review `ssuljaengi_qc_issues_total` for quality control failures
+  - Review `ssuljaengi_qc_issues_total` for visual storytelling checks (note: some rules are soft warnings now)
   - Check `ssuljaengi_json_parse_failures_total` for LLM output parsing issues
-  - Investigate `ssuljaengi_blind_test_results_total{result="fail"}` for quality issues
+  - Investigate `ssuljaengi_blind_test_results_total` for narrative/visual flow issues
 
 - **Performance issues**:
   - Review `ssuljaengi_graph_node_duration_seconds` histogram for slow nodes
@@ -418,6 +437,7 @@ print(gemini_client.get_circuit_breaker_status())
 ```
 
 **Key log patterns to search**:
+
 - `gemini.generate_text` - Text generation traces
 - `gemini.generate_image` - Image generation traces
 - `circuit breaker OPEN` - Circuit breaker opened

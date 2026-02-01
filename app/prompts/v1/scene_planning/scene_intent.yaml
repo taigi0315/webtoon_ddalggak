@@ -7,37 +7,50 @@
 prompt_scene_intent: |
   {{ global_constraints }}
 
-  Analyze the following scene and extract its narrative intent for webtoon adaptation.
+  Analyze the following scene for webtoon adaptation.
+  Your goal is to extract NOT ONLY plot, but how the scene WANTS to be visually told.
 
-  OUTPUT SCHEMA (return exactly this structure):
+  Think like a webtoon director, not a screenwriter.
+
+  Return EXACTLY the following JSON structure.
+
+  OUTPUT SCHEMA:
   {
-    "logline": "One sentence describing the core action/conflict of this scene",
-    "pacing": "slow_burn|normal|fast|impact",
+    "logline": "One sentence describing the core narrative purpose of this scene",
+    "pacing": "slow_burn | normal | fast | impact",
     "emotional_arc": {
-      "start": "emotion at scene start (e.g., calm, tense, happy)",
-      "peak": "strongest emotion in scene",
+      "start": "dominant emotion at scene start",
+      "peak": "strongest emotional moment",
       "end": "emotion at scene end"
     },
-    "visual_motifs": ["list of 2-4 key visual elements to emphasize"],
-    "summary": "2-3 sentence summary of the scene",
-    "beats": ["list of 2-4 key story beats in order"],
+    "cinematic_mode": "continuity | montage | reveal | dialogue_heavy | atmospheric",
+    "continuity_preference": 0.0-1.0,
+    "shot_variety_preference": 0.0-1.0,
+    "visual_motifs": [
+      "objects, gestures, environmental elements, or body parts that could carry meaning"
+    ],
+    "beats": [
+      "List 2–5 visual story beats. Each beat should be ONE visual moment, not a paragraph."
+    ],
     "setting": "primary location/environment or null",
-    "characters": ["list of characters present in scene"]
+    "characters": ["characters present in this scene"]
   }
 
-  PACING GUIDE:
-  - slow_burn: introspective, atmospheric, lingering on emotion
-  - normal: standard narrative flow, balanced action and dialogue
-  - fast: rapid cuts, urgency, action-driven
-  - impact: dramatic reveals, emotional climax, single powerful moment
+  GUIDANCE:
 
-  WHAT MAKES GOOD BEATS:
-  - Each beat should be a single discrete visual moment
-  - Beats should follow cause-and-effect logic
-  - Include character reactions, not just actions
-  - Balance dialogue beats with action/reaction beats
+  - continuity mode means sequential motion MAY be effective (not required)
+  - montage mode means implication, metaphor, and compression
+  - reveal mode means a single moment should dominate visually
+  - atmospheric mode favors mood over action
 
-  Known characters: {{ char_list }}
+  IMPORTANT:
+
+  - Do NOT plan panels here
+  - Do NOT force close-ups or object shots
+  - Simply describe WHAT WOULD BE EFFECTIVE, not WHAT IS REQUIRED
+
+  Known characters:
+  {{ char_list }}
 
   Scene text:
   {{ scene_text }}
