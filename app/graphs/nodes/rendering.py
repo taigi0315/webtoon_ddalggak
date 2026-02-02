@@ -84,12 +84,27 @@ def run_prompt_compiler(
                         art_direction=art_direction,
                     )
                 
+                # Determine active characters in this scene
+                active_char_ids: list[str] = []
+                if panel_semantics.payload and "panels" in panel_semantics.payload:
+                    names_in_scene: set[str] = set()
+                    for p in panel_semantics.payload["panels"]:
+                        if "characters" in p:
+                            names_in_scene.update(str(n).lower() for n in p["characters"])
+                    
+                    if names_in_scene:
+                        # Map names to IDs
+                        for char in characters:
+                            if char.name and char.name.lower() in names_in_scene:
+                                active_char_ids.append(str(char.character_id))
+
                 payload = {
                     "prompt": prompt,
                     "style_id": effective_style_id,
                     "layout_template_id": layout.payload.get("template_id"),
                     "panel_count": panel_count,
                     "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+                    "active_char_ids": active_char_ids,
                 }
                 return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_SPEC, payload=payload)
 
@@ -336,8 +351,19 @@ def run_image_renderer(
                 if gemini is not None:
                     scene = _get_scene(db, scene_id)
                     style_id = render_spec.payload.get("style_id")
+                    active_char_ids_str = render_spec.payload.get("active_char_ids")
+                    active_ids: set[uuid.UUID] | None = None
+                    if active_char_ids_str:
+                         try:
+                             active_ids = {uuid.UUID(s) for s in active_char_ids_str}
+                         except ValueError:
+                             pass
+                    
                     reference_images = _load_character_reference_images(
-                        db, scene.story_id, style_id=style_id
+                        db,
+                        scene.story_id,
+                        style_id=style_id,
+                        filter_char_ids=active_ids,
                     )
 
                 image_bytes, mime_type, metadata = _render_image_from_prompt(

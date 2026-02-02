@@ -47,10 +47,17 @@ export default function ScenesPage() {
         Object.entries(activeJobs).map(async ([sceneId, jobId]) => {
           try {
             const status = await fetchJob(jobId);
-            if (["completed", "failed", "cancelled"].includes(status.status)) {
+            if (["completed", "succeeded", "failed", "cancelled"].includes(status.status)) {
               // Job finished
               delete updatedJobs[sceneId];
               changed = true;
+              
+              // Show error if job failed
+              if (status.status === "failed" && status.error) {
+                console.error(`Scene generation failed for ${sceneId}:`, status.error);
+                alert(`Scene generation failed: ${status.error}`);
+              }
+              
               // Invalidate queries for this scene
               queryClient.invalidateQueries({ queryKey: ["renders", sceneId] });
               queryClient.invalidateQueries({ queryKey: ["artifacts", sceneId] });
@@ -84,7 +91,7 @@ export default function ScenesPage() {
     
     // Default values if not specified
     const styleId = storyQuery.data?.default_image_style ?? "default";
-    const panelCount = 4; // Or fetch from scene settings if available
+    const panelCount = 3; // Maximum allowed panels per scene
 
     try {
       const promises = scenesQuery.data.map(async (scene) => {
@@ -434,7 +441,7 @@ function SceneDetail({
     try {
       await renderMutation.mutateAsync({
         sceneId: scene.scene_id,
-        panelCount: 4,
+        panelCount: 3,
         styleId: scene.image_style_override ?? imageStyle ?? "default",
         promptOverride: normalizedPromptOverride
       });

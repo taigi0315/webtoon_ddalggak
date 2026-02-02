@@ -283,7 +283,14 @@ prompt_scene_intent: |
 prompt_panel_plan: |
   {{ global_constraints }}
 
-  Create a panel plan for a {{ panel_count }}-panel webtoon sequence.
+  You are creating a panel plan for a SINGLE webtoon scene image that contains exactly {{ panel_count }} panel(s).
+
+  **CRITICAL CONSTRAINT - READ CAREFULLY:**
+  - You MUST output exactly {{ panel_count }} panels in the "panels" array
+  - The scene text below may describe multiple story moments or beats - you MUST COMBINE them into {{ panel_count }} panels
+  - DO NOT create one panel per paragraph or story beat - MERGE related beats together
+  - If the scene has 6 story moments, you still output only {{ panel_count }} panels by combining moments
+
   {% if intent_block %}
   {{ intent_block }}
   {% endif %}
@@ -333,11 +340,17 @@ prompt_panel_plan: |
   Scene text:
   {{ scene_text }}
 
+  **FINAL REMINDER: Output exactly {{ panel_count }} panels. Combine multiple story beats into these {{ panel_count }} panels. Do NOT output more than {{ panel_count }} panels regardless of how many beats are in the scene text.**
+
 prompt_panel_semantics: |
   {{ global_constraints }}
 
   Fill in DETAILED visual semantics for each panel. Each description must be 100-150 words minimum.
   This will be used for AI image generation - be SPECIFIC, VISUAL, and COMPLETE.
+  
+  **CRITICAL: Your output MUST contain the EXACT SAME number of panels as in the PANEL PLAN below (1-3 panels max).**
+  **DO NOT add extra panels. DO NOT remove panels. Match the panel_plan exactly.**
+  
   {% if intent_block %}
   {{ intent_block }}
   {% endif %}

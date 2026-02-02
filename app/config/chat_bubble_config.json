@@ -80,8 +80,8 @@
     }
   },
   "animation": {
-    "min_stay_time": 0.8,
-    "time_per_character": 0.05,
+    "min_stay_time": 0.7,
+    "time_per_character": 0.04,
     "transition_duration": 0.2,
     "sequential": true
   }

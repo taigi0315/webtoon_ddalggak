@@ -162,21 +162,30 @@ def _panel_count_for_importance(
     scene_text: str,
     fallback: int,
 ) -> int:
+    """Determine panel count based on scene importance.
+
+    Returns a value between 1-3 (hard limit for panel count per scene).
+    """
     importance = (scene_importance or "").lower()
     word_count = len(re.findall(r"\w+", scene_text or ""))
+
+    # Maximum 3 panels per scene image
+    MAX_PANELS = 3
+
     if importance in {"climax", "cliffhanger"}:
+        # Impact moments: single powerful panel
         return 1
     if importance == "release":
+        # Resolution scenes: 2-3 panels
         return 3 if word_count >= 120 else 2
     if importance == "setup":
-        return 4 if word_count >= 120 else 3
+        # Setup scenes: use max panels for context
+        return MAX_PANELS
     if importance == "build":
-        if word_count >= 160:
-            return 5
-        if word_count >= 90:
-            return 4
-        return 3
-    return max(1, int(fallback))
+        # Build scenes: scale with content length, max 3
+        return MAX_PANELS
+
+    return max(1, min(int(fallback), MAX_PANELS))
 
 
 def _derive_panel_plan_features(panel_plan: dict, character_names: list[str] | None = None) -> dict:
@@ -464,6 +473,13 @@ def _render_image_from_prompt(
         raise RuntimeError("Gemini is not configured")
 
     try:
+        if reference_images:
+            total_size = sum(len(img) for img, _ in reference_images)
+            logger.info(
+                "Gemini image gen: sending prompt + %d reference images (total img size: %.2f MB)",
+                len(reference_images),
+                total_size / (1024 * 1024),
+            )
         image_bytes, mime_type = gemini.generate_image(prompt=prompt, reference_images=reference_images)
     except TypeError:
         image_bytes, mime_type = gemini.generate_image(prompt=prompt)

@@ -111,18 +111,26 @@ def _node_scene_splitter(state: StoryBuildState) -> dict[str, Any]:
             batch = beats[i : i + beats_per_scene]
             idx = len(scenes) + 1
             
-            # Format batch as source_text for backward compatibility
-            # and better context for downstream LLM nodes
+            # Format batch as source_text - use narrative format without explicit
+            # BEAT markers to avoid LLM interpreting each beat as a separate panel
             text_parts = []
             for b in batch:
-                part = f"BEAT: {b.get('visual_action', '')}"
-                if b.get("dialogue"):
-                    part += f"\nDIALOGUE: {b.get('dialogue')}"
-                if b.get("sfx"):
-                    part += f"\nSFX: {b.get('sfx')}"
+                # Format as natural narrative text instead of structured BEAT markers
+                action = b.get('visual_action', '')
+                dialogue = b.get('dialogue', '')
+                sfx = b.get('sfx', '')
+
+                # Build natural sentence/paragraph
+                part = action
+                if dialogue:
+                    # Integrate dialogue naturally
+                    part += f' "{dialogue}"'
+                if sfx:
+                    part += f" ({sfx})"
                 text_parts.append(part)
-            
-            source_text = "\n\n".join(text_parts)
+
+            # Join with single newlines for continuity (not double newlines that suggest separation)
+            source_text = " ".join(text_parts)
             summary = batch[0].get("visual_action", "")[:100] # Use first beat as summary base
             
             scenes.append(

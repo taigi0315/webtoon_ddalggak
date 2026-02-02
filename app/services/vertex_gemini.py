@@ -179,8 +179,9 @@ class GeminiClient:
         self._timeout_seconds = timeout_seconds
         self._max_retries = max_retries
         self._initial_backoff_seconds = initial_backoff_seconds
-        # Reduce default backoff to avoid 10+ minute hangs
-        self._rate_limit_backoff_seconds = rate_limit_backoff_seconds or [4, 8, 16, 30]
+        # For rate limits, wait for quota to reset (60s rolling window)
+        # Exponential increase: 15s, 30s, 60s to avoid burning attempts
+        self._rate_limit_backoff_seconds = rate_limit_backoff_seconds or [15, 30, 60]
 
         self.last_request_id: str | None = None
         self.last_model: str | None = None

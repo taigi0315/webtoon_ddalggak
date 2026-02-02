@@ -1,4 +1,7 @@
+import logging
 import uuid
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -23,7 +26,7 @@ router = APIRouter(tags=["generation"])
 
 
 class GenerateFullRequest(BaseModel):
-    panel_count: int = Field(default=3, ge=1, le=12)
+    panel_count: int = Field(default=3, ge=1, le=3)
     style_id: str = Field(min_length=1)
     genre: str | None = None
     prompt_override: str | None = None
@@ -97,6 +100,13 @@ def _handle_full_generation_job(job: job_queue.JobRecord) -> dict | None:
         _scene_or_404(db, scene_id)
         if not has_image_style(payload.style_id):
             payload.style_id = "default"
+        
+        # DEBUG: Log request parameters
+        logger.info(
+            f"Full generation job for scene {scene_id}: "
+            f"panel_count={payload.panel_count}, style_id={payload.style_id}"
+        )
+        
         gemini = _build_gemini_client()
         out = run_full_pipeline(
             db=db,
