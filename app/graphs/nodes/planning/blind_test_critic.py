@@ -20,6 +20,7 @@ def run_blind_test_critic(
     story_text: str,
     script: dict[str, Any] | None,
     scene_ids: list[str],
+    tone_analysis: dict[str, Any] | None = None,
     gemini: GeminiClient | None = None,
 ) -> dict[str, Any]:
     """Analyze blind test results and decide if rewrite is needed."""
@@ -40,6 +41,7 @@ def run_blind_test_critic(
         "prompt_blind_test_critic",
         story_text=story_text,
         episode_intent=script.get("episode_intent", "Unknown") if script else "Unknown",
+        tone_analysis=json.dumps(tone_analysis or {}, ensure_ascii=False),
         reports_json=json.dumps(reports, ensure_ascii=False, indent=2),
     )
 

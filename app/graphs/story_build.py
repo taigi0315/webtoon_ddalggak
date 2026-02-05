@@ -14,6 +14,7 @@ from app.core.telemetry import trace_span
 from app.db.session import session_scope
 from app.db.models import Character, Scene, Story, StoryCharacter
 from app.graphs import nodes
+from app.graphs.nodes.constants import GENRE_PROFILES
 from app.services.artifacts import ArtifactService
 from app.services.vertex_gemini import GeminiClient
 
@@ -43,6 +44,7 @@ class StoryBuildState(TypedDict, total=False):
     feedback: list[str]
     script_drafts: list[dict]
     tone_analysis: dict | None
+    genre_profile: dict | None
     retry_count: int
     max_retries: int
 
@@ -84,12 +86,25 @@ def _node_validate_inputs(state: StoryBuildState) -> dict[str, Any]:
             if story is not None:
                 image_style = image_style or story.default_image_style
 
+    # Genre-aware constraints (Task 6.1)
+    primary_genre = (story_style or "drama").lower().split(",")[0].strip()
+    genre_profile = GENRE_PROFILES.get(primary_genre, GENRE_PROFILES["drama"])
+    
+    # If panel_count wasn't explicitly provided, use genre defaults or state logic
+    # (Note: panel_count in our system is panels per scene image, not per episode)
+    if not state.get("panel_count"):
+        if primary_genre == "action":
+            panel_count = 4 # Action webtoons prefer higher density
+        elif primary_genre == "comedy":
+            panel_count = 2 # Comedy prefers tight timing
+
     progress = {
         "max_scenes": max_scenes,
         "max_characters": max_characters,
         "panel_count": panel_count,
         "story_style": story_style,
         "image_style": image_style,
+        "genre_profile": genre_profile,
         "progress": {"current_node": "ValidateStoryInputs", "message": "Validating inputs...", "step": 1},
     }
     _persist_progress(state, progress["progress"])
@@ -221,6 +236,33 @@ def _node_webtoon_script_writer(state: StoryBuildState, gemini: GeminiClient | N
     return progress
 
 
+def _node_dialogue_minimizer(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
+    script = state.get("webtoon_script")
+    if not script or "visual_beats" not in script:
+        return {}
+    
+    with session_scope() as db:
+        minimized_beats = nodes.run_dialogue_minimizer(
+            db=db,
+            scene_id=state.get("story_id"),
+            visual_beats=script["visual_beats"],
+            gemini=gemini,
+        )
+    
+    script["visual_beats"] = minimized_beats
+    return {"webtoon_script": script}
+
+
+def _node_silent_panel_classifier(state: StoryBuildState) -> dict[str, Any]:
+    script = state.get("webtoon_script")
+    if not script or "visual_beats" not in script:
+        return {}
+    
+    beats = nodes.run_silent_panel_classifier(script["visual_beats"])
+    script["visual_beats"] = beats
+    return {"webtoon_script": script}
+
+
 def _node_studio_director(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
     result = nodes.run_studio_director(
         script=state.get("webtoon_script"),
@@ -265,6 +307,7 @@ def _node_blind_test_critic(state: StoryBuildState, gemini: GeminiClient | None)
             story_text=state.get("story_text", ""),
             script=state.get("webtoon_script"),
             scene_ids=state.get("scene_ids", []),
+            tone_analysis=state.get("tone_analysis"),
             gemini=gemini,
         )
     
@@ -451,6 +494,23 @@ def _node_llm_visual_plan_compiler(state: StoryBuildState, gemini: GeminiClient 
             scene_uuid = uuid.UUID(scene_id)
             artifact = svc.create_artifact(scene_id=scene_uuid, type=nodes.ARTIFACT_VISUAL_PLAN, payload=plan)
             plan_ids.append(str(artifact.artifact_id))
+            
+            # Phase 1: Core Narrative Grammar
+            if isinstance(plan, dict) and plan.get("beats"):
+                # Transition Type Classification
+                nodes.run_transition_type_classifier(
+                    db=db,
+                    scene_id=scene_uuid,
+                    visual_beats=plan["beats"],
+                    gemini=gemini
+                )
+                # Closure Planning
+                nodes.run_closure_planner(
+                    db=db,
+                    scene_id=scene_uuid,
+                    gemini=gemini
+                )
+
             if isinstance(plan, dict) and plan.get("scene_importance"):
                 scene = db.get(Scene, scene_uuid)
                 if scene is not None:
@@ -502,6 +562,10 @@ def _node_per_scene_planning_loop(state: StoryBuildState, gemini: GeminiClient |
             panel_semantics_id = nodes.run_panel_semantic_filler(db, scene_uuid, gemini=gemini).artifact_id
             qc_report_id = nodes.run_qc_checker(db, scene_uuid).artifact_id
             dialogue_suggestions_id = nodes.run_dialogue_extractor(db, scene_uuid).artifact_id
+            
+            # Phase 2: Vertical Rhythm Planning
+            rhythm_artifact = nodes.run_vertical_rhythm_planner(db, scene_uuid, gemini=gemini)
+            rhythm_id = rhythm_artifact.artifact_id if rhythm_artifact else None
 
             planning_artifacts.append(
                 {
@@ -514,8 +578,20 @@ def _node_per_scene_planning_loop(state: StoryBuildState, gemini: GeminiClient |
                     "panel_semantics": str(panel_semantics_id),
                     "qc_report": str(qc_report_id),
                     "dialogue_suggestions": str(dialogue_suggestions_id),
+                    "vertical_rhythm": str(rhythm_id) if rhythm_id else None,
                 }
             )
+            
+            # Phase 3: Visual Metaphor Recommendation
+            metaphor_artifact = nodes.run_metaphor_recommender(db, scene_uuid, gemini=gemini)
+            if metaphor_artifact:
+                # Add to the last planning item
+                planning_artifacts[-1]["metaphor_directions"] = str(metaphor_artifact.artifact_id)
+
+            # Phase 4: Presence Logic
+            presence_artifact = nodes.run_presence_mapper(db, scene_uuid, gemini=gemini)
+            if presence_artifact:
+                planning_artifacts[-1]["presence_map"] = str(presence_artifact.artifact_id)
 
             recent_templates.append(template_id)
 
@@ -588,6 +664,8 @@ def build_story_build_graph(planning_mode: str = "full", gemini: GeminiClient | 
     graph.add_node("llm_character_extractor", partial(_node_llm_character_extractor, gemini=gemini))
     graph.add_node("llm_character_normalizer", partial(_node_llm_character_normalizer, gemini=gemini))
     graph.add_node("webtoon_script_writer", partial(_node_webtoon_script_writer, gemini=gemini))
+    graph.add_node("dialogue_minimizer", partial(_node_dialogue_minimizer, gemini=gemini))
+    graph.add_node("silent_panel_classifier", _node_silent_panel_classifier)
     graph.add_node("studio_director", partial(_node_studio_director, gemini=gemini))
     graph.add_node("persist_story_bundle", _node_persist_story_bundle)
 
@@ -595,8 +673,11 @@ def build_story_build_graph(planning_mode: str = "full", gemini: GeminiClient | 
     graph.add_edge("validate_inputs", "llm_character_extractor")
     graph.add_edge("llm_character_extractor", "llm_character_normalizer")
     graph.add_edge("llm_character_normalizer", "webtoon_script_writer")
-    graph.add_edge("webtoon_script_writer", "studio_director")
-    
+    graph.add_edge("webtoon_script_writer", "dialogue_minimizer")
+    graph.add_edge("dialogue_minimizer", "silent_panel_classifier")
+    graph.add_edge("silent_panel_classifier", "studio_director")
+    graph.add_edge("studio_director", "persist_story_bundle")
+        
     graph.add_conditional_edges(
         "studio_director",
         _router_optimization,

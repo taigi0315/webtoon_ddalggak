@@ -365,71 +365,81 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
             "summary": "QC failed: no panels detected.",
         }
 
-    # NOTE: We have removed strict checks for 'too_many_closeups' and 'repeated_framing'
-    # to support the new "Cinematic Intent" system where layout is driven by soft preferences
-    # rather than hard constraints.
+    issues: list[str] = []
+    issue_details: list[dict[str, str]] = []
+    
+    # 1. Word Count Check (25% Rule / Word Count Violation)
+    word_count_violations = []
+    total_word_count = 0
+    if panel_semantics and isinstance(panel_semantics.get("panels"), list):
+        for p_sem in panel_semantics["panels"]:
+            dialogue = p_sem.get("dialogue") or []
+            p_words = sum(len(str(line).split()) for line in dialogue)
+            total_word_count += p_words
+            if p_words > 25:
+                word_count_violations.append(p_sem.get("panel_index"))
+    
+    if word_count_violations:
+        issues.append("word_count_violation")
+        issue_details.append({
+            "code": "word_count_violation",
+            "message": f"Panels {word_count_violations} exceed the 25-word limit.",
+            "hint": "Reduce dialogue or split into multiple panels."
+        })
 
+    # 2. Layout Monotony check (Task 7.1)
+    widths = [p.get("panel_hierarchy", {}).get("width_percentage") for p in panels]
+    monotony_run = 1
+    max_monotony = 1
+    for idx in range(1, len(widths)):
+        if widths[idx] == widths[idx-1] and widths[idx] is not None:
+            monotony_run += 1
+            max_monotony = max(max_monotony, monotony_run)
+        else:
+            monotony_run = 1
+    
+    if max_monotony > 3:
+        issues.append("monotonous_layout")
+        issue_details.append({
+            "code": "monotonous_layout",
+            "message": f"Redundant layout width found ({max_monotony} consecutive panels).",
+            "hint": "Vary panel widths (100%, 80%, 60%) to improve rhythm."
+        })
+
+    # 3. Show-Don't-Tell / Dialogue Redundancy
+    redundant_panels = []
+    if panel_semantics and isinstance(panel_semantics.get("panels"), list):
+        for p_sem in panel_semantics["panels"]:
+            dialogue = " ".join(p_sem.get("dialogue", [])).lower()
+            # Simple heuristic for redundant descriptions in dialogue
+            if any(key in dialogue for key in ["i am showing", "look at", "see how i"]):
+                redundant_panels.append(p_sem.get("panel_index"))
+    
+    if redundant_panels:
+        issues.append("dialogue_redundancy")
+        issue_details.append({
+            "code": "dialogue_redundancy",
+            "message": f"Redundant 'Show' statements in dialogue for panels {redundant_panels}.",
+            "hint": "Let the art show the action; remove self-descriptive dialogue."
+        })
+
+    # Existing closeup and dialogue ratio checks
     closeups = [p for p in panels if p.get("grammar_id") == "emotion_closeup"]
     closeup_count = len(closeups)
     closeup_ratio = closeup_count / total
 
-    dialogue_ratio = 0.0
-    dialogue_count = 0
-    if panel_semantics and isinstance(panel_semantics.get("panels"), list):
-        dialogue_panels = [p for p in panel_semantics["panels"] if p.get("dialogue")]
-        dialogue_count = len(dialogue_panels)
-        dialogue_ratio = dialogue_count / total
+    dialogue_panels = [p for p in (panel_semantics.get("panels") or []) if p.get("dialogue")] if panel_semantics else []
+    dialogue_count = len(dialogue_panels)
+    dialogue_ratio = dialogue_count / total if total > 0 else 0.0
 
-    # Check for repeated framing (metric only, no fail)
-    run_len = 1
-    max_run = 1
-    for idx in range(1, total):
-        if panels[idx].get("grammar_id") == panels[idx - 1].get("grammar_id"):
-            run_len += 1
-            max_run = max(max_run, run_len)
-        else:
-            run_len = 1
-
-    issues: list[str] = []
-    # Relaxed dialogue check: only flag if > 85% panels have dialogue (readability risk)
     if dialogue_ratio > 0.85:
         issues.append("too_much_dialogue")
-
-    if rules.require_environment_on_establishing:
-        first = panels[0].get("grammar_id")
-        if first == "establishing" and panel_semantics and panel_semantics.get("panels"):
-            desc = panel_semantics["panels"][0].get("description", "").lower()
-            if not any(word in desc for word in rules.environment_keywords):
-                issues.append("missing_environment_on_establishing")
-
-    issue_details: list[dict[str, str]] = []
-    for code in issues:
-        if code == "too_much_dialogue":
-            allowed = max(1, int(total * 0.85))
-            issue_details.append(
-                {
-                    "code": code,
-                    "message": f"Too many dialogue panels ({dialogue_count}/{total}). Max {allowed}.",
-                    "hint": "Move some dialogue to narration or spread it across fewer panels.",
-                }
-            )
-        elif code == "missing_environment_on_establishing":
-            examples = ", ".join(rules.environment_keywords[:6])
-            issue_details.append(
-                {
-                    "code": code,
-                    "message": "Establishing panel lacks clear environment cues.",
-                    "hint": f"Add location details (e.g., {examples}).",
-                }
-            )
-        else:
-            issue_details.append(
-                {
-                    "code": code,
-                    "message": "QC rule failed.",
-                    "hint": "Regenerate the panel plan or adjust scene semantics.",
-                }
-            )
+        allowed = max(1, int(total * 0.85))
+        issue_details.append({
+            "code": "too_much_dialogue",
+            "message": f"Too many dialogue panels ({dialogue_count}/{total}). Max {allowed}.",
+            "hint": "Strategically use silent panels for emotional impact."
+        })
 
     record_qc_issues(issues)
     return {
@@ -439,13 +449,21 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
         "metrics": {
             "panel_count": total,
             "closeup_count": closeup_count,
-            "closeup_ratio": closeup_ratio,
+            "closeup_ratio": roundup(closeup_ratio, 3),
             "dialogue_count": dialogue_count,
-            "dialogue_ratio": dialogue_ratio,
-            "max_repeated_framing": max_run,
+            "dialogue_ratio": roundup(dialogue_ratio, 3),
+            "max_monotony": max_monotony,
+            "total_word_count": total_word_count,
         },
         "summary": "QC passed." if not issues else f"QC failed: {len(issues)} issue(s).",
     }
+
+
+def roundup(val, digits):
+    try:
+        return round(float(val), digits)
+    except (ValueError, TypeError):
+        return val
 
 
 def _character_ids_with_reference_images(db: Session, story_id: uuid.UUID) -> set[uuid.UUID]:

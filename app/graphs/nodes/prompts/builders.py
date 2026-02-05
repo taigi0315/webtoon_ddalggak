@@ -280,4 +280,45 @@ def _prompt_visual_plan(
     )
 
 
+def _prompt_transition_classifier(visual_beats_json: str) -> str:
+    """Prompt for classifying transitions between visual beats."""
+    return render_prompt(
+        "prompt_transition_classifier",
+        visual_beats_json=visual_beats_json,
+    )
+
+
+def _prompt_closure_planner(panel_pair_json: str) -> str:
+    """Prompt for planning reader inference in the gutter between panels."""
+    return render_prompt(
+        "prompt_closure_planner",
+        panel_pair_json=panel_pair_json,
+    )
+
+
+def _prompt_vertical_rhythm_planner(scene_data_json: str) -> str:
+    """Prompt for planning vertical rhythm and spacing."""
+    return render_prompt(
+        "prompt_vertical_rhythm_planner",
+        scene_data_json=scene_data_json,
+    )
+
+
+def _prompt_metaphor_recommender(lexicon_json: str, semantics_json: str) -> str:
+    """Prompt for recommending visual metaphors."""
+    return render_prompt(
+        "prompt_metaphor_recommender",
+        lexicon_json=lexicon_json,
+        semantics_json=semantics_json,
+    )
+
+
+def _prompt_presence_mapper(scene_data_json: str) -> str:
+    """Prompt for mapping character presence across panels."""
+    return render_prompt(
+        "prompt_presence_mapper",
+        scene_data_json=scene_data_json,
+    )
+
+
 __all__ = [name for name in globals() if not name.startswith("__")]

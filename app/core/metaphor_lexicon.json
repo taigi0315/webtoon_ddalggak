@@ -1,0 +1,27 @@
+[
+    {
+        "emotion": "Isolation",
+        "metaphor": "Wide shot with character small in the corner of a panel",
+        "visual_cue": "Excessive white space/negative space"
+    },
+    {
+        "emotion": "Anger",
+        "metaphor": "Cracked glass overlay or sharp, jagged panel borders",
+        "visual_cue": "Red saturation or fire-like background SFX"
+    },
+    {
+        "emotion": "Confusion",
+        "metaphor": "Labyrinthine background or tilted (Dutch angle) panels",
+        "visual_cue": "Swirling sound effects or blurred periphery"
+    },
+    {
+        "emotion": "Sadness",
+        "metaphor": "Rain behind a window reflecting on the face",
+        "visual_cue": "Blue/Desaturated tones, drooping shoulders"
+    },
+    {
+        "emotion": "Power",
+        "metaphor": "Low angle shot looking up at character",
+        "visual_cue": "Shadows casting upwards, larger-than-life presence"
+    }
+]

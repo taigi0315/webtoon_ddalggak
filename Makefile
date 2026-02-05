@@ -1,7 +1,10 @@
 .PHONY: help install install-back install-front dev dev-install dev-back dev-arize dev-front db-up db-migrate db-down api ui kill test lint clean test-data
 
 # Default target
-# Default target
+VENV := venv
+PYTHON := $(shell if [ -d $(VENV) ]; then echo $(VENV)/bin/python; else echo python3; fi)
+PIP := $(shell if [ -d $(VENV) ]; then echo $(VENV)/bin/pip; else echo python3 -m pip; fi)
+
 help:
 	@echo "Available commands:"
 	@echo "  install    Install backend + frontend dependencies"
@@ -26,7 +29,7 @@ help:
 install: install-back install-front
 
 install-back:
-	pip install -e .
+	$(PIP) install -e .
 
 install-front:
 	@if [ ! -d frontend/node_modules ]; then \
@@ -37,7 +40,7 @@ install-front:
 	fi
 
 dev-install:
-	pip install -e ".[dev]"
+	$(PIP) install -e ".[dev]"
 
 db-up:
 	docker compose up -d
@@ -46,10 +49,10 @@ db-down:
 	docker compose down
 
 db-migrate:
-	alembic upgrade head
+	$(PYTHON) -m alembic upgrade head
 
 api:
-	uvicorn app.main:app --reload
+	$(PYTHON) -m uvicorn app.main:app --reload
 
 ui:
 	npm --prefix frontend run dev
@@ -62,12 +65,12 @@ dev:
 
 dev-back:
 	@echo "Starting backend..."
-	uvicorn app.main:app --reload
+	$(PYTHON) -m uvicorn app.main:app --reload
 
 dev-arize:
 	docker compose up -d phoenix
 	@echo "Starting backend with Phoenix OTEL endpoint..."
-	PHOENIX_OTEL_ENDPOINT=http://localhost:6006/v1/traces uvicorn app.main:app --reload
+	PHOENIX_OTEL_ENDPOINT=http://localhost:6006/v1/traces $(PYTHON) -m uvicorn app.main:app --reload
 
 dev-front: ui
 
@@ -80,15 +83,15 @@ kill:
 	@echo "Done."
 
 test:
-	pytest -q
+	$(PYTHON) -m pytest -q
 
 lint:
-	ruff check .
-	black --check .
+	$(PYTHON) -m ruff check .
+	$(PYTHON) -m black --check .
 
 format:
-	ruff check --fix .
-	black .
+	$(PYTHON) -m ruff check --fix .
+	$(PYTHON) -m black .
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
@@ -96,4 +99,4 @@ clean:
 	find . -type d -name .mypy_cache -exec rm -rf {} + 2>/dev/null || true
 
 test-data:
-	python scripts/create_test_data.py
+	$(PYTHON) scripts/create_test_data.py

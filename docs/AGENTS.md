@@ -22,13 +22,17 @@ Agent design guidelines
 
 1. Roles & responsibilities
    - Panel Plan Agent: returns a `panel_plan` JSON (schema below). Should be idempotent and conservative.
-   - Webtoon Script Writer Agent: translates raw story into visual beats, dialogue, and SFX. Focuses on "Show, Don't Tell" and character consistency via anchors.
-   - Tone Auditor Agent: Analyzes narrative beats for mood shifts (Mood Segments) and assigns importance weights to ensure critical moments aren't lost during optimization.
-   - Scene Optimizer Agent: Manages story budget by merging low-weight beats. Functions as a "Production Manager" that selects image styles per scene and triggers script rewrites if budget constraints compromise quality.
-   - Layout Resolver Agent: picks layout templates based on `panel_plan` + derived features (weights, hero_count, pace, scene_importance).
-   - Semantics Filler Agent: enriches panels with `text` and visual cues for image generation.
-   - Blind Test Critic Agent: Analyzes story reconstruction reports ("Blind Tests") to detect narrative gaps or visual inconsistencies, forcing iterative script improvements.
-   - Repair Agent (LLM): invoked only for repairing malformed JSON outputs.
+    - Webtoon Script Writer Agent: translates raw story into visual beats, dialogue, and SFX. Focuses on "Show, Don't Tell" and character consistency via anchors.
+    - Dialogue Minimizer Agent: Enforces the 25% rule by reducing word counts to < 25 per panel, prioritizing visual rhythm over text density.
+    - Silent Panel Classifier Agent: Identifies emotional beats for dialogue-free storytelling (silence as a narrative tool).
+    - Transition & Closure Agent: Classifies transitions (action-to-action, etc.) and plans closure logic (gutter logic).
+    - Vertical Rhythm Agent: Maps pacing and panel density for scrolling reading experience.
+    - Visual Metaphor Agent: Recommends metaphors from the GossipToon lexicon to enhance emotional delivery.
+    - Presence Mapper Agent: Manages character visibility and distance logic across scenes.
+    - Layout Resolver Agent: picks layout templates based on `panel_plan` + derived features (weights, hero_count, pace, scene_importance).
+    - Semantics Filler Agent: enriches panels with `text` and visual cues for image generation.
+    - Blind Test Critic Agent: Analyzes story reconstruction reports ("Blind Tests") to detect narrative gaps and emotional delivery issues, forcing iterative script improvements.
+    - Repair Agent (LLM): invoked only for repairing malformed JSON outputs.
 
 2. Prompt engineering
    - Use a strong system prompt that enforces JSON-only responses and an explicit output schema (e.g., `system_prompt_json`).
@@ -67,7 +71,8 @@ Safety & guardrails (project-specific examples)
 
 - Episode-level template guardrail: do not select the same template more than twice consecutively; provide a re-resolve with exclusions.
 - Require hero single: optionally enforce at least one single-panel hero-shot per episode when requested.
-- QC hard constraints: max closeup ratio, no more than 2 consecutive grammar repeats, enforce first panel establishing, last panel reaction/reveal.
+- QC hard constraints (Task 7.1): max closeup ratio, word count > 25 per panel (ERROR), layout monotony > 3 (WARNING), dialogue redundancy (ERROR).
+- Cliffhanger rule (Task 6.2): Episode-ending scenes must terminate with a 100% width panel.
 
 Monitoring & telemetry
 

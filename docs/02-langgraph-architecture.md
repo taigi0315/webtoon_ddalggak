@@ -41,13 +41,14 @@ The system uses three LangGraph state machines to orchestrate the webtoon genera
 - **llm_character_extractor** - Extract character profiles from story text
 - **llm_character_normalizer** - Add visual details (hair, face, build, outfit) and narrative descriptions to characters
 - **webtoon_script_writer** - Translate raw story into a visual script with narrative beats, dialogue, and SFX
-- **tone_auditor** - Analyze mood shifts and assign narrative weights to beats
-- **scene_optimizer** - Optimize beats into final scenes based on budget and tone weights
+- **dialogue_minimizer** - Reduce dialogue to < 25 words per panel using webtoon rhythm principles
+- **silent_panel_classifier** - Identify beats for dialogue-free visual storytelling
+- **studio_director** - General studio director node for episode-level oversight
 - **persist_story_bundle** - Save optimized scenes, characters, and script to database
-- **llm_visual_plan_compiler** - Convert scenes to visual beats with importance ratings _(full mode only)_
-- **per_scene_planning** - Run ScenePlanningGraph for each scene with level guardrails _(full mode only)_
+- **llm_visual_plan_compiler** - Convert scenes to visual beats with importance ratings, transition types, and closure plans _(full mode only)_
+- **per_scene_planning** - Run ScenePlanningGraph for each scene, including Vertical Rhythm, Visual Metaphor, and Character Presence Mapping _(full mode only)_
 - **blind_test_runner** - Evaluate narrative coherence of panel plans _(full mode only)_
-- **blind_test_critic** - Analyze blind test reports for narrative gaps and trigger rewrites if needed _(full mode only)_
+- **blind_test_critic** - Analyze blind test reports for narrative gaps and emotional delivery _(full mode only)_
 
 ### Episode-Level Guardrails
 
@@ -74,21 +75,22 @@ graph TD
     A[validate_inputs] --> B[llm_character_extractor]
     B --> C[llm_character_normalizer]
     C --> D[webtoon_script_writer]
-    D --> E[tone_auditor]
-    E --> F[scene_optimizer]
+    D --> E[dialogue_minimizer]
+    E --> F[silent_panel_classifier]
+    F --> G[studio_director]
 
-    F -->|Budget Risk| D
-    F -->|Passed| G[persist_story_bundle]
+    G -->|Iteration Needed| D
+    G -->|Passed| H[persist_story_bundle]
 
-    G --> H{Planning Mode?}
-    H -->|characters_only| Z[END]
-    H -->|full| I[llm_visual_plan_compiler]
+    H --> I{Planning Mode?}
+    I -->|characters_only| Z[END]
+    I -->|full| J[llm_visual_plan_compiler]
 
-    I --> J[per_scene_planning]
-    J --> K[blind_test_runner]
-    K --> L[blind_test_critic]
-    L -->|Narrative Gap| D
-    L -->|Passed| Z
+    J --> K[per_scene_planning]
+    K --> L[blind_test_runner]
+    L --> M[blind_test_critic]
+    M -->|Narrative Gap| D
+    M -->|Passed| Z
 ```
 
 ### State Schema: StoryBuildState
@@ -120,6 +122,7 @@ graph TD
 - `feedback` - History of director/critic feedback for iteration
 - `script_drafts` - Versioned drafts of the webtoon script
 - `tone_analysis` - Mood segments and beat-level importance weights
+- `genre_profile` - Genre-specific pacing and transition rules
 - `retry_count` - Current iteration number for optimization/critic loops
 - `max_retries` - Hard limit on rewrite attempts
 

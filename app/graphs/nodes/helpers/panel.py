@@ -145,54 +145,72 @@ def _evaluate_and_prune_panel_plan(panel_plan: dict) -> dict:
 
 
 def _assign_panel_weights(panel_plan: dict, scene_importance: str | None = None) -> dict:
-    """Add `weight` (0.1-1.0) and `must_be_large` to each panel based on importance or utility."""
+    """Add `weight` (0.1-1.0), `must_be_large`, and `panel_hierarchy` to each panel."""
     panels = list(panel_plan.get("panels") or [])
     if not panels:
         return panel_plan
 
+    total_panels = len(panels)
+    
     # Check for explicit importance_weight from LLM
     has_explicit = any(p.get("importance_weight") is not None for p in panels)
 
-    if has_explicit:
-        for p in panels:
+    for idx, p in enumerate(panels):
+        if has_explicit:
             w = p.get("importance_weight")
             try:
                 weight = float(w) if w is not None else 0.5
             except (ValueError, TypeError):
                 weight = 0.5
-            
             p["weight"] = round(min(max(weight, 0.1), 1.0), 3)
-            
-            # Simple heuristic for dominant panels if scene is critical
-            must = bool(p.get("must_be_large", False))
-            if not must and scene_importance in {"climax", "cliffhanger"} and weight > 0.75:
-                must = True
-            p["must_be_large"] = must
-        return {"panels": panels}
+        else:
+            # Fallback: Utility-based weight assignment
+            utilities = [p.get("utility_score", 0.3) for p in panels]
+            min_u = min(utilities)
+            max_u = max(utilities)
+            range_u = max(max_u - min_u, 1e-6)
+            u = float(p.get("utility_score", 0.3))
+            norm = (u - min_u) / range_u if range_u > 0 else 0.0
+            weight = 0.12 + norm * (1.0 - 0.12)
+            p["weight"] = round(float(weight), 3)
 
-    # Fallback: Utility-based weight assignment
-    utilities = [p.get("utility_score", 0.3) for p in panels]
-    min_u = min(utilities)
-    max_u = max(utilities)
-    range_u = max(max_u - min_u, 1e-6)
-
-    for p in panels:
-        u = float(p.get("utility_score", 0.3))
-        norm = (u - min_u) / range_u if range_u > 0 else 0.0
-        weight = 0.12 + norm * (1.0 - 0.12)
-        explicit = p.get("weight")
-        if isinstance(explicit, (int, float)):
-            try:
-                ew = float(explicit)
-                weight = min(max(ew, 0.1), 1.0)
-            except Exception:
-                pass
-        p["weight"] = round(float(weight), 3)
-
+        # Handle must_be_large
         must = bool(p.get("must_be_large", False))
         purpose = p.get("panel_purpose")
-        if not must and purpose in {"reveal", "reaction"} and scene_importance in {"climax", "cliffhanger"}:
+        is_high_impact = purpose in {"reveal", "reaction"} and scene_importance in {"climax", "cliffhanger"}
+        if not must and is_high_impact:
             must = True
         p["must_be_large"] = must
+
+        # Task 2.2: Add panel_hierarchy information
+        is_last_panel = (idx == total_panels - 1)
+        is_cliffhanger = (scene_importance == "cliffhanger" and is_last_panel)
+        
+        if must or is_cliffhanger:
+            width = 100
+            reason = "impact"
+        elif weight > 0.6:
+            width = 80
+            reason = "standard"
+        else:
+            width = 60
+            reason = "intimate"
+
+        # Resolve visual dominance from grammar_id
+        grammar_id = p.get("grammar_id", "")
+        if "closeup" in grammar_id or "emotion" in grammar_id:
+            dominance = "character"
+        elif "establishing" in grammar_id:
+            dominance = "environment"
+        elif "object" in grammar_id:
+            dominance = "object"
+        else:
+            dominance = "character" # Default
+
+        p["panel_hierarchy"] = {
+            "width_percentage": width,
+            "hierarchy_reason": reason,
+            "visual_dominance": dominance
+        }
 
     return {"panels": panels}

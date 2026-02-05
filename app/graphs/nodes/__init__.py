@@ -20,6 +20,13 @@ from app.graphs.nodes.planning import (
     run_webtoon_script_writer,
     run_blind_test_critic,
     run_studio_director,
+    run_transition_type_classifier,
+    run_closure_planner,
+    run_dialogue_minimizer,
+    run_silent_panel_classifier,
+    run_vertical_rhythm_planner,
+    run_metaphor_recommender,
+    run_presence_mapper,
 )
 from app.graphs.nodes.rendering import (
     compute_prompt_compiler,
@@ -98,4 +105,11 @@ __all__ = [
     "run_webtoon_script_writer",
     "run_blind_test_critic",
     "run_studio_director",
+    "run_transition_type_classifier",
+    "run_closure_planner",
+    "run_dialogue_minimizer",
+    "run_silent_panel_classifier",
+    "run_vertical_rhythm_planner",
+    "run_metaphor_recommender",
+    "run_presence_mapper",
 ]

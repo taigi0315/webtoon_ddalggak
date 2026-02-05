@@ -45,6 +45,10 @@ ssuljaengi_v4/
 │   │       ├── planning/          # Planning nodes
 │   │       │   ├── character.py   # Character extraction (style-neutral)
 │   │       │   ├── script_writer.py # Webtoon script writing
+│   │       │   ├── dialogue_minimizer.py # Dialogue reduction (25% rule)
+│   │       │   ├── rhythm.py      # Vertical Rhythm Planning
+│   │       │   ├── metaphor.py    # Visual Metaphor Recommendation
+│   │       │   ├── presence.py    # Character Presence Mapping
 │   │       │   ├── studio_director.py # Scene planning (style-agnostic)
 │   │       │   ├── art_direction.py # Art direction (mood & atmosphere)
 │   │       │   ├── panel_semantics.py # Cinematographer (layout focus)
@@ -511,9 +515,14 @@ curl http://localhost:8000/metrics
 - **Circuit Breaker** - Protection against cascading failures (opens after 5 consecutive errors)
 - **Request ID** - Unique identifier (x-request-id) for tracing requests through system
 - **Visual Plan** - Character extraction and scene importance ratings for episode-level planning
+- **Transition Map** - Classification of image-to-image relationships (action, aspect, etc.)
+- **Closure Plan** - Gutter logic definitions for narrative flow
+- **Vertical Rhythm** - Scrolling pacing and panel density mapping
+- **Visual Metaphor** - Lexicon-driven emotional enhancements for visual prompts
+- **Presence Map** - Character distance and visibility logic
 - **Blind Test** - Evaluation of narrative coherence by reconstructing story from panels only
 - **Webtoon Script** - Structured visual beat-by-beat translation of the raw story
-- **QC Rules** - Quality control thresholds (closeup_ratio_max, dialogue_ratio_max, etc.)
+- **QC Rules** - Quality control thresholds (closeup_ratio_max, dialogue_ratio_max, word_count_max, etc.)
 - **Episode Guardrails** - Layout diversity enforcement and hero single-panel requirements
 - **Identity Line** - Compiled character description for prompts (e.g., "Alice: young adult female, long black hair") - style-neutral as of migration `83f5330535c1`
 

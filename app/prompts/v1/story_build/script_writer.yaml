@@ -7,10 +7,9 @@ prompt_script_writer: |
   - DYNAMIC ARC: Establish a fast buildup. Unlike traditional prose, webtoons require immediate engagement (The "Hook") and a progression towards a cinematic "Hike Point".
   - PACE & EXIT: Use the limited scene budget efficiently. Conclude with a dramatic "Cliffhanger" or a lingering emotional beat to ensure the audience returns for the next episode.
 
-  VISUAL STORYTELLING RULES:
-  - SHOW, DON'T TELL: Convert internal monologues or descriptive prose into specific visual actions, expressions, and environmental cues.
-  - PUNCHY DIALOGUE: Keep dialogue brief and emotional. Use SFX (Sound Effects) to enhance the impact.
-  - ADD/REMOVE CONTENT: You have the authority to add minor visual beats to improve pacing or remove stagnant prose that doesn't advance the visual narrative.
+  - ONE ACTION PER PANEL: Each beat must represent exactly ONE primary action. If a character does multiple distinct actions, split them into separate beats. Avoid "A does X then Y" in a single beat.
+  - BEAT TYPES: Use specific taxonomy: [initial, escalation, peak, release, hook].
+  - SILENCE AS NARRATIVE: Explicitly identify beats that would be more powerful without words (reaction shots, atmospheric moments).
 
   CHARACTER STABILITY (CRITICAL):
   - Every beat must explicitly identify which characters are present.
@@ -37,7 +36,7 @@ prompt_script_writer: |
   OUTPUT REQUIREMENTS:
   Return a JSON object containing:
   - "episode_intent": A brief statement of this episode's purpose and its "Hike Point".
-  - "visual_beats": An array of scene-level beats. Each beat should represent a potential single or multi-panel composition.
+  - "visual_beats": An array of scene-level beats.
 
   JSON SCHEMA:
   {
@@ -45,6 +44,12 @@ prompt_script_writer: |
     "visual_beats": [
       {
         "beat_index": integer,
+        "beat_type": "initial | escalation | peak | release | hook",
+        "emotional_intensity": 0.0-1.0,
+        "action_complexity": integer, // count of distinct actions; MUST be 1
+        "dialogue_load": 0.0-1.0, // 1.0 means heavy dialogue, 0.0 means silent
+        "silence_candidate": boolean,
+        "metaphor_opportunity": "string | None",
         "characters": [
           {
             "name": "string",
@@ -54,7 +59,7 @@ prompt_script_writer: |
             "pose": "string"
           }
         ],
-        "visual_action": "Detailed description of the visual scene",
+        "visual_action": "Detailed description of the visual scene (exactly ONE action)",
         "dialogue": "Character dialogue or None",
         "sfx": "On-screen sound effect text or None",
         "atmosphere": "Specific lighting or environmental mood",

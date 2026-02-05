@@ -55,8 +55,11 @@ def run_scene_intent_extractor(
                 "characters": character_names,
                 "logline": None,
                 "pacing": "normal",
+                "pacing_profile": "drama",
                 "emotional_arc": None,
+                "narrative_arc": None,
                 "visual_motifs": [],
+                "character_presence_map": {},
             }
 
             if gemini is not None:

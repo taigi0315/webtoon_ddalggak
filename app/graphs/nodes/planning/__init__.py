@@ -34,6 +34,13 @@ from .visual_plan import (
 # Script writing and optimization
 from .script_writer import run_webtoon_script_writer
 from .studio_director import run_studio_director
+from .transition import run_transition_type_classifier
+from .closure import run_closure_planner
+from .dialogue_minimizer import run_dialogue_minimizer
+from .silence import run_silent_panel_classifier
+from .rhythm import run_vertical_rhythm_planner
+from .metaphor import run_metaphor_recommender
+from .presence import run_presence_mapper
 
 # Scene intent
 from .scene_intent import run_scene_intent_extractor
@@ -71,6 +78,13 @@ __all__ = [
     "compute_scene_chunker",
     "run_webtoon_script_writer",
     "run_studio_director",
+    "run_transition_type_classifier",
+    "run_closure_planner",
+    "run_dialogue_minimizer",
+    "run_silent_panel_classifier",
+    "run_vertical_rhythm_planner",
+    "run_metaphor_recommender",
+    "run_presence_mapper",
     # Scene intent
     "run_scene_intent_extractor",
     # Art direction

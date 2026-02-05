@@ -251,16 +251,29 @@ prompt_scene_intent: |
   {
     "logline": "One sentence describing the core action/conflict of this scene",
     "pacing": "slow_burn|normal|fast|impact",
+    "pacing_profile": "action|drama|comedy|atmospheric",
     "emotional_arc": {
       "start": "emotion at scene start (e.g., calm, tense, happy)",
       "peak": "strongest emotion in scene",
       "end": "emotion at scene end"
     },
+    "narrative_arc": {
+      "setup_beats": ["indices of beats for setup (e.g. [0])"],
+      "climax_beats": ["indices of beats for climax (e.g. [1, 2])"],
+      "resolution_beats": ["indices of beats for resolution (e.g. [3])"]
+    },
     "visual_motifs": ["list of 2-4 key visual elements to emphasize"],
     "summary": "2-3 sentence summary of the scene",
     "beats": ["list of 2-4 key story beats in order"],
     "setting": "primary location/environment or null",
-    "characters": ["list of characters present in scene"]
+    "characters": ["list of characters present in scene"],
+    "character_presence_map": {
+      "CHARACTER_NAME": {
+        "shown_in_beats": ["indices of beats where they are visible"],
+        "implied_in_beats": ["indices of beats where they are present but not fully shown"],
+        "implication_method": "shadow|off_panel_voice|object_interaction|reflection|none"
+      }
+    }
   }
 
   PACING GUIDE:
@@ -699,4 +712,98 @@ prompt_visual_plan: |
         "must_show": ["critical visual elements for this scene"]
       }
     ]
+  }
+
+prompt_transition_classifier: |
+  {{ system_prompt_json }}
+  You are a professional WEBTOON NARRATIVE ARCHITECT. Analyze transitions between visual beats using McCloud's taxonomy.
+
+  THE 6-TYPE TAXONOMY:
+  1. moment_to_moment: Same subject, minuscule time gap (e.g., blinking).
+  2. action_to_action: Same subject, meaningful action progression (e.g., punch -> impact).
+  3. subject_to_subject: Different subjects within the same scene (e.g., speaker -> listener).
+  4. scene_to_scene: Significant jumps in time or space (e.g., day -> night).
+  5. aspect_to_aspect: Different viewpoints of the same moment (mood/atmosphere).
+  6. non_sequitur: No logical connection (rare).
+
+  Visual Beats JSON:
+  {{ visual_beats_json }}
+
+  OUTPUT SCHEMA:
+  {
+    "transitions": [
+      {
+        "beat_pair": [integer, integer],
+        "transition_type": "moment_to_moment|action_to_action|subject_to_subject|scene_to_scene|aspect_to_aspect|non_sequitur",
+        "closure_complexity": "low|medium|high",
+        "gutter_implication": "What happens in the space between panels",
+        "should_add_panel": boolean,
+        "reason": "Rationale"
+      }
+    ]
+  }
+
+prompt_closure_planner: |
+  {{ system_prompt_json }}
+  Plan what the reader infers in the space (gutter) between two webtoon panels.
+
+  Panel Pair JSON:
+  {{ panel_pair_json }}
+
+  OUTPUT SCHEMA:
+  {
+    "panel_pair": [integer, integer],
+    "closure_type": "spatial|temporal|causal",
+    "reader_inference": "What the reader will fill in naturally",
+    "inference_difficulty": 0.0-1.0,
+    "explicit_if_needed": boolean
+  }
+
+prompt_vertical_rhythm_planner: |
+  {{ system_prompt_json }}
+  Map pixel distances to dramatic weight and webtoon pacing.
+
+  Scene Data:
+  {{ scene_data_json }}
+
+  SPACING HEURISTICS:
+  - Rapid Action: 30-100px (escalation + action)
+  - Standard Flow: 200-400px (default)
+  - Narrative Pause: 600-800px (high emotion > 0.7 or release)
+  - Scene Transition: 1000px+ (scene_to_scene)
+
+  OUTPUT SCHEMA:
+  {
+    "rhythm_map": [
+      {
+        "panel_id": "string",
+        "gutter_spacing_px": integer,
+        "panel_width_pct": 50|60|80|100,
+        "is_thumb_stop": boolean,
+        "scroll_reveal": boolean
+      }
+    ]
+  }
+
+prompt_dialogue_minimizer: |
+  {{ system_prompt_json }}
+  You are a webtoon dialogue editor. Your job is to cut words ruthlessly to enforce the 25% rule.
+
+  ORIGINAL: {{ original_dialogue }}
+  CONTEXT: {{ scene_context }}
+  SPEAKER: {{ speaker }}
+
+  RULES:
+  1. Maximum 25 words total.
+  2. If the art shows it (visual context), don't say it.
+  3. Convert adverbs to [VISUAL CUE: ...] instructions for the artist.
+  4. "I feel X" -> Must be shown via expression/pose, not said.
+  5. Prefer incomplete sentences (natural speech).
+  6. If the moment is pure reaction, set can_be_silent to true.
+
+  OUTPUT SCHEMA:
+  {
+    "minimized_dialogue": "string",
+    "visual_cues": ["list of strings"],
+    "can_be_silent": boolean
   }
