@@ -64,13 +64,13 @@ def run_panel_plan_generator(
                 scene = _get_scene(db, scene_id)
                 characters = _list_characters(db, scene.story_id)
                 character_names = [c.name for c in characters]
-                panel_count = max(1, min(int(panel_count), 3))
+                panel_count = max(1, min(int(panel_count), 5))
                 importance = scene.scene_importance
 
                 if importance:
                     panel_count = _panel_count_for_importance(importance, scene.source_text, panel_count)
                     # Ensure panel count stays within limits even after importance adjustment
-                    panel_count = max(1, min(panel_count, 3))
+                    panel_count = max(1, min(panel_count, 5))
 
                 # Get scene_intent if available
                 scene_intent_artifact = svc.get_latest_artifact(scene_id, ARTIFACT_SCENE_INTENT)
@@ -84,29 +84,32 @@ def run_panel_plan_generator(
                     "repeated_framing_run_length": qc_rules_obj.repeated_framing_run_length,
                 }
 
-                plan = _heuristic_panel_plan(scene.source_text, panel_count)
+                if gemini is None:
+                    logger.error("panel_plan fail-fast: Gemini client missing (scene_id=%s)", scene_id)
+                    raise RuntimeError("panel_plan requires Gemini client (fallback disabled)")
 
-                if gemini is not None:
-                    # DEBUG: Log what we're sending to the LLM
-                    logger.info(
-                        f"Calling panel_plan LLM for scene {scene_id}: "
-                        f"panel_count={panel_count}, scene_text_length={len(scene.source_text)}, "
-                        f"importance={importance}"
-                    )
-                    
-                    llm = _maybe_json_from_gemini(
-                        gemini,
-                        _prompt_panel_plan(
-                            scene.source_text,
-                            panel_count,
-                            scene_intent=scene_intent,
-                            scene_importance=importance,
-                            character_names=character_names,
-                            qc_rules=qc_rules,
-                        ),
-                    )
-                    if isinstance(llm, dict) and isinstance(llm.get("panels"), list):
-                        plan = {"panels": llm["panels"]}
+                logger.info(
+                    f"Calling panel_plan LLM for scene {scene_id}: "
+                    f"panel_count={panel_count}, scene_text_length={len(scene.source_text)}, "
+                    f"importance={importance}"
+                )
+
+                llm = _maybe_json_from_gemini(
+                    gemini,
+                    _prompt_panel_plan(
+                        scene.source_text,
+                        panel_count,
+                        scene_intent=scene_intent,
+                        scene_importance=importance,
+                        character_names=character_names,
+                        qc_rules=qc_rules,
+                    ),
+                )
+                if not isinstance(llm, dict) or not isinstance(llm.get("panels"), list):
+                    logger.error("panel_plan generation failed: invalid Gemini JSON (scene_id=%s)", scene_id)
+                    raise RuntimeError("panel_plan failed: Gemini returned invalid JSON")
+
+                plan = {"panels": llm["panels"]}
 
                 plan = _evaluate_and_prune_panel_plan(plan)
                 # Assign weights and must_be_large flags to panels based on utility and scene importance
@@ -114,13 +117,13 @@ def run_panel_plan_generator(
                 if not isinstance(plan, dict):
                     plan = {"panels": []}
 
-                # CRITICAL: Force panel count to max 3
-                if "panels" in plan and len(plan["panels"]) > 3:
+                # CRITICAL: Force panel count to max 5
+                if "panels" in plan and len(plan["panels"]) > 5:
                     logger.warning(
                         f"Panel plan for scene {scene_id} generated {len(plan['panels'])} panels, "
-                        f"truncating to 3 (max allowed)"
+                        f"truncating to 5 (max allowed)"
                     )
-                    plan["panels"] = plan["panels"][:3]
+                    plan["panels"] = plan["panels"][:5]
                     # Re-index panels
                     for idx, panel in enumerate(plan["panels"], start=1):
                         panel["panel_index"] = idx

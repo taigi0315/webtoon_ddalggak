@@ -10,6 +10,8 @@ from app.graphs.nodes.helpers.character import _active_variants_by_character
 from app.graphs.nodes.helpers.media import _load_character_reference_images
 from app.graphs.nodes.helpers.scene import _get_scene, _list_characters
 from app.graphs.nodes.utils import _character_ids_with_reference_images, _render_image_from_prompt
+from app.config.loaders import has_image_style
+from app.core.image_styles import get_style_semantic_hint
 
 
 def compute_prompt_compiler(
@@ -112,6 +114,7 @@ def generate_character_reference_image(
     db: Session,
     character_id: uuid.UUID,
     ref_type: str = "face",
+    style_id: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> CharacterReferenceImage:
     character = db.get(Character, character_id)
@@ -125,6 +128,7 @@ def generate_character_reference_image(
 
     style_prompt = get_character_style_prompt(character.gender, character.age_range)
     identity = character.identity_line or character.description or character.name
+    effective_style_id = style_id if style_id and has_image_style(style_id) else None
 
     prompt_parts = [
         "High-quality character reference image.",
@@ -134,6 +138,10 @@ def generate_character_reference_image(
     ]
     if style_prompt:
         prompt_parts.append(style_prompt)
+    if effective_style_id:
+        prompt_parts.append(
+            f"Style direction ({effective_style_id}): {get_style_semantic_hint(effective_style_id)}"
+        )
     prompt_parts.append("Plain background, clean silhouette, full body if possible.")
 
     prompt = " ".join([part for part in prompt_parts if part])
@@ -155,6 +163,7 @@ def generate_character_reference_image(
             "request_id": getattr(gemini, "last_request_id", None),
             "usage": getattr(gemini, "last_usage", None),
             "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            "style_id": effective_style_id,
         },
     )
     db.add(ref)

@@ -8,6 +8,7 @@ import {
   fetchCharacters,
   fetchProjects,
   fetchStories,
+  fetchStory,
   fetchCharacterRefs,
   fetchCharacterVariants,
   createCharacterVariant,
@@ -51,6 +52,12 @@ export default function CharacterStudioPage() {
     queryKey: ["stories", projectId],
     queryFn: () => fetchStories(projectId),
     enabled: projectId.length > 0
+  });
+
+  const storyQuery = useQuery({
+    queryKey: ["story", storyId],
+    queryFn: () => fetchStory(storyId),
+    enabled: storyId.length > 0
   });
 
   const charactersQuery = useQuery({
@@ -237,6 +244,7 @@ export default function CharacterStudioPage() {
               <CharacterDetail
                 character={selectedCharacter}
                 storyId={storyId}
+                imageStyleId={storyQuery.data?.default_image_style}
                 suggestions={variantSuggestionsQuery.data ?? []}
               />
             )}
@@ -274,10 +282,12 @@ export default function CharacterStudioPage() {
 function CharacterDetail({
   character,
   storyId,
+  imageStyleId,
   suggestions
 }: {
   character: Character;
   storyId: string;
+  imageStyleId?: string;
   suggestions: CharacterVariantSuggestion[];
 }) {
   const queryClient = useQueryClient();
@@ -411,7 +421,8 @@ function CharacterDetail({
     generateRefsMutation.mutate({
       characterId: character.character_id,
       refTypes: ["face"],
-      countPerType: 1
+      countPerType: 1,
+      styleId: imageStyleId ?? null
     });
   };
 
@@ -594,9 +605,11 @@ function CharacterDetail({
                     className={`w-full aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                       ref.is_primary
                         ? "border-green-500 ring-2 ring-green-300"
-                        : "border-slate-200 hover:border-indigo-400"
+                        : previewRefId === ref.reference_image_id
+                          ? "border-indigo-500 ring-2 ring-indigo-200"
+                          : "border-slate-200 hover:border-indigo-400"
                     }`}
-                    onClick={() => handleSelectAsReference(ref)}
+                    onClick={() => setPreviewRefId(ref.reference_image_id)}
                     disabled={approveRefMutation.isPending || setPrimaryRefMutation.isPending}
                   >
                     <img
@@ -604,6 +617,18 @@ function CharacterDetail({
                       alt="Character reference"
                       className="w-full h-full object-cover"
                     />
+                  </button>
+
+                  <button
+                    className="absolute bottom-1 left-1 right-1 rounded bg-white/90 text-[10px] text-slate-700 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity border border-slate-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectAsReference(ref);
+                    }}
+                    disabled={approveRefMutation.isPending || setPrimaryRefMutation.isPending}
+                    title="Set as primary reference"
+                  >
+                    Set Primary
                   </button>
 
                   <button
@@ -1151,5 +1176,3 @@ function LoadCharacterFromLibrary({
     </>
   );
 }
-
-

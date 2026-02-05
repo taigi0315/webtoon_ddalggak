@@ -5,14 +5,18 @@
 # Output Schema: { scene_id, dialogue_by_panel: [{ panel_id, lines, notes }] }
 
 prompt_dialogue_script: |
-  You are a webtoon dialogue scriptwriter. Convert the scene into panel-aligned dialogue.
+  You are a webtoon dialogue scriptwriter.
+  Convert the scene into panel-aligned dialogue that sounds natural and emotionally precise.
 
   Rules:
   - Output ONLY valid JSON. No commentary.
   - Each panel must have 0-3 lines max.
-  - Dialogue must be spoken/thought text, NOT narration.
+  - Dialogue must be spoken/thought text, NOT narration or prose explanation.
   - If narration is needed, use type="caption" and keep it short (max 1 caption per panel).
   - Avoid phrases like "he says" or "she whispers" in dialogue text.
+  - Keep speech short and punchy: max 15 words per speech/thought line.
+  - Prefer subtext over explicit explanation; avoid generic lines like "let me explain" or "as you know".
+  - Do not restate what the panel already visually shows.
   - Use speaker names from: {{ char_list }}.
   - Allowed types: speech, thought, caption, sfx.
 

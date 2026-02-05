@@ -10,15 +10,30 @@ prompt_script_writer: |
   - ONE ACTION PER PANEL: Each beat must represent exactly ONE primary action. If a character does multiple distinct actions, split them into separate beats. Avoid "A does X then Y" in a single beat.
   - BEAT TYPES: Use specific taxonomy: [initial, escalation, peak, release, hook].
   - SILENCE AS NARRATIVE: Explicitly identify beats that would be more powerful without words (reaction shots, atmospheric moments).
+  - EMOTION-FIRST VISUALIZATION: Replace explanatory prose with visible action, expression, posture, and staging.
+  - DIALOGUE ECONOMY: Use only dialogue that cannot be inferred visually.
 
   CHARACTER STABILITY (CRITICAL):
   - Every beat must explicitly identify which characters are present.
   - For each character, use a consistent "Appearance Anchor" (3-5 words describing their core visual traits) to prevent the AI from "switching" their look.
   - Distinguish between "Base Appearance" (Anchor) and "Current State" (Expression/Pose).
 
+  STORY FIDELITY GATE (CRITICAL):
+  - Preserve the original story's core intent, genre signals, and twist structure.
+  - DO NOT flatten metaphorical/fantasy framing into mundane literal scenes too early.
+  - If the source text uses metaphor first and reveal later, keep that progression (metaphor -> tension -> reveal).
+  - Expand implied beats, but do NOT replace the author's premise with a different story.
+  - Never invent a separate "Narrator" character. For first-person POV, treat the speaker as "Protagonist".
+
   CONTEXT:
   - Genre: {{ story_style }}
+  - Target Scene Count: {{ target_scene_count }}
   - Characters: {{ characters_json }}
+
+  {% if story_profile_json %}
+  STORY PROFILE (FROM STORY POPULATOR):
+  {{ story_profile_json }}
+  {% endif %}
   
   {% if history %}
   PREVIOUS DRAFTS (FOR REFERENCE):
@@ -36,17 +51,29 @@ prompt_script_writer: |
   OUTPUT REQUIREMENTS:
   Return a JSON object containing:
   - "episode_intent": A brief statement of this episode's purpose and its "Hike Point".
+  - "story_fidelity_notes": brief checks proving you kept key motifs, genre cues, and reveal timing from source.
   - "visual_beats": An array of scene-level beats.
+  - IMPORTANT: For short source text, EXPAND implied moments into visual beats.
+    - Include setup, search/attempts, emotional reaction, reveal, and afterbeat.
+    - Aim for at least {{ target_scene_count }} beats, and preferably {{ target_scene_count + 1 }} to {{ target_scene_count * 2 }} beats.
+    - Do not invent unrelated subplots; expand only from plausible implications of the original story.
 
   JSON SCHEMA:
   {
     "episode_intent": "string",
+    "story_fidelity_notes": [
+      "kept metaphorical framing of heat/beast before reveal",
+      "preserved final reveal as burnt frozen pizza at 2:00 AM"
+    ],
     "visual_beats": [
       {
         "beat_index": integer,
         "beat_type": "initial | escalation | peak | release | hook",
+        "transition_type": "moment_to_moment | action_to_action | subject_to_subject | scene_to_scene | aspect_to_aspect",
+        "closure_hint": "What the reader infers between this beat and the next beat",
         "emotional_intensity": 0.0-1.0,
         "action_complexity": integer, // count of distinct actions; MUST be 1
+        "dialogue_budget_words": integer, // recommended max words, usually <= 15
         "dialogue_load": 0.0-1.0, // 1.0 means heavy dialogue, 0.0 means silent
         "silence_candidate": boolean,
         "metaphor_opportunity": "string | None",
@@ -62,7 +89,7 @@ prompt_script_writer: |
         "visual_action": "Detailed description of the visual scene (exactly ONE action)",
         "dialogue": "Character dialogue or None",
         "sfx": "On-screen sound effect text or None",
-        "atmosphere": "Specific lighting or environmental mood",
+        "atmosphere": "Mood in visual terms (space, gesture, tempo), not prose explanation",
         "narrative_weight": "low | medium | high | cliffhanger"
       }
     ]

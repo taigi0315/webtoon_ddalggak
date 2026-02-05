@@ -20,7 +20,7 @@ prompt_panel_semantics: |
 
   **CINEMATOGRAPHER ROLE: LAYOUT & COMPOSITION ONLY**
   
-  Fill in DETAILED visual LAYOUT and COMPOSITION for each panel. Each description must be 50-75 words minimum.
+  Fill in DETAILED visual LAYOUT and COMPOSITION for each panel. Each description must be 35-60 words.
   Focus EXCLUSIVELY on spatial arrangement, camera work, and physical positioning.
   
   **FORBIDDEN ELEMENTS (handled by Art Director):**
@@ -35,6 +35,7 @@ prompt_panel_semantics: |
   - Spatial composition and arrangement
   - Environment structure, architecture, props
   - Physical actions and movements
+  - Emotional readability through body language and micro-actions
   
   {% if intent_block %}
   {{ intent_block }}
@@ -50,7 +51,7 @@ prompt_panel_semantics: |
 
   **VISUAL PROMPT FORMULA (LAYOUT FOCUS):**
   [shot_type], vertical 9:16 webtoon panel, [composition with character % of frame],
-  [environment with 5+ specific details: architecture, furniture, props, spatial arrangement],
+  [environment with 2-4 specific details: architecture, props, spatial arrangement],
   [character placement: position in frame, posture, action, expression, body language],
   [camera angle and perspective]
 
@@ -64,12 +65,12 @@ prompt_panel_semantics: |
   - reveal: Subject entering or being unveiled, dramatic framing
   - impact_silence: Minimal elements, 70%+ negative space, frozen moment, stark composition
 
-  **ENVIRONMENT DETAILS MUST INCLUDE (5+ per panel):**
+  **ENVIRONMENT DETAILS MUST INCLUDE (2-4 per panel):**
   1. Architecture/space (walls, windows, ceiling, floor material)
   2. Furniture/major objects (tables, chairs, counters)
   3. Small props (cups, phones, books, bags)
   4. Spatial arrangement (depth, layering, foreground/background)
-  5. Background activity (other people, movement)
+  5. Background activity is optional when emotion focus is primary
 
   VALID CAMERA VALUES: extreme_closeup, closeup, medium_closeup, medium, medium_full, full, wide, establishing
   VALID GAZE VALUES: at_other, at_object, down, away, toward_path, camera
@@ -83,7 +84,7 @@ prompt_panel_semantics: |
         "camera": "wide",
         "character_frame_percentage": 25,
         "focus_on": "environment with characters",
-        "description": "50-75 word concise LAYOUT description (NO lighting/mood/color)",
+        "description": "35-60 word concise LAYOUT description (NO lighting/mood/color)",
         "characters": [
           {
             "name": "Character Name",

@@ -23,7 +23,8 @@ def run_closure_planner(
 ) -> Any:
     """Explicitly plan what the reader infers in each gutter."""
     if gemini is None:
-        return None
+        logger.error("closure_planner fail-fast: Gemini client missing (scene_id=%s)", scene_id)
+        raise RuntimeError("closure_planner requires Gemini client (fallback disabled)")
 
     # Check for existing artifact
     svc = ArtifactService(db)
@@ -34,10 +35,14 @@ def run_closure_planner(
     # We need the transition map to plan closure
     transition_artifact = svc.get_latest_artifact(scene_id, ARTIFACT_TRANSITION_MAP)
     if not transition_artifact:
-        logger.warning(f"Transition map missing for scene {scene_id}, cannot plan closure")
-        return None
+        logger.error(f"closure_planner fail-fast: transition map missing (scene_id={scene_id})")
+        raise ValueError("closure_planner requires transition_map artifact")
 
     transitions = transition_artifact.payload.get("transitions", [])
+    if not transitions:
+        logger.info("closure_planner skipped: no transitions to evaluate (scene_id=%s)", scene_id)
+        return svc.create_artifact(scene_id, ARTIFACT_CLOSURE_PLAN, {"closure_plans": []})
+
     closure_plans = []
 
     for trans in transitions:
@@ -58,7 +63,8 @@ def run_closure_planner(
             closure_plans.append(result)
 
     if not closure_plans:
-        return None
+        logger.error("closure_planner generation failed: no closure plans produced (scene_id=%s)", scene_id)
+        raise RuntimeError("closure_planner failed: empty closure plans")
 
     payload = {"closure_plans": closure_plans}
     return svc.create_artifact(scene_id, ARTIFACT_CLOSURE_PLAN, payload)

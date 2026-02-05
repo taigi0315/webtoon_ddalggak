@@ -20,7 +20,6 @@ from ..utils import (
     _maybe_json_from_gemini,
     _prompt_blind_reader,
     _prompt_comparator,
-    _prompt_blind_test,
     GeminiClient,
 )
 
@@ -61,48 +60,32 @@ def run_blind_test_evaluator(
                 emotional_takeaway = None
                 visual_observations = []
 
-                if gemini is not None:
-                    # Try two-stage blind test process
-                    two_stage_success = False
+                if gemini is None:
+                    raise RuntimeError("blind_test_evaluator requires Gemini client (fallback disabled)")
 
-                    # Stage 1: Blind reader reconstructs story
-                    blind_reading = _maybe_json_from_gemini(
-                        gemini,
-                        _prompt_blind_reader(panel_semantics.payload),
-                    )
+                blind_reading = _maybe_json_from_gemini(
+                    gemini,
+                    _prompt_blind_reader(panel_semantics.payload),
+                )
+                if not blind_reading or not isinstance(blind_reading, dict):
+                    raise RuntimeError("blind_test_evaluator failed: blind_reader returned invalid JSON")
 
-                    if blind_reading and isinstance(blind_reading, dict):
-                        reconstructed = blind_reading.get("reconstructed_story", reconstructed)
-                        emotional_takeaway = blind_reading.get("emotional_takeaway")
-                        visual_observations = blind_reading.get("visual_storytelling_observations", [])
+                reconstructed = blind_reading.get("reconstructed_story", reconstructed)
+                emotional_takeaway = blind_reading.get("emotional_takeaway")
+                visual_observations = blind_reading.get("visual_storytelling_observations", [])
 
-                        # Stage 2: Comparator scores the reconstruction
-                        comparison_result = _maybe_json_from_gemini(
-                            gemini,
-                            _prompt_comparator(scene.source_text, blind_reading),
-                        )
+                comparison_result = _maybe_json_from_gemini(
+                    gemini,
+                    _prompt_comparator(scene.source_text, blind_reading),
+                )
+                if not comparison_result or not isinstance(comparison_result, dict):
+                    raise RuntimeError("blind_test_evaluator failed: comparator returned invalid JSON")
 
-                        if comparison_result and isinstance(comparison_result, dict):
-                            two_stage_success = True
-                            comparison = comparison_result.get("comparison", comparison)
-                            scores = comparison_result.get("scores")
-                            score = float(comparison_result.get("weighted_score", score))
-                            failure_points = comparison_result.get("failure_points", [])
-                            repair_suggestions = comparison_result.get("repair_suggestions", [])
-
-                    # Fallback to single-prompt if two-stage failed
-                    if not two_stage_success:
-                        llm = _maybe_json_from_gemini(
-                            gemini,
-                            _prompt_blind_test(scene.source_text, panel_semantics.payload),
-                        )
-                        if isinstance(llm, dict):
-                            reconstructed = llm.get("reconstructed_story", reconstructed)
-                            comparison = llm.get("comparison", comparison)
-                            score = float(llm.get("score", score))
-                            scores = llm.get("scores")
-                            failure_points = llm.get("failure_points", [])
-                            repair_suggestions = llm.get("repair_suggestions", [])
+                comparison = comparison_result.get("comparison", comparison)
+                scores = comparison_result.get("scores")
+                score = float(comparison_result.get("weighted_score", score))
+                failure_points = comparison_result.get("failure_points", [])
+                repair_suggestions = comparison_result.get("repair_suggestions", [])
 
                 payload = {
                     "reconstructed_story": reconstructed,

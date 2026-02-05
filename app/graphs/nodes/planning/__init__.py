@@ -32,6 +32,7 @@ from .visual_plan import (
 )
 
 # Script writing and optimization
+from .story_populator import run_story_populator
 from .script_writer import run_webtoon_script_writer
 from .studio_director import run_studio_director
 from .transition import run_transition_type_classifier
@@ -76,6 +77,7 @@ __all__ = [
     "compile_visual_plan_bundle",
     "compile_visual_plan_bundle_llm",
     "compute_scene_chunker",
+    "run_story_populator",
     "run_webtoon_script_writer",
     "run_studio_director",
     "run_transition_type_classifier",

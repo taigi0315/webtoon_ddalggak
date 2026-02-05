@@ -1,12 +1,14 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
+import logging
 import threading
 import uuid
 from typing import Any, Callable
 
 
 JobHandler = Callable[["JobRecord"], dict | None]
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,6 +62,16 @@ def enqueue_job(
     )
     with _jobs_lock:
         _jobs[job_id] = job
+
+    scene_id = payload.get("scene_id")
+    story_id = payload.get("story_id")
+    logger.info(
+        "job_enqueued job_id=%s type=%s scene_id=%s story_id=%s",
+        job_id,
+        job_type,
+        scene_id or "",
+        story_id or "",
+    )
 
     asyncio.run_coroutine_threadsafe(_queue.put(job_id), _loop)
     return job
@@ -119,6 +131,14 @@ async def _worker_loop() -> None:
         with _jobs_lock:
             job.status = "running"
             job.updated_at = _utcnow()
+        logger.info(
+            "job_started job_id=%s type=%s scene_id=%s story_id=%s",
+            job.job_id,
+            job.job_type,
+            job.payload.get("scene_id") or "",
+            job.payload.get("story_id") or "",
+        )
+        started = _utcnow()
 
         try:
             if job.handler is None:
@@ -129,11 +149,23 @@ async def _worker_loop() -> None:
                 job.status = "failed"
                 job.error = str(exc)
                 job.updated_at = _utcnow()
+            logger.exception(
+                "job_failed job_id=%s type=%s duration_ms=%.1f",
+                job.job_id,
+                job.job_type,
+                (job.updated_at - started).total_seconds() * 1000,
+            )
         else:
             with _jobs_lock:
                 job.status = "succeeded"
                 job.result = result
                 job.updated_at = _utcnow()
+            logger.info(
+                "job_succeeded job_id=%s type=%s duration_ms=%.1f",
+                job.job_id,
+                job.job_type,
+                (job.updated_at - started).total_seconds() * 1000,
+            )
         finally:
             _queue.task_done()
 

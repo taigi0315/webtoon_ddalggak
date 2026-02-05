@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+import logging
 
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import select
@@ -37,6 +38,7 @@ from app.services.vertex_gemini import GeminiClient
 
 
 router = APIRouter(tags=["stories"])
+logger = logging.getLogger(__name__)
 
 
 def _build_gemini_client() -> GeminiClient:
@@ -172,7 +174,19 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
             require_hero_single=payload.require_hero_single,
         )
     except ValueError as exc:
+        logger.exception(
+            "story blueprint validation failed (story_id=%s, request_id=%s)",
+            story_id,
+            get_request_id(),
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "story blueprint generation failed (story_id=%s, request_id=%s)",
+            story_id,
+            get_request_id(),
+        )
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     scenes = list(db.execute(select(Scene).where(Scene.story_id == story_id)).scalars().all())
 
@@ -258,6 +272,12 @@ def _handle_story_blueprint_job(job: job_queue.JobRecord) -> dict | None:
             )
         return {"story_id": str(story_id)}
     except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "story blueprint async job failed (story_id=%s, job_id=%s, request_id=%s)",
+            story_id,
+            job.job_id,
+            job.request_id,
+        )
         story = db.get(Story, story_id)
         if story is not None:
             prev_status = story.generation_status

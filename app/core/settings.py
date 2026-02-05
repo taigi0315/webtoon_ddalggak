@@ -1,9 +1,16 @@
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_SETTINGS_DIR = Path(__file__).resolve().parent
+_APP_DIR = _SETTINGS_DIR.parent
+_APP_ENV_FILE = _APP_DIR / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # Fail-safe: always load env from app/.env regardless of process CWD.
+    model_config = SettingsConfigDict(env_file=str(_APP_ENV_FILE), env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = Field(default="sqlite+pysqlite:///./dev.db", validation_alias="DATABASE_URL")
     db_auto_create: bool = Field(default=True, validation_alias="DB_AUTO_CREATE")

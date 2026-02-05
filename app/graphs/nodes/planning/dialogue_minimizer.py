@@ -22,8 +22,11 @@ def run_dialogue_minimizer(
     gemini: GeminiClient | None = None,
 ) -> list[dict]:
     """Minimize dialogue to enforce the 25% rule and word count constraints."""
-    if gemini is None or not visual_beats:
+    if not visual_beats:
         return visual_beats
+    if gemini is None:
+        logger.error("dialogue_minimizer fail-fast: Gemini client missing (scene_id=%s)", scene_id)
+        raise RuntimeError("dialogue_minimizer requires Gemini client (fallback disabled)")
 
     minimized_beats = []
     for beat in visual_beats:
@@ -40,12 +43,18 @@ def run_dialogue_minimizer(
         )
 
         result = _maybe_json_from_gemini(gemini, rendered_prompt)
-        if result:
-            beat["minimized_dialogue"] = result.get("minimized_dialogue", dialogue)
-            beat["visual_cues"] = result.get("visual_cues", [])
-            beat["can_be_silent"] = result.get("can_be_silent", False)
-            # Update main dialogue field with minimized version
-            beat["dialogue"] = beat["minimized_dialogue"]
+        if not result or "minimized_dialogue" not in result:
+            logger.error(
+                "dialogue_minimizer generation failed: invalid Gemini JSON (scene_id=%s, beat_index=%s)",
+                scene_id,
+                beat.get("beat_index"),
+            )
+            raise RuntimeError("dialogue_minimizer failed: Gemini returned invalid JSON")
+        beat["minimized_dialogue"] = result.get("minimized_dialogue", dialogue)
+        beat["visual_cues"] = result.get("visual_cues", [])
+        beat["can_be_silent"] = result.get("can_be_silent", False)
+        # Update main dialogue field with minimized version
+        beat["dialogue"] = beat["minimized_dialogue"]
         
         minimized_beats.append(beat)
 

@@ -50,7 +50,6 @@ from app.core.metrics import record_qc_issues
 from app.graphs.nodes.helpers.dialogue import (
     _dialogue_panel_ids,
     _extract_dialogue_lines,
-    _fallback_dialogue_script,
     _normalize_dialogue_script,
 )
 from app.graphs.nodes.helpers.media import _load_character_reference_images, _resolve_media_path
@@ -164,26 +163,34 @@ def _panel_count_for_importance(
 ) -> int:
     """Determine panel count based on scene importance.
 
-    Returns a value between 1-3 (hard limit for panel count per scene).
+    Returns a value between 1-5 (hard limit for panel count per scene).
     """
     importance = (scene_importance or "").lower()
     word_count = len(re.findall(r"\w+", scene_text or ""))
 
-    # Maximum 3 panels per scene image
-    MAX_PANELS = 3
+    # Maximum 5 panels per scene image
+    MAX_PANELS = 5
 
     if importance in {"climax", "cliffhanger"}:
         # Impact moments: single powerful panel
         return 1
     if importance == "release":
-        # Resolution scenes: 2-3 panels
-        return 3 if word_count >= 120 else 2
+        # Resolution scenes: allow longer decompression beats.
+        if word_count >= 220:
+            return 5
+        if word_count >= 120:
+            return 4
+        return 2
     if importance == "setup":
-        # Setup scenes: use max panels for context
+        # Setup scenes: use more panels for spatial/emotional context.
         return MAX_PANELS
     if importance == "build":
-        # Build scenes: scale with content length, max 3
-        return MAX_PANELS
+        # Build scenes: scale with content length for pacing flexibility.
+        if word_count >= 220:
+            return 5
+        if word_count >= 120:
+            return 4
+        return max(2, min(int(fallback), MAX_PANELS))
 
     return max(1, min(int(fallback), MAX_PANELS))
 
@@ -367,25 +374,107 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
 
     issues: list[str] = []
     issue_details: list[dict[str, str]] = []
-    
-    # 1. Word Count Check (25% Rule / Word Count Violation)
-    word_count_violations = []
+
+    def _line_texts(dialogue_val: object) -> list[str]:
+        if isinstance(dialogue_val, str):
+            t = dialogue_val.strip()
+            return [t] if t else []
+        if not isinstance(dialogue_val, list):
+            return []
+        out: list[str] = []
+        for item in dialogue_val:
+            if isinstance(item, dict):
+                txt = str(item.get("text") or "").strip()
+            else:
+                txt = str(item).strip()
+            if txt:
+                out.append(txt)
+        return out
+
+    def _is_narration_like(text: str) -> bool:
+        lowered = text.lower()
+        return any(
+            phrase in lowered
+            for phrase in (
+                " he says",
+                " she says",
+                " he whispers",
+                " she whispers",
+                " he thinks",
+                " she thinks",
+                " as you know",
+                " meanwhile",
+                " suddenly",
+            )
+        )
+
+    def _is_generic_dialogue(text: str) -> bool:
+        lowered = text.lower()
+        return any(
+            pat in lowered
+            for pat in (
+                "let me explain",
+                "in other words",
+                "this changes everything",
+                "i cannot believe this is happening",
+                "we need to",
+                "i have a bad feeling",
+            )
+        )
+
+    word_count_violations: list[int] = []
+    line_word_violations: list[int] = []
+    silent_panels = 0
+    dialogue_panels = 0
     total_word_count = 0
-    if panel_semantics and isinstance(panel_semantics.get("panels"), list):
-        for p_sem in panel_semantics["panels"]:
-            dialogue = p_sem.get("dialogue") or []
-            p_words = sum(len(str(line).split()) for line in dialogue)
-            total_word_count += p_words
-            if p_words > 25:
-                word_count_violations.append(p_sem.get("panel_index"))
-    
+    total_dialogue_lines = 0
+    narration_like_lines = 0
+    generic_lines = 0
+    semantics_panels = list(panel_semantics.get("panels") or []) if panel_semantics else []
+
+    for p_sem in semantics_panels:
+        lines = _line_texts(p_sem.get("dialogue"))
+        panel_words = sum(len(line.split()) for line in lines)
+        total_word_count += panel_words
+        total_dialogue_lines += len(lines)
+
+        panel_id = p_sem.get("panel_index")
+        if lines:
+            dialogue_panels += 1
+        else:
+            silent_panels += 1
+
+        if panel_words > rules.max_words_per_panel and isinstance(panel_id, int):
+            word_count_violations.append(panel_id)
+
+        if any(len(line.split()) > rules.max_words_per_line for line in lines) and isinstance(panel_id, int):
+            line_word_violations.append(panel_id)
+
+        for line in lines:
+            if _is_narration_like(line):
+                narration_like_lines += 1
+            if _is_generic_dialogue(line):
+                generic_lines += 1
+
     if word_count_violations:
         issues.append("word_count_violation")
-        issue_details.append({
-            "code": "word_count_violation",
-            "message": f"Panels {word_count_violations} exceed the 25-word limit.",
-            "hint": "Reduce dialogue or split into multiple panels."
-        })
+        issue_details.append(
+            {
+                "code": "word_count_violation",
+                "message": f"Panels {word_count_violations} exceed the panel word limit ({rules.max_words_per_panel}).",
+                "hint": "Cut exposition and let action/expression carry meaning.",
+            }
+        )
+
+    if line_word_violations:
+        issues.append("line_too_long")
+        issue_details.append(
+            {
+                "code": "line_too_long",
+                "message": f"Panels {line_word_violations} include dialogue lines longer than {rules.max_words_per_line} words.",
+                "hint": "Split into shorter, natural bursts or replace with silent reaction.",
+            }
+        )
 
     # 2. Layout Monotony check (Task 7.1)
     widths = [p.get("panel_hierarchy", {}).get("width_percentage") for p in panels]
@@ -398,7 +487,7 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
         else:
             monotony_run = 1
     
-    if max_monotony > 3:
+    if max_monotony >= rules.repeated_framing_run_length:
         issues.append("monotonous_layout")
         issue_details.append({
             "code": "monotonous_layout",
@@ -407,14 +496,14 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
         })
 
     # 3. Show-Don't-Tell / Dialogue Redundancy
-    redundant_panels = []
-    if panel_semantics and isinstance(panel_semantics.get("panels"), list):
-        for p_sem in panel_semantics["panels"]:
-            dialogue = " ".join(p_sem.get("dialogue", [])).lower()
-            # Simple heuristic for redundant descriptions in dialogue
-            if any(key in dialogue for key in ["i am showing", "look at", "see how i"]):
-                redundant_panels.append(p_sem.get("panel_index"))
-    
+    redundant_panels: list[int] = []
+    for p_sem in semantics_panels:
+        panel_id = p_sem.get("panel_index")
+        dialogue_joined = " ".join(_line_texts(p_sem.get("dialogue"))).lower()
+        if any(key in dialogue_joined for key in ["i am showing", "look at", "see how i", "as you can see"]):
+            if isinstance(panel_id, int):
+                redundant_panels.append(panel_id)
+
     if redundant_panels:
         issues.append("dialogue_redundancy")
         issue_details.append({
@@ -428,18 +517,60 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
     closeup_count = len(closeups)
     closeup_ratio = closeup_count / total
 
-    dialogue_panels = [p for p in (panel_semantics.get("panels") or []) if p.get("dialogue")] if panel_semantics else []
-    dialogue_count = len(dialogue_panels)
-    dialogue_ratio = dialogue_count / total if total > 0 else 0.0
+    if closeup_ratio > rules.closeup_ratio_max:
+        issues.append("too_many_closeups")
+        issue_details.append(
+            {
+                "code": "too_many_closeups",
+                "message": f"Close-up ratio too high ({roundup(closeup_ratio, 3)}).",
+                "hint": "Mix in establishing/reaction/object shots to restore visual rhythm.",
+            }
+        )
 
-    if dialogue_ratio > 0.85:
+    dialogue_count = dialogue_panels
+    dialogue_ratio = dialogue_count / total if total > 0 else 0.0
+    silent_ratio = (silent_panels / total) if total > 0 else 0.0
+    narration_ratio = (narration_like_lines / total_dialogue_lines) if total_dialogue_lines else 0.0
+    generic_ratio = (generic_lines / total_dialogue_lines) if total_dialogue_lines else 0.0
+
+    if dialogue_ratio > rules.dialogue_ratio_max:
         issues.append("too_much_dialogue")
-        allowed = max(1, int(total * 0.85))
+        allowed = max(1, int(total * rules.dialogue_ratio_max))
         issue_details.append({
             "code": "too_much_dialogue",
             "message": f"Too many dialogue panels ({dialogue_count}/{total}). Max {allowed}.",
             "hint": "Strategically use silent panels for emotional impact."
         })
+
+    if silent_ratio < rules.min_silent_panel_ratio:
+        issues.append("not_enough_silence")
+        issue_details.append(
+            {
+                "code": "not_enough_silence",
+                "message": f"Silent panel ratio too low ({roundup(silent_ratio, 3)}).",
+                "hint": "Add reaction/hold panels with no text to improve emotional pacing.",
+            }
+        )
+
+    if narration_ratio > rules.narration_ratio_max:
+        issues.append("narration_like_dialogue")
+        issue_details.append(
+            {
+                "code": "narration_like_dialogue",
+                "message": f"Narration-like dialogue ratio too high ({roundup(narration_ratio, 3)}).",
+                "hint": "Convert descriptive lines into visual action or captions.",
+            }
+        )
+
+    if generic_ratio > rules.generic_dialogue_ratio_max:
+        issues.append("generic_dialogue")
+        issue_details.append(
+            {
+                "code": "generic_dialogue",
+                "message": f"Generic dialogue ratio too high ({roundup(generic_ratio, 3)}).",
+                "hint": "Use character-specific voice and subtext instead of stock phrases.",
+            }
+        )
 
     record_qc_issues(issues)
     return {
@@ -452,8 +583,13 @@ def _qc_report(panel_plan: dict, panel_semantics: dict | None) -> dict:
             "closeup_ratio": roundup(closeup_ratio, 3),
             "dialogue_count": dialogue_count,
             "dialogue_ratio": roundup(dialogue_ratio, 3),
+            "silent_panel_count": silent_panels,
+            "silent_panel_ratio": roundup(silent_ratio, 3),
+            "narration_like_ratio": roundup(narration_ratio, 3),
+            "generic_dialogue_ratio": roundup(generic_ratio, 3),
             "max_monotony": max_monotony,
             "total_word_count": total_word_count,
+            "total_dialogue_lines": total_dialogue_lines,
         },
         "summary": "QC passed." if not issues else f"QC failed: {len(issues)} issue(s).",
     }
@@ -545,17 +681,40 @@ def _generate_dialogue_script(
 ) -> dict:
     panel_ids = _dialogue_panel_ids(panel_semantics)
     if not panel_ids:
-        panel_ids = list(range(1, 5))
+        logger.error(
+            "dialogue_writer fail-fast: no panel ids (scene_id=%s, panel_semantics_keys=%s)",
+            scene_id,
+            list(panel_semantics.keys()) if isinstance(panel_semantics, dict) else type(panel_semantics).__name__,
+        )
+        raise ValueError("dialogue_writer failed: no valid panel ids in panel_semantics")
 
     if gemini is None:
-        return _fallback_dialogue_script(scene_text, panel_ids)
+        logger.error(
+            "dialogue_writer fail-fast: missing Gemini client (scene_id=%s, panel_count=%d)",
+            scene_id,
+            len(panel_ids),
+        )
+        raise RuntimeError("Gemini client is required for dialogue generation (fail-fast mode)")
 
     prompt = _prompt_dialogue_script(scene_id, scene_text, panel_semantics, character_names)
     expected_schema = "{ scene_id: string, dialogue_by_panel: [{ panel_id: number, lines: [{ speaker: string, type: string, text: string }], notes: string|null }] }"
     raw = _maybe_json_from_gemini(gemini, prompt, expected_schema=expected_schema)
     if not isinstance(raw, dict):
-        return _fallback_dialogue_script(scene_text, panel_ids)
-    return _normalize_dialogue_script(raw, panel_ids)
+        logger.error(
+            "dialogue_writer generation failed: invalid Gemini JSON (scene_id=%s, panel_count=%d)",
+            scene_id,
+            len(panel_ids),
+        )
+        raise RuntimeError("dialogue_writer failed: Gemini returned invalid JSON")
+    normalized = _normalize_dialogue_script(raw, panel_ids)
+    dialogue_by_panel = normalized.get("dialogue_by_panel")
+    if not isinstance(dialogue_by_panel, list):
+        logger.error(
+            "dialogue_writer normalization failed: missing dialogue_by_panel list (scene_id=%s)",
+            scene_id,
+        )
+        raise RuntimeError("dialogue_writer failed: normalized output missing dialogue_by_panel")
+    return normalized
 
 
 __all__ = [name for name in globals() if not name.startswith("__")]

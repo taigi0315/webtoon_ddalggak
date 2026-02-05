@@ -21,7 +21,6 @@ from ..utils import (
     ARTIFACT_PANEL_SEMANTICS,
     _get_scene,
     _list_characters,
-    _heuristic_panel_semantics,
     _maybe_json_from_gemini,
     _prompt_panel_semantics,
     GeminiClient,
@@ -118,34 +117,34 @@ def run_panel_semantic_filler(
             if panel_plan is None or layout is None:
                 raise ValueError("panel_plan and layout_template artifacts are required")
 
-            payload = _heuristic_panel_semantics(
-                scene_text=scene.source_text,
-                panel_plan=panel_plan.payload,
-                layout_template=layout.payload,
-                characters=characters,
-                scene_intent=scene_intent,
-            )
+            if gemini is None:
+                logger.error("panel_semantics fail-fast: Gemini client missing (scene_id=%s)", scene_id)
+                raise RuntimeError("panel_semantics requires Gemini client (fallback disabled)")
 
-            if gemini is not None:
-                llm = _maybe_json_from_gemini(
-                    gemini,
-                    _prompt_panel_semantics(
-                        scene.source_text,
-                        panel_plan.payload,
-                        layout.payload,
-                        characters,
-                        scene_intent=scene_intent,
-                    ),
+            llm = _maybe_json_from_gemini(
+                gemini,
+                _prompt_panel_semantics(
+                    scene.source_text,
+                    panel_plan.payload,
+                    layout.payload,
+                    characters,
+                    scene_intent=scene_intent,
+                ),
+            )
+            if not isinstance(llm, dict) or not isinstance(llm.get("panels"), list):
+                logger.error("panel_semantics generation failed: invalid Gemini JSON (scene_id=%s)", scene_id)
+                raise RuntimeError("panel_semantics failed: Gemini returned invalid JSON")
+
+            payload = {
+                "panels": llm["panels"],
+            }
+
+            # Post-processing: Detect style keywords in LLM output
+            detected_keywords = _detect_style_keywords_in_panel_semantics(payload)
+            if detected_keywords:
+                logger.warning(
+                    f"Cinematographer output for scene {scene_id} contains style keywords "
+                    f"(should be handled by Art Director): {detected_keywords}"
                 )
-                if isinstance(llm, dict) and isinstance(llm.get("panels"), list):
-                    payload["panels"] = llm["panels"]
-                    
-                    # Post-processing: Detect style keywords in LLM output
-                    detected_keywords = _detect_style_keywords_in_panel_semantics(payload)
-                    if detected_keywords:
-                        logger.warning(
-                            f"Cinematographer output for scene {scene_id} contains style keywords "
-                            f"(should be handled by Art Director): {detected_keywords}"
-                        )
 
             return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_PANEL_SEMANTICS, payload=payload)

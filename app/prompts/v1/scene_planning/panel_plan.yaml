@@ -62,6 +62,8 @@ prompt_panel_plan: |
   - You are allowed to use multiple similar panels IF continuity_preference is high
   - You are allowed to skip close-ups or object shots entirely if not useful
   - If there is an emotional peak, at least ONE panel should have high importance_weight
+  - If emotional_intensity is high, include at least one reaction or impact_silence panel
+  - Preserve one_action_per_panel logic; avoid combining unrelated actions in one panel note
   - Do NOT force balance — imbalance is allowed and encouraged
 
   DO NOT:

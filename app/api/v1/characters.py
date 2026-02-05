@@ -25,6 +25,7 @@ from app.api.v1.schemas import (
     SaveToLibraryRequest,
     SaveToLibraryResponse,
 )
+from app.config.loaders import has_image_style
 from app.db.models import (
     Character,
     CharacterReferenceImage,
@@ -511,6 +512,8 @@ def generate_character_refs(character_id: uuid.UUID, payload: CharacterGenerateR
             detail="character needs description or identity_line to generate reference images"
         )
 
+    style_id = payload.style_id if payload.style_id and has_image_style(payload.style_id) else None
+
     generated_refs: list[CharacterReferenceImage] = []
     for ref_type in payload.ref_types:
         for _ in range(payload.count_per_type):
@@ -518,6 +521,7 @@ def generate_character_refs(character_id: uuid.UUID, payload: CharacterGenerateR
                 db=db,
                 character_id=character_id,
                 ref_type=ref_type,
+                style_id=style_id,
             )
             generated_refs.append(ref)
 

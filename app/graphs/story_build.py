@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -11,12 +12,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.telemetry import trace_span
+from app.core.request_context import log_context
 from app.db.session import session_scope
 from app.db.models import Character, Scene, Story, StoryCharacter
 from app.graphs import nodes
 from app.graphs.nodes.constants import GENRE_PROFILES
 from app.services.artifacts import ArtifactService
 from app.services.vertex_gemini import GeminiClient
+
+logger = logging.getLogger(__name__)
 
 
 class StoryBuildState(TypedDict, total=False):
@@ -41,16 +45,20 @@ class StoryBuildState(TypedDict, total=False):
     progress: dict
     require_hero_single: bool
     webtoon_script: dict | None
+    story_profile: dict | None
+    character_hints: list[dict]
     feedback: list[str]
     script_drafts: list[dict]
     tone_analysis: dict | None
     genre_profile: dict | None
+    quality_signals: dict | None
+    optimized: bool
     retry_count: int
     max_retries: int
 
 
 def _total_steps(planning_mode: str | None) -> int:
-    return 10 if planning_mode == "full" else 6
+    return 11 if planning_mode == "full" else 7
 
 
 def _persist_progress(state: StoryBuildState, progress: dict) -> None:
@@ -179,61 +187,165 @@ def _node_scene_splitter(state: StoryBuildState) -> dict[str, Any]:
         "progress": {
             "current_node": "SceneSplitter",
             "message": f"Splitting story into scenes ({len(scenes)}/{max_scenes})...",
-            "step": 5,
+            "step": 6,
         },
     }
     _persist_progress(state, progress["progress"])
     return progress
 
 
+def _node_story_populator(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
+    with log_context(node_name="story_populator"):
+        _persist_progress(
+            state,
+            {
+                "current_node": "StoryPopulator",
+                "message": "Expanding story seed into webtoon-ready structure...",
+                "step": 2,
+            },
+        )
+        profile = nodes.run_story_populator(
+            story_text=state.get("story_text", ""),
+            target_scene_count=state.get("max_scenes", 6),
+            max_characters=min(4, int(state.get("max_characters", 6))),
+            story_style=state.get("story_style"),
+            gemini=gemini,
+        )
+        expanded_story = profile.get("expanded_story_text") or state.get("story_text", "")
+        hints = profile.get("character_plan") if isinstance(profile.get("character_plan"), list) else []
+        recommended = int(profile.get("max_characters_recommended") or state.get("max_characters", 6))
+        recommended = max(1, min(recommended, 4))
+        progress = {
+            "story_profile": profile,
+            "story_text": expanded_story,
+            "character_hints": hints,
+            "max_characters": recommended,
+            "progress": {
+                "current_node": "StoryPopulator",
+                "message": "Story seed expanded and character plan prepared.",
+                "step": 2,
+            },
+        }
+        _persist_progress(state, progress["progress"])
+        return progress
+
+
 def _node_llm_character_extractor(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
-    profiles = nodes.compute_character_profiles_llm(
-        state.get("story_text", ""),
-        max_characters=state.get("max_characters", 6),
-        gemini=gemini,
-    )
-    progress = {
-        "characters": profiles,
-        "progress": {"current_node": "LLMCharacterExtractor", "message": "Extracting characters...", "step": 2},
-    }
-    _persist_progress(state, progress["progress"])
-    return progress
+    with log_context(node_name="llm_character_extractor"):
+        _persist_progress(
+            state,
+            {
+                "current_node": "LLMCharacterExtractor",
+                "message": "Extracting characters with Gemini...",
+                "step": 3,
+            },
+        )
+        logger.info(
+            "story_build character extraction started (story_id=%s, max_characters=%s)",
+            state.get("story_id"),
+            state.get("max_characters", 6),
+        )
+        try:
+            profiles = nodes.compute_character_profiles_llm(
+                state.get("story_text", ""),
+                max_characters=state.get("max_characters", 6),
+                character_hints=state.get("character_hints", []),
+                gemini=gemini,
+            )
+        except Exception:
+            logger.exception(
+                "story_build character extraction failed (story_id=%s, max_characters=%s)",
+                state.get("story_id"),
+                state.get("max_characters", 6),
+            )
+            raise
+        progress = {
+            "characters": profiles,
+            "progress": {"current_node": "LLMCharacterExtractor", "message": "Extracting characters...", "step": 3},
+        }
+        logger.info(
+            "story_build character extraction completed (story_id=%s, extracted=%s)",
+            state.get("story_id"),
+            len(profiles),
+        )
+        _persist_progress(state, progress["progress"])
+        return progress
 
 
 def _node_llm_character_normalizer(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
-    profiles = nodes.normalize_character_profiles_llm(
-        state.get("characters", []),
-        source_text=state.get("story_text", ""),
-        gemini=gemini,
-    )
-    progress = {
-        "characters": profiles,
-        "progress": {"current_node": "LLMCharacterProfileNormalizer", "message": "Normalizing characters...", "step": 3},
-    }
-    _persist_progress(state, progress["progress"])
-    return progress
+    with log_context(node_name="llm_character_normalizer"):
+        _persist_progress(
+            state,
+            {
+                "current_node": "LLMCharacterProfileNormalizer",
+                "message": "Normalizing characters with Gemini...",
+                "step": 4,
+            },
+        )
+        logger.info(
+            "story_build character normalization started (story_id=%s, input_characters=%s)",
+            state.get("story_id"),
+            len(state.get("characters", [])),
+        )
+        try:
+            profiles = nodes.normalize_character_profiles_llm(
+                state.get("characters", []),
+                source_text=state.get("story_text", ""),
+                gemini=gemini,
+            )
+        except Exception:
+            logger.exception(
+                "story_build character normalization failed (story_id=%s, character_count=%s)",
+                state.get("story_id"),
+                len(state.get("characters", [])),
+            )
+            raise
+        progress = {
+            "characters": profiles,
+            "progress": {"current_node": "LLMCharacterProfileNormalizer", "message": "Normalizing characters...", "step": 4},
+        }
+        logger.info(
+            "story_build character normalization completed (story_id=%s, normalized=%s)",
+            state.get("story_id"),
+            len(profiles),
+        )
+        _persist_progress(state, progress["progress"])
+        return progress
 
 
 def _node_webtoon_script_writer(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
-    script = nodes.run_webtoon_script_writer(
-        story_text=state.get("story_text", ""),
-        characters=state.get("characters", []),
-        story_style=state.get("story_style"),
-        feedback=state.get("feedback"),
-        history=state.get("script_drafts"),
-        gemini=gemini,
-    )
-    
-    drafts = state.get("script_drafts", [])
-    drafts.append(script)
-    
-    progress = {
-        "webtoon_script": script,
-        "script_drafts": drafts,
-        "progress": {"current_node": "WebtoonScriptWriter", "message": "Writing webtoon script...", "step": 4},
-    }
-    _persist_progress(state, progress["progress"])
-    return progress
+    with log_context(node_name="webtoon_script_writer"):
+        logger.info(
+            "story_build script writer started (story_id=%s, retry_count=%s)",
+            state.get("story_id"),
+            state.get("retry_count", 0),
+        )
+        script = nodes.run_webtoon_script_writer(
+            story_text=state.get("story_text", ""),
+            characters=state.get("characters", []),
+            target_scene_count=state.get("max_scenes", 6),
+            story_style=state.get("story_style"),
+            story_profile=state.get("story_profile"),
+            feedback=state.get("feedback"),
+            history=state.get("script_drafts"),
+            gemini=gemini,
+        )
+
+        drafts = state.get("script_drafts", [])
+        drafts.append(script)
+
+        progress = {
+            "webtoon_script": script,
+            "script_drafts": drafts,
+            "progress": {"current_node": "WebtoonScriptWriter", "message": "Writing webtoon script...", "step": 5},
+        }
+        _persist_progress(state, progress["progress"])
+        logger.info(
+            "story_build script writer completed (story_id=%s, beats=%s)",
+            state.get("story_id"),
+            len(script.get("visual_beats", [])) if isinstance(script, dict) else 0,
+        )
+        return progress
 
 
 def _node_dialogue_minimizer(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
@@ -264,28 +376,40 @@ def _node_silent_panel_classifier(state: StoryBuildState) -> dict[str, Any]:
 
 
 def _node_studio_director(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
-    result = nodes.run_studio_director(
-        script=state.get("webtoon_script"),
-        max_scenes=state.get("max_scenes", 6),
-        gemini=gemini,
-    )
-    
-    # If optimization requires a script rewrite (feedback loop)
-    if result.get("action") == "rewrite":
-        feedback = state.get("feedback", [])
-        feedback.append(result.get("feedback", "Please optimize the script for better pacing."))
-        return {
-            "feedback": feedback,
-            "retry_count": state.get("retry_count", 0) + 1,
-            "optimized": False,
-        }
+    with log_context(node_name="studio_director"):
+        result = nodes.run_studio_director(
+            script=state.get("webtoon_script"),
+            max_scenes=state.get("max_scenes", 6),
+            gemini=gemini,
+        )
 
-    progress = {
-        "scenes": result.get("scenes"),
-        "progress": {"current_node": "StudioDirector", "message": "Unified planning and budget optimization...", "step": 5},
-    }
-    _persist_progress(state, progress["progress"])
-    return progress
+        # If optimization requires a script rewrite (feedback loop)
+        if result.get("action") == "rewrite":
+            feedback = state.get("feedback", [])
+            feedback.append(result.get("feedback", "Please optimize the script for better pacing."))
+            next_retry = state.get("retry_count", 0) + 1
+            logger.info(
+                "story_build studio_director requested rewrite (story_id=%s, retry_count=%s)",
+                state.get("story_id"),
+                next_retry,
+            )
+            return {
+                "feedback": feedback,
+                "retry_count": next_retry,
+                "optimized": False,
+            }
+
+        progress = {
+            "scenes": result.get("scenes"),
+            "progress": {"current_node": "StudioDirector", "message": "Unified planning and budget optimization...", "step": 6},
+        }
+        _persist_progress(state, progress["progress"])
+        logger.info(
+            "story_build studio_director completed (story_id=%s, scenes=%s)",
+            state.get("story_id"),
+            len(result.get("scenes", [])) if isinstance(result, dict) else 0,
+        )
+        return progress
 
 
 def _router_optimization(state: StoryBuildState) -> str:
@@ -301,6 +425,20 @@ def _router_optimization(state: StoryBuildState) -> str:
 
 
 def _node_blind_test_critic(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
+    quality_signals = state.get("quality_signals") or {}
+    if quality_signals and not quality_signals.get("quality_gate_passed", True):
+        feedback = state.get("feedback", [])
+        feedback.append(
+            "Visual rhythm/emotional clarity is weak. Increase silence/reaction beats, diversify gutter pacing, "
+            "and reduce explanatory dialogue."
+        )
+        return {
+            "feedback": feedback,
+            "retry_count": state.get("retry_count", 0) + 1,
+            "optimized": False,
+            "scene_ids": [],
+        }
+
     with session_scope() as db:
         result = nodes.run_blind_test_critic(
             db=db,
@@ -308,6 +446,7 @@ def _node_blind_test_critic(state: StoryBuildState, gemini: GeminiClient | None)
             script=state.get("webtoon_script"),
             scene_ids=state.get("scene_ids", []),
             tone_analysis=state.get("tone_analysis"),
+            quality_signals=quality_signals,
             gemini=gemini,
         )
     
@@ -322,7 +461,8 @@ def _node_blind_test_critic(state: StoryBuildState, gemini: GeminiClient | None)
         }
 
     progress = {
-        "progress": {"current_node": "BlindTestCritic", "message": "Analyzing blind test results...", "step": 10},
+        "optimized": True,
+        "progress": {"current_node": "BlindTestCritic", "message": "Analyzing blind test results...", "step": 11},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -346,138 +486,150 @@ def _node_persist_story_bundle(state: StoryBuildState) -> dict[str, Any]:
     story_id = state.get("story_id")
     if story_id is None:
         raise ValueError("story_id is required to persist scenes")
-
-    with session_scope() as db:
-        allow_append = bool(state.get("allow_append"))
-        existing_scenes = list(db.execute(select(Scene).where(Scene.story_id == story_id)).scalars().all())
-        if existing_scenes and not allow_append:
-            if state.get("retry_count", 0) > 0:
-                # Clear old scenes to make room for the optimized/corrected version
-                for scene in existing_scenes:
-                    db.delete(scene)
-                db.flush()
-            else:
-                raise ValueError("story already has scenes; set allow_append to true to append more")
-
-        story = db.get(Story, story_id)
-        if story is None:
-            raise ValueError("story not found")
-
-        existing_chars = list(
-            db.execute(select(Character).where(Character.project_id == story.project_id)).scalars().all()
+    with log_context(node_name="persist_story_bundle"):
+        logger.info(
+            "story_build persist bundle started (story_id=%s, scenes=%s, characters=%s)",
+            story_id,
+            len(state.get("scenes", [])),
+            len(state.get("characters", [])),
         )
-        existing_by_name = {c.name.strip().lower(): c for c in existing_chars if c.name}
-        existing_codes = {c.canonical_code for c in existing_chars if c.canonical_code}
-        existing_story_links = {
-            row[0]
-            for row in db.execute(
-                select(StoryCharacter.character_id).where(StoryCharacter.story_id == story_id)
-            ).all()
-        }
 
-    def _code_from_index(index: int) -> str:
-        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        result = ""
-        while True:
-            index, rem = divmod(index, 26)
-            result = alphabet[rem] + result
-            if index == 0:
-                break
-            index -= 1
-        return f"CHAR_{result}"
+        with session_scope() as db:
+            allow_append = bool(state.get("allow_append"))
+            existing_scenes = list(db.execute(select(Scene).where(Scene.story_id == story_id)).scalars().all())
+            if existing_scenes and not allow_append:
+                if state.get("retry_count", 0) > 0:
+                    for scene in existing_scenes:
+                        db.delete(scene)
+                    db.flush()
+                else:
+                    raise ValueError("story already has scenes; set allow_append to true to append more")
 
-    def _next_character_code() -> str:
-        idx = 0
-        while True:
-            code = _code_from_index(idx)
-            if code not in existing_codes:
-                existing_codes.add(code)
-                return code
-            idx += 1
+            story = db.get(Story, story_id)
+            if story is None:
+                raise ValueError("story not found")
 
-    character_ids: list[str] = []
-    for profile in state.get("characters", []):
-        name = str(profile.get("name") or "").strip()
-        if not name:
-            continue
-        key = name.lower()
-        appearance = profile.get("appearance") if isinstance(profile.get("appearance"), dict) else None
-        hair_description = profile.get("hair_description")
-        if hair_description is None and appearance:
-            hair_description = appearance.get("hair")
-        base_outfit = profile.get("base_outfit") or profile.get("outfit")
-        if key in existing_by_name:
-            existing_char = existing_by_name[key]
-            if not existing_char.canonical_code:
-                existing_char.canonical_code = _next_character_code()
-            if profile.get("gender") and not existing_char.gender:
-                existing_char.gender = profile.get("gender")
-            if profile.get("age_range") and not existing_char.age_range:
-                existing_char.age_range = profile.get("age_range")
-            if appearance and not existing_char.appearance:
-                existing_char.appearance = appearance
-            if profile.get("identity_line") and not existing_char.identity_line:
-                existing_char.identity_line = profile.get("identity_line")
-            if hair_description and not existing_char.hair_description:
-                existing_char.hair_description = hair_description
-            if base_outfit and not existing_char.base_outfit:
-                existing_char.base_outfit = base_outfit
-            if existing_char.character_id not in existing_story_links:
+            existing_chars = list(
+                db.execute(select(Character).where(Character.project_id == story.project_id)).scalars().all()
+            )
+            existing_by_name = {c.name.strip().lower(): c for c in existing_chars if c.name}
+            existing_codes = {c.canonical_code for c in existing_chars if c.canonical_code}
+            existing_story_links = {
+                row[0]
+                for row in db.execute(
+                    select(StoryCharacter.character_id).where(StoryCharacter.story_id == story_id)
+                ).all()
+            }
+
+            def _code_from_index(index: int) -> str:
+                alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                result = ""
+                while True:
+                    index, rem = divmod(index, 26)
+                    result = alphabet[rem] + result
+                    if index == 0:
+                        break
+                    index -= 1
+                return f"CHAR_{result}"
+
+            def _next_character_code() -> str:
+                idx = 0
+                while True:
+                    code = _code_from_index(idx)
+                    if code not in existing_codes:
+                        existing_codes.add(code)
+                        return code
+                    idx += 1
+
+            character_ids: list[str] = []
+            for profile in state.get("characters", []):
+                name = str(profile.get("name") or "").strip()
+                if not name:
+                    continue
+                key = name.lower()
+                appearance = profile.get("appearance") if isinstance(profile.get("appearance"), dict) else None
+                hair_description = profile.get("hair_description")
+                if hair_description is None and appearance:
+                    hair_description = appearance.get("hair")
+                base_outfit = profile.get("base_outfit") or profile.get("outfit")
+                if key in existing_by_name:
+                    existing_char = existing_by_name[key]
+                    if not existing_char.canonical_code:
+                        existing_char.canonical_code = _next_character_code()
+                    if profile.get("gender") and not existing_char.gender:
+                        existing_char.gender = profile.get("gender")
+                    if profile.get("age_range") and not existing_char.age_range:
+                        existing_char.age_range = profile.get("age_range")
+                    if appearance and not existing_char.appearance:
+                        existing_char.appearance = appearance
+                    if profile.get("identity_line") and not existing_char.identity_line:
+                        existing_char.identity_line = profile.get("identity_line")
+                    if hair_description and not existing_char.hair_description:
+                        existing_char.hair_description = hair_description
+                    if base_outfit and not existing_char.base_outfit:
+                        existing_char.base_outfit = base_outfit
+                    if existing_char.character_id not in existing_story_links:
+                        db.add(
+                            StoryCharacter(
+                                story_id=story_id,
+                                character_id=existing_char.character_id,
+                                narrative_description=profile.get("description"),
+                            )
+                        )
+                        existing_story_links.add(existing_char.character_id)
+                    character_ids.append(str(existing_char.character_id))
+                    continue
+                character = Character(
+                    project_id=story.project_id,
+                    canonical_code=_next_character_code(),
+                    name=name,
+                    description=profile.get("description"),
+                    role=profile.get("role") or "secondary",
+                    gender=profile.get("gender"),
+                    age_range=profile.get("age_range"),
+                    appearance=appearance,
+                    hair_description=hair_description,
+                    base_outfit=base_outfit,
+                    identity_line=profile.get("identity_line"),
+                )
+                db.add(character)
+                db.flush()
                 db.add(
                     StoryCharacter(
                         story_id=story_id,
-                        character_id=existing_char.character_id,
+                        character_id=character.character_id,
                         narrative_description=profile.get("description"),
                     )
                 )
-                existing_story_links.add(existing_char.character_id)
-            character_ids.append(str(existing_char.character_id))
-            continue
-        character = Character(
-            project_id=story.project_id,
-            canonical_code=_next_character_code(),
-            name=name,
-            description=profile.get("description"),
-            role=profile.get("role") or "secondary",
-            gender=profile.get("gender"),
-            age_range=profile.get("age_range"),
-            appearance=appearance,
-            hair_description=hair_description,
-            base_outfit=base_outfit,
-            identity_line=profile.get("identity_line"),
-        )
-        db.add(character)
-        db.flush()
-        db.add(
-            StoryCharacter(
-                story_id=story_id,
-                character_id=character.character_id,
-                narrative_description=profile.get("description"),
-            )
-        )
-        existing_story_links.add(character.character_id)
-        character_ids.append(str(character.character_id))
+                existing_story_links.add(character.character_id)
+                character_ids.append(str(character.character_id))
 
-    scene_ids: list[str] = []
-    for scene in state.get("scenes", []):
-        row = Scene(
-            story_id=story_id,
-            source_text=scene.get("source_text") or "",
-            image_style_override=scene.get("image_style_id"),
+            scene_ids: list[str] = []
+            for scene in state.get("scenes", []):
+                row = Scene(
+                    story_id=story_id,
+                    source_text=scene.get("source_text") or "",
+                    image_style_override=scene.get("image_style_id"),
+                )
+                db.add(row)
+                db.flush()
+                scene_ids.append(str(row.scene_id))
+
+            db.commit()
+
+        progress = {
+            "scene_ids": scene_ids,
+            "character_ids": character_ids,
+            "progress": {"current_node": "PersistStoryBundle", "message": "Saving story bundle...", "step": 7},
+        }
+        _persist_progress(state, progress["progress"])
+        logger.info(
+            "story_build persist bundle completed (story_id=%s, saved_scenes=%s, saved_characters=%s)",
+            story_id,
+            len(scene_ids),
+            len(character_ids),
         )
-        db.add(row)
-        db.flush()
-        scene_ids.append(str(row.scene_id))
-
-    db.commit()
-
-    progress = {
-        "scene_ids": scene_ids,
-        "character_ids": character_ids,
-        "progress": {"current_node": "PersistStoryBundle", "message": "Saving story bundle...", "step": 6},
-    }
-    _persist_progress(state, progress["progress"])
-    return progress
+        return progress
 
 
 def _node_llm_visual_plan_compiler(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
@@ -520,7 +672,7 @@ def _node_llm_visual_plan_compiler(state: StoryBuildState, gemini: GeminiClient 
     progress = {
         "visual_plan_bundle": plans,
         "visual_plan_artifact_ids": plan_ids,
-        "progress": {"current_node": "LLMVisualPlanCompiler", "message": "Converting story to visual beats...", "step": 7},
+        "progress": {"current_node": "LLMVisualPlanCompiler", "message": "Converting story to visual beats...", "step": 8},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -602,7 +754,7 @@ def _node_per_scene_planning_loop(state: StoryBuildState, gemini: GeminiClient |
             state["progress"] = {
                 "current_node": "PerScenePlanningLoop",
                 "message": f"Planning scene {idx}/{total}...",
-                "step": 8,
+                "step": 9,
             }
             _persist_progress(state, state["progress"])
 
@@ -639,13 +791,96 @@ def _node_per_scene_planning_loop(state: StoryBuildState, gemini: GeminiClient |
 
 def _node_blind_test_runner(state: StoryBuildState, gemini: GeminiClient | None) -> dict[str, Any]:
     report_ids: list[str] = []
+    blind_scores: list[float] = []
+    rhythm_diversities: list[float] = []
+    scene_thumb_stops = 0
+    total_silent_panels = 0
+    total_panels = 0
+
+    def _safe_float(val: Any, fallback: float = 0.0) -> float:
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return fallback
+
     with session_scope() as db:
+        svc = ArtifactService(db)
         for scene_id in state.get("scene_ids", []):
-            artifact = nodes.run_blind_test_evaluator(db, uuid.UUID(scene_id), gemini=gemini)
+            scene_uuid = uuid.UUID(scene_id)
+            artifact = nodes.run_blind_test_evaluator(db, scene_uuid, gemini=gemini)
             report_ids.append(str(artifact.artifact_id))
+            blind_scores.append(_safe_float((artifact.payload or {}).get("score"), 0.0))
+
+            rhythm_art = svc.get_latest_artifact(scene_uuid, nodes.ARTIFACT_VERTICAL_RHYTHM)
+            if rhythm_art and isinstance(rhythm_art.payload, dict):
+                rhythm_map = list(rhythm_art.payload.get("rhythm_map") or [])
+                if rhythm_map:
+                    spacings = [
+                        int(item.get("gutter_spacing_px"))
+                        for item in rhythm_map
+                        if isinstance(item, dict) and item.get("gutter_spacing_px") is not None
+                    ]
+                    if spacings:
+                        rhythm_diversities.append(len(set(spacings)) / max(1, len(spacings)))
+                    if any(bool(item.get("is_thumb_stop")) for item in rhythm_map if isinstance(item, dict)):
+                        scene_thumb_stops += 1
+
+            semantics_art = svc.get_latest_artifact(scene_uuid, nodes.ARTIFACT_PANEL_SEMANTICS)
+            if semantics_art and isinstance(semantics_art.payload, dict):
+                sem_panels = list(semantics_art.payload.get("panels") or [])
+                total_panels += len(sem_panels)
+                for panel in sem_panels:
+                    if not isinstance(panel, dict):
+                        continue
+                    dialogue = panel.get("dialogue")
+                    is_silent = False
+                    if dialogue is None:
+                        is_silent = True
+                    elif isinstance(dialogue, str):
+                        is_silent = not dialogue.strip()
+                    elif isinstance(dialogue, list):
+                        is_silent = len([d for d in dialogue if str(d).strip()]) == 0
+                    else:
+                        is_silent = True
+                    if is_silent:
+                        total_silent_panels += 1
+
+    avg_blind_score = (sum(blind_scores) / len(blind_scores)) if blind_scores else 0.0
+    avg_rhythm_diversity = (sum(rhythm_diversities) / len(rhythm_diversities)) if rhythm_diversities else 0.0
+    silent_ratio = (total_silent_panels / total_panels) if total_panels else 0.0
+    thumb_stop_ratio = (scene_thumb_stops / len(state.get("scene_ids", []))) if state.get("scene_ids") else 0.0
+    # Best around 0.25 silent ratio, but allow a wide practical range.
+    silence_balance_score = max(0.0, 1.0 - min(1.0, abs(silent_ratio - 0.25) / 0.25))
+    rhythm_score = avg_rhythm_diversity if rhythm_diversities else 0.5
+    silence_score = silence_balance_score if total_panels else 0.5
+    quality_composite = (
+        (avg_blind_score * 0.5)
+        + (rhythm_score * 0.2)
+        + (silence_score * 0.2)
+        + (thumb_stop_ratio * 0.1)
+    )
+    blind_ok = avg_blind_score >= 0.3 if blind_scores else True
+    rhythm_ok = avg_rhythm_diversity >= 0.2 if rhythm_diversities else True
+    silence_ok = silent_ratio >= 0.1 if total_panels else True
+    quality_signals = {
+        "avg_blind_score": round(avg_blind_score, 3),
+        "avg_rhythm_diversity": round(avg_rhythm_diversity, 3),
+        "silent_panel_ratio": round(silent_ratio, 3),
+        "thumb_stop_scene_ratio": round(thumb_stop_ratio, 3),
+        "silence_balance_score": round(silence_balance_score, 3),
+        "quality_composite": round(quality_composite, 3),
+        "quality_gate_passed": bool(
+            blind_ok
+            and quality_composite >= 0.35
+            and silence_ok
+            and rhythm_ok
+        ),
+    }
+
     progress = {
         "blind_test_report_ids": report_ids,
-        "progress": {"current_node": "BlindTestRunner", "message": "Running blind tests...", "step": 9},
+        "quality_signals": quality_signals,
+        "progress": {"current_node": "BlindTestRunner", "message": "Running blind tests...", "step": 10},
     }
     _persist_progress(state, progress["progress"])
     return progress
@@ -661,31 +896,40 @@ def _summarize_text(text: str, max_words: int = 32) -> str:
 def build_story_build_graph(planning_mode: str = "full", gemini: GeminiClient | None = None):
     graph = StateGraph(StoryBuildState)
     graph.add_node("validate_inputs", _node_validate_inputs)
+    graph.add_node("story_populator", partial(_node_story_populator, gemini=gemini))
     graph.add_node("llm_character_extractor", partial(_node_llm_character_extractor, gemini=gemini))
     graph.add_node("llm_character_normalizer", partial(_node_llm_character_normalizer, gemini=gemini))
     graph.add_node("webtoon_script_writer", partial(_node_webtoon_script_writer, gemini=gemini))
+    graph.add_node("scene_splitter", _node_scene_splitter)
     graph.add_node("dialogue_minimizer", partial(_node_dialogue_minimizer, gemini=gemini))
     graph.add_node("silent_panel_classifier", _node_silent_panel_classifier)
     graph.add_node("studio_director", partial(_node_studio_director, gemini=gemini))
     graph.add_node("persist_story_bundle", _node_persist_story_bundle)
 
     graph.set_entry_point("validate_inputs")
-    graph.add_edge("validate_inputs", "llm_character_extractor")
+    graph.add_edge("validate_inputs", "story_populator")
+    graph.add_edge("story_populator", "llm_character_extractor")
     graph.add_edge("llm_character_extractor", "llm_character_normalizer")
     graph.add_edge("llm_character_normalizer", "webtoon_script_writer")
-    graph.add_edge("webtoon_script_writer", "dialogue_minimizer")
-    graph.add_edge("dialogue_minimizer", "silent_panel_classifier")
-    graph.add_edge("silent_panel_classifier", "studio_director")
-    graph.add_edge("studio_director", "persist_story_bundle")
-        
-    graph.add_conditional_edges(
-        "studio_director",
-        _router_optimization,
-        {
-            "webtoon_script_writer": "webtoon_script_writer",
-            "persist_story_bundle": "persist_story_bundle",
-        },
-    )
+
+    if planning_mode == "full":
+        graph.add_edge("webtoon_script_writer", "dialogue_minimizer")
+        graph.add_edge("dialogue_minimizer", "silent_panel_classifier")
+        graph.add_edge("silent_panel_classifier", "studio_director")
+        graph.add_edge("studio_director", "persist_story_bundle")
+        graph.add_conditional_edges(
+            "studio_director",
+            _router_optimization,
+            {
+                "webtoon_script_writer": "webtoon_script_writer",
+                "persist_story_bundle": "persist_story_bundle",
+            },
+        )
+    else:
+        # Fast path for story blueprint: avoid extra LLM optimization loops.
+        graph.add_edge("webtoon_script_writer", "scene_splitter")
+        graph.add_edge("scene_splitter", "persist_story_bundle")
+
     graph.add_edge("persist_story_bundle", "llm_visual_plan_compiler") if planning_mode == "full" else graph.add_edge("persist_story_bundle", END)
 
     if planning_mode == "full":

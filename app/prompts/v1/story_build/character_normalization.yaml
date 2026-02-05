@@ -12,6 +12,10 @@ prompt_character_normalization: |
   Use context clues from the story to infer appearance. Focus on OBJECTIVE PHYSICAL CHARACTERISTICS ONLY.
 
   **CRITICAL CONSTRAINT: Focus on objective morphological descriptions only. DO NOT include style-specific keywords.**
+  **DEMOGRAPHIC INFERENCE RULE:**
+  - Infer a practical gender presentation (male or female) when not explicit, based on narrative voice and genre conventions.
+  - Keep age_range and appearance internally consistent for rendering.
+  - Keep ethnicity/cultural labels only when explicitly supported by story text.
 
   **FORBIDDEN KEYWORDS (do not use):**
   - Style terms: manhwa, webtoon, aesthetic, K-drama, Korean male lead, romance female lead, Naver webtoon
@@ -46,7 +50,7 @@ prompt_character_normalization: |
   - elderly (60+): Smile lines, grey hair, 155-165cm, gentle posture
 
   For each character, provide:
-  - gender: male|female|unknown
+  - gender: male|female
   - age_range: child|teen|young_adult|adult|middle_aged|elderly
   - appearance:
     - hair: color, style, length (be specific: "soft side-swept black bangs" not just "black hair")
@@ -56,7 +60,7 @@ prompt_character_normalization: |
   - identity_line: Single comprehensive line for artist (150+ characters, NO STYLE KEYWORDS)
 
   **IDENTITY LINE FORMAT (Style-Neutral):**
-  "[age_range] [ethnicity] [gender], [hair description], [face/expression], [build/height], [typical outfit]"
+  "[age_range] [ethnicity-or-unspecified] [gender-or-unknown], [hair description], [face/expression], [build/height], [typical outfit]"
 
   **GOOD EXAMPLE (Style-Neutral):**
   "early_20s Korean female, long flowing black hair with soft waves, large expressive eyes with delicate lashes, tall slender figure 168cm with long legs, cream knit sweater and high-waisted jeans"

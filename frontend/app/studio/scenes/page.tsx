@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -9,11 +9,11 @@ import {
   fetchStories,
   fetchStory,
   fetchScenes,
+  fetchSceneStatus,
   fetchSceneArtifacts,
   fetchSceneRenders,
-
-
-  generateSceneFullAsync,
+  planSceneAsync,
+  generateSceneRenderAsync,
   fetchJob
 } from "@/lib/api/queries";
 import type { Scene, Artifact } from "@/lib/api/types";
@@ -31,57 +31,76 @@ export default function ScenesPage() {
   const [promptOverride, setPromptOverride] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [activeJobs, setActiveJobs] = useState<Record<string, string>>({});
+  const [planningJobs, setPlanningJobs] = useState<Record<string, string>>({});
+  const [planningStatusByScene, setPlanningStatusByScene] = useState<Record<string, boolean>>({});
+  const plannedSceneIdsRef = useRef<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   // Global polling for active jobs
   useEffect(() => {
-    const jobIds = Object.values(activeJobs);
-    if (jobIds.length === 0) return;
+    const renderEntries = Object.entries(activeJobs).map(([sceneId, jobId]) => ({
+      sceneId,
+      jobId,
+      kind: "render" as const
+    }));
+    const planEntries = Object.entries(planningJobs).map(([sceneId, jobId]) => ({
+      sceneId,
+      jobId,
+      kind: "plan" as const
+    }));
+    const entries = [...renderEntries, ...planEntries];
+    if (entries.length === 0) return;
 
     const interval = setInterval(async () => {
-      // Create a copy to modify
-      let updatedJobs = { ...activeJobs };
+      let updatedRenderJobs = { ...activeJobs };
+      let updatedPlanJobs = { ...planningJobs };
       let changed = false;
 
       await Promise.all(
-        Object.entries(activeJobs).map(async ([sceneId, jobId]) => {
+        entries.map(async ({ sceneId, jobId, kind }) => {
           try {
             const status = await fetchJob(jobId);
             if (["completed", "succeeded", "failed", "cancelled"].includes(status.status)) {
-              // Job finished
-              delete updatedJobs[sceneId];
-              changed = true;
-              
-              // Show error if job failed
-              if (status.status === "failed" && status.error) {
-                console.error(`Scene generation failed for ${sceneId}:`, status.error);
-                alert(`Scene generation failed: ${status.error}`);
+              if (kind === "render") {
+                delete updatedRenderJobs[sceneId];
+              } else {
+                delete updatedPlanJobs[sceneId];
               }
-              
-              // Invalidate queries for this scene
-              queryClient.invalidateQueries({ queryKey: ["renders", sceneId] });
+              changed = true;
+
+              if (status.status === "failed" && status.error) {
+                console.error(`${kind} job failed for ${sceneId}:`, status.error);
+                alert(`Scene ${kind} failed: ${status.error}`);
+              }
+
               queryClient.invalidateQueries({ queryKey: ["artifacts", sceneId] });
+              if (kind === "render") {
+                queryClient.invalidateQueries({ queryKey: ["renders", sceneId] });
+              } else {
+                setPlanningStatusByScene((prev) => ({ ...prev, [sceneId]: status.status !== "failed" }));
+              }
             }
           } catch (e) {
             console.error(`Failed to poll job ${jobId}`, e);
-            // If checking fails repeatedly, maybe remove it? For now, keep trying.
           }
         })
       );
 
       if (changed) {
-        setActiveJobs(updatedJobs);
-        // If we were generating all and now jobs are empty, assuming we are done?
-        // But activeJobs might be empty if all finished. 
-        // We set isGeneratingAll to false in handleGenerateAll finally block anyway.
+        setActiveJobs(updatedRenderJobs);
+        setPlanningJobs(updatedPlanJobs);
       }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [activeJobs, queryClient]);
+  }, [activeJobs, planningJobs, queryClient]);
 
   const handleJobStarted = (sceneId: string, jobId: string) => {
     setActiveJobs((prev) => ({ ...prev, [sceneId]: jobId }));
+  };
+
+  const handlePlanJobStarted = (sceneId: string, jobId: string) => {
+    setPlanningJobs((prev) => ({ ...prev, [sceneId]: jobId }));
   };
 
   const handleGenerateAll = async () => {
@@ -89,17 +108,14 @@ export default function ScenesPage() {
     if (!confirm("This will regenerate images for ALL scenes in the story. Continue?")) return;
     setIsGeneratingAll(true);
     
-    // Default values if not specified
     const styleId = storyQuery.data?.default_image_style ?? "default";
-    const panelCount = 3; // Maximum allowed panels per scene
 
     try {
       const promises = scenesQuery.data.map(async (scene) => {
         try {
-          const res = await generateSceneFullAsync({
+          const res = await generateSceneRenderAsync({
             sceneId: scene.scene_id,
-            styleId: scene.image_style_override ?? styleId,
-            panelCount: panelCount
+            styleId: scene.image_style_override ?? styleId
           });
           handleJobStarted(scene.scene_id, res.job_id);
         } catch (e) {
@@ -157,6 +173,48 @@ export default function ScenesPage() {
   }, [storyId]);
 
   useEffect(() => {
+    plannedSceneIdsRef.current = new Set();
+    setPlanningJobs({});
+    setPlanningStatusByScene({});
+  }, [storyId]);
+
+  useEffect(() => {
+    if (!storyId || !scenesQuery.data || scenesQuery.data.length === 0) return;
+    let cancelled = false;
+
+    const runPlanning = async () => {
+      for (const scene of scenesQuery.data) {
+        if (cancelled) return;
+        if (planningJobs[scene.scene_id]) continue;
+        if (plannedSceneIdsRef.current.has(scene.scene_id)) continue;
+
+        try {
+          const status = await fetchSceneStatus(scene.scene_id);
+          if (cancelled) return;
+          plannedSceneIdsRef.current.add(scene.scene_id);
+          setPlanningStatusByScene((prev) => ({
+            ...prev,
+            [scene.scene_id]: status.planning_complete
+          }));
+
+          if (!status.planning_complete) {
+            const job = await planSceneAsync({ sceneId: scene.scene_id, panelCount: 3 });
+            if (cancelled) return;
+            handlePlanJobStarted(scene.scene_id, job.job_id);
+          }
+        } catch (e) {
+          console.error(`Failed to check planning status for ${scene.scene_id}`, e);
+        }
+      }
+    };
+
+    runPlanning();
+    return () => {
+      cancelled = true;
+    };
+  }, [storyId, scenesQuery.data, planningJobs]);
+
+  useEffect(() => {
     if (!scenesQuery.data || scenesQuery.data.length === 0) return;
     const storageKey = storyId ? `lastSceneId:${storyId}` : "";
     const storedSceneId = storageKey ? window.localStorage.getItem(storageKey) : null;
@@ -178,6 +236,16 @@ export default function ScenesPage() {
     () => scenesQuery.data?.find((scene) => scene.scene_id === selectedSceneId),
     [scenesQuery.data, selectedSceneId]
   );
+
+  const planningSummary = useMemo(() => {
+    const total = scenesQuery.data?.length ?? 0;
+    if (total === 0) {
+      return { total: 0, done: 0, inProgress: false };
+    }
+    const done = scenesQuery.data?.filter((scene) => planningStatusByScene[scene.scene_id]).length ?? 0;
+    const inProgress = Object.keys(planningJobs).length > 0;
+    return { total, done, inProgress };
+  }, [scenesQuery.data, planningStatusByScene, planningJobs]);
 
   if (!storyId) {
     return (
@@ -269,6 +337,12 @@ export default function ScenesPage() {
         <div className="mt-8 grid gap-6 lg:grid-cols-[260px,1fr,320px]">
           <aside className="flex flex-col gap-2">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Scenes</p>
+            {planningSummary.total > 0 && (planningSummary.inProgress || planningSummary.done < planningSummary.total) && (
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-[11px] text-indigo-700">
+                Planning scenes: {planningSummary.done}/{planningSummary.total}
+                {planningSummary.inProgress ? " (in progress)" : ""}
+              </div>
+            )}
             {scenesQuery.isLoading && (
               <div className="text-sm text-slate-500">Loading scenes...</div>
             )}
@@ -291,6 +365,13 @@ export default function ScenesPage() {
                 <p className="mt-0.5 text-xs text-slate-500 line-clamp-2">
                   {scene.source_text}
                 </p>
+                {planningJobs[scene.scene_id] && (
+                  <p className="mt-1 text-[11px] text-indigo-500">Planning...</p>
+                )}
+                {!planningJobs[scene.scene_id] &&
+                  planningStatusByScene[scene.scene_id] === false && (
+                    <p className="mt-1 text-[11px] text-amber-600">Planning queued</p>
+                  )}
               </button>
             ))}
           </aside>
@@ -305,7 +386,9 @@ export default function ScenesPage() {
                 imageStyle={storyQuery.data?.default_image_style}
                 promptOverride={promptOverride}
                 activeJobId={activeJobs[selectedScene.scene_id]}
+                planningJobId={planningJobs[selectedScene.scene_id]}
                 onJobStarted={handleJobStarted}
+                onPlanJobStarted={handlePlanJobStarted}
               />
             )}
           </div>
@@ -324,12 +407,11 @@ export default function ScenesPage() {
 
         {scenesQuery.data && scenesQuery.data.length > 0 && (
           <div className="mt-8 pt-6 border-t border-slate-200">
-            <Link
-              href="/studio/dialogue"
-              className="btn-primary w-full py-3 text-base text-center block"
-            >
-              Proceed to Dialogue Editor
-            </Link>
+            <ProceedToDialogueButton
+              scenes={scenesQuery.data}
+              activeJobs={activeJobs}
+              isGeneratingAll={isGeneratingAll}
+            />
             <p className="mt-3 text-xs text-slate-500 text-center">
               Next: Add dialogue bubbles to your scene images
             </p>
@@ -345,13 +427,17 @@ function SceneDetail({
   imageStyle,
   promptOverride,
   activeJobId,
-  onJobStarted
+  planningJobId,
+  onJobStarted,
+  onPlanJobStarted
 }: {
   scene: Scene;
   imageStyle?: string;
   promptOverride?: string | null;
   activeJobId?: string;
+  planningJobId?: string;
   onJobStarted: (sceneId: string, jobId: string) => void;
+  onPlanJobStarted: (sceneId: string, jobId: string) => void;
 }) {
   const queryClient = useQueryClient();
   const [isStarting, setIsStarting] = useState(false);
@@ -360,6 +446,7 @@ function SceneDetail({
   
   // Derived state from prop
   const isGenerating = !!activeJobId;
+  const isPlanning = !!planningJobId;
 
   const [zoom, setZoom] = useState(1);
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
@@ -388,7 +475,7 @@ function SceneDetail({
   }, [scene.scene_id]);
 
   const renderMutation = useMutation({
-    mutationFn: generateSceneFullAsync,
+    mutationFn: generateSceneRenderAsync,
     onSuccess: (data) => {
       onJobStarted(scene.scene_id, data.job_id);
       setIsStarting(false);
@@ -397,6 +484,16 @@ function SceneDetail({
     onError: (err) => {
       setError(err instanceof Error ? err.message : "Generation failed");
       setIsStarting(false);
+    }
+  });
+
+  const planMutation = useMutation({
+    mutationFn: planSceneAsync,
+    onSuccess: (data) => {
+      onPlanJobStarted(scene.scene_id, data.job_id);
+    },
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : "Planning failed");
     }
   });
 
@@ -419,6 +516,10 @@ function SceneDetail({
   const hasSemantics = artifactsQuery.data
     ? !!getLatestArtifact(artifactsQuery.data, "panel_semantics")
     : false;
+  const hasLayout = artifactsQuery.data
+    ? !!getLatestArtifact(artifactsQuery.data, "layout_template")
+    : false;
+  const planningComplete = hasSemantics && hasLayout;
   const qcReport = artifactsQuery.data
     ? getLatestArtifact(artifactsQuery.data, "qc_report")
     : null;
@@ -434,6 +535,10 @@ function SceneDetail({
 
   const handleGenerate = async () => {
     setError("");
+    if (!planningComplete) {
+      setError("Scene planning is not ready yet. Please wait for planning to finish.");
+      return;
+    }
     setIsStarting(true);
     const normalizedPromptOverride = promptOverride?.trim()
       ? promptOverride.trim()
@@ -441,9 +546,21 @@ function SceneDetail({
     try {
       await renderMutation.mutateAsync({
         sceneId: scene.scene_id,
-        panelCount: 3,
         styleId: scene.image_style_override ?? imageStyle ?? "default",
-        promptOverride: normalizedPromptOverride
+        promptOverride: normalizedPromptOverride,
+        enforceQc: false
+      });
+    } catch {
+      // Error handled in mutation
+    }
+  };
+
+  const handlePlan = async () => {
+    setError("");
+    try {
+      await planMutation.mutateAsync({
+        sceneId: scene.scene_id,
+        panelCount: 3
       });
     } catch {
       // Error handled in mutation
@@ -501,23 +618,40 @@ function SceneDetail({
         <div>
           <h3 className="text-lg font-semibold text-ink">Scene Image</h3>
           <p className="text-xs text-slate-500">
-            {hasSemantics
+            {planningComplete
               ? "Scene planning ready."
-              : "Scene planning not complete. This was generated during story creation."}
+              : isPlanning
+                ? "Scene planning in progress."
+                : "Scene planning not complete yet."}
           </p>
         </div>
         <button
           className="btn-primary text-sm"
           onClick={handleGenerate}
-          disabled={isGenerating || isStarting}
+          disabled={isGenerating || isStarting || isPlanning || !planningComplete}
         >
-          {isGenerating || isStarting
-            ? "Generating..."
-            : imageUrl
-              ? "Generate Another"
-              : "Generate Image"}
+          {isPlanning
+            ? "Planning..."
+            : isGenerating || isStarting
+              ? "Generating..."
+              : !planningComplete
+                ? "Waiting for Planning"
+                : imageUrl
+                  ? "Generate Another"
+                  : "Generate Image"}
         </button>
       </div>
+      {!planningComplete && !isPlanning && (
+        <div className="mt-2">
+          <button
+            className="btn-ghost text-xs"
+            onClick={handlePlan}
+            disabled={planMutation.isPending}
+          >
+            {planMutation.isPending ? "Planning..." : "Retry Planning"}
+          </button>
+        </div>
+      )}
 
       <div className="mt-6 flex items-center justify-center rounded-2xl bg-white/80 p-4 shadow-soft">
         <div className="w-full">
@@ -556,9 +690,11 @@ function SceneDetail({
           ) : (
             <div className="flex h-[520px] w-full items-center justify-center rounded-xl bg-slate-100 text-slate-400">
               {imageLoadError ||
-                (isGenerating
-                  ? "Generating image... This can take a minute."
-                  : "No scene image yet. Click Generate Image to run planning + render.")}
+                (isPlanning
+                  ? "Planning scene... This can take a minute."
+                  : isGenerating
+                    ? "Generating image... This can take a minute."
+                    : "No scene image yet. Planning runs on entry; generate once ready.")}
             </div>
           )}
         </div>
@@ -609,134 +745,115 @@ function SceneDetail({
             Previous versions ({rendersQuery.data.length})
           </p>
           <div className="flex gap-2 overflow-x-auto">
-            {rendersQuery.data.slice(1, 5).map((render) => {
+            {[...rendersQuery.data]
+              .sort((a, b) => b.version - a.version)
+              .slice(1, 5)
+              .map((render) => {
               const url = render.payload?.image_url
                 ? getImageUrl(String(render.payload.image_url))
-                : null;
-              if (!url) return null;
-              return (
-                <button
-                  key={render.artifact_id}
-                  type="button"
-                  className="group"
-                  onClick={() => {
-                    const prompt =
-                      typeof render.payload?.prompt === "string"
-                        ? render.payload.prompt
-                        : null;
-                    setSelectedPrompt(prompt);
-
-                    setSelectedPromptVersion(render.version);
-                    setSelectedArtifactId(render.artifact_id);
-                  }}
-                >
-                  <img
-                    src={url}
-                    alt={`Version ${render.version}`}
-                    className="w-16 h-28 rounded object-cover opacity-60 hover:opacity-100 cursor-pointer"
-                  />
-                </button>
-              );
-            })}
-          </div>
-          {selectedPromptVersion && (
-            <div className="mt-3 rounded-xl border border-slate-200 bg-white/80 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-ink">
-                  Prompt for version {selectedPromptVersion}
-                </p>
-                <button
-                  type="button"
-                  className="text-[11px] font-semibold text-slate-400 hover:text-slate-500"
-                  onClick={() => {
-                    setSelectedPrompt(null);
-
-                    setSelectedPromptVersion(null);
-                    setSelectedArtifactId(null);
-                  }}
-                >
-                  Hide
-                </button>
-              </div>
-              {selectedPrompt ? (
-                <p className="mt-2 text-[11px] text-slate-600 whitespace-pre-wrap">
-                  {selectedPrompt}
-                </p>
-              ) : (
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Prompt not available for this version.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ScenePromptPanel({
-  sceneId,
-  onPromptOverrideChange
+function ProceedToDialogueButton({
+  scenes,
+  activeJobs,
+  isGeneratingAll
 }: {
-  sceneId: string;
-  onPromptOverrideChange: (prompt: string | null) => void;
+  scenes: Scene[];
+  activeJobs: Record<string, string>;
+  isGeneratingAll: boolean;
 }) {
-  const artifactsQuery = useQuery({
-    queryKey: ["artifacts", sceneId],
-    queryFn: () => fetchSceneArtifacts(sceneId),
-    enabled: sceneId.length > 0
+  // Use useQuery to fetch render data for all scenes
+  // This ensures we get real-time updates when renders are generated
+  const renderQueries = useQuery({
+    queryKey: ["all-scene-renders", scenes.map(s => s.scene_id).join(",")],
+    queryFn: async () => {
+      const results = await Promise.all(
+        scenes.map(async (scene) => {
+          try {
+            const renders = await fetchSceneRenders(scene.scene_id);
+            const artifacts = await fetchSceneArtifacts(scene.scene_id);
+            
+            const latestRenderFromRenders = renders
+              ? getLatestArtifact(renders, "render_result")
+              : null;
+            const latestRenderFromArtifacts = artifacts
+              ? getLatestArtifact(artifacts, "render_result")
+              : null;
+            const latestRender = latestRenderFromRenders ?? latestRenderFromArtifacts;
+            
+            return {
+              sceneId: scene.scene_id,
+              hasRender: !!latestRender,
+              isGenerating: !!activeJobs[scene.scene_id]
+            };
+          } catch (error) {
+            console.error(`Error checking render for scene ${scene.scene_id}:`, error);
+            return {
+              sceneId: scene.scene_id,
+              hasRender: false,
+              isGenerating: !!activeJobs[scene.scene_id]
+            };
+          }
+        })
+      );
+      return results;
+    },
+    enabled: scenes.length > 0,
+    refetchInterval: 3000, // Refetch every 3 seconds to catch new renders
+    staleTime: 2000
   });
-
-  const latestRenderSpec = artifactsQuery.data
-    ? getLatestArtifact(artifactsQuery.data, "render_spec")
-    : null;
-  const renderPrompt =
-    typeof latestRenderSpec?.payload?.prompt === "string"
-      ? latestRenderSpec.payload.prompt
-      : "";
-
-  const [draft, setDraft] = useState("");
-  const [isDirty, setIsDirty] = useState(false);
-
-  useEffect(() => {
-    setDraft(renderPrompt);
-    setIsDirty(false);
-    onPromptOverrideChange(null);
-  }, [sceneId, renderPrompt, onPromptOverrideChange]);
-
-  return (
-    <>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink">Scene Prompt</h3>
+  
+  const sceneRenderStatus = renderQueries.data ?? [];
+  const allScenesHaveRenders = sceneRenderStatus.length > 0 && sceneRenderStatus.every((s) => s.hasRender);
+  const anySceneGenerating = sceneRenderStatus.some((s) => s.isGenerating) || isGeneratingAll;
+  const scenesWithoutRenders = sceneRenderStatus.filter((s) => !s.hasRender);
+  
+  const isDisabled = !allScenesHaveRenders || anySceneGenerating || renderQueries.isLoading;
+  
+  let tooltipMessage = "";
+  if (renderQueries.isLoading) {
+    tooltipMessage = "Checking scene render status...";
+  } else if (anySceneGenerating) {
+    tooltipMessage = "Please wait for image generation to complete";
+  } else if (!allScenesHaveRenders) {
+    tooltipMessage = `${scenesWithoutRenders.length} scene(s) need image generation`;
+  }
+  
+  if (isDisabled) {
+    return (
+      <>
         <button
-          type="button"
-          className="text-[11px] font-semibold text-indigo-500 hover:text-indigo-600"
-          onClick={() => {
-            setDraft(renderPrompt);
-            setIsDirty(false);
-            onPromptOverrideChange(null);
-          }}
-          disabled={!renderPrompt}
+          className="btn-primary w-full py-3 text-base text-center block opacity-50 cursor-not-allowed"
+          disabled
+          title={tooltipMessage}
         >
-          Reset to auto
+          Proceed to Dialogue Editor
         </button>
-      </div>
-      <p className="mt-1 text-xs text-slate-500">Edit the prompt used to generate this scene image.</p>
-      <textarea
-        className="mt-3 h-[360px] w-full rounded-xl border border-slate-200 bg-white/80 p-3 text-xs text-slate-700 shadow-soft focus:outline-none focus:ring-2 focus:ring-indigo-200"
-        value={draft}
-        onChange={(e) => {
-          const value = e.target.value;
-          setDraft(value);
-          setIsDirty(true);
-          onPromptOverrideChange(value);
-        }}
-        placeholder="Generate an image to see the auto prompt, or type your own."
-      />
-      <p className="mt-2 text-[11px] text-slate-400">
-        {isDirty ? "Custom prompt will be used on Generate Image." : "Auto prompt loaded."}
-      </p>
-    </>
+        <p className="mt-2 text-xs text-amber-600 text-center font-medium">
+          {tooltipMessage}
+        </p>
+        {/* Debug info */}
+        {!allScenesHaveRenders && !renderQueries.isLoading && (
+          <details className="mt-2 text-xs text-slate-500">
+            <summary className="cursor-pointer">Debug: Scene render status</summary>
+            <ul className="mt-2 space-y-1">
+              {sceneRenderStatus.map((status, idx) => (
+                <li key={status.sceneId}>
+                  Scene {idx + 1}: {status.hasRender ? "✓ Has render" : "✗ No render"}
+                  {status.isGenerating && " (generating...)"}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </>
+    );
+  }
+  
+  return (
+    <Link
+      href="/studio/dialogue"
+      className="btn-primary w-full py-3 text-base text-center block"
+    >
+      Proceed to Dialogue Editor
+    </Link>
   );
 }

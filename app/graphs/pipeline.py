@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 import uuid
 from functools import partial
 from typing import Any, TypedDict
@@ -11,9 +13,12 @@ from app.graphs import nodes
 from app.db.models import Scene, Story
 from app.db.session import session_scope
 from app.core.metrics import track_graph_node
+from app.core.request_context import log_context
 from app.core.telemetry import trace_span
 from app.services.artifacts import ArtifactService
 from app.services.vertex_gemini import GeminiClient
+
+logger = logging.getLogger(__name__)
 
 
 class PlanningState(TypedDict, total=False):
@@ -273,37 +278,70 @@ def run_full_pipeline(
     gemini: GeminiClient | None = None,
 ) -> PipelineState:
     with track_graph_node("full_pipeline", "run_full_pipeline"):
-        with trace_span("graph.full_pipeline", scene_id=str(scene_id), style_id=style_id):
-            if not style_id:
-                scene = db.get(Scene, scene_id)
-                if scene is not None:
-                    story = db.get(Story, scene.story_id)
-                    style_id = scene.image_style_override or (story.default_image_style if story else None)
-            if not style_id:
-                raise ValueError("style_id is required for full generation")
+        with log_context(node_name="full_pipeline", scene_id=scene_id):
+            with trace_span("graph.full_pipeline", scene_id=str(scene_id), style_id=style_id):
+                pipeline_started = time.perf_counter()
 
-            planning_state = run_scene_planning(
-                db=db,
-                scene_id=scene_id,
-                panel_count=panel_count,
-                genre=genre,
-                gemini=gemini,
-            )
+                if not style_id:
+                    scene = db.get(Scene, scene_id)
+                    if scene is not None:
+                        story = db.get(Story, scene.story_id)
+                        style_id = scene.image_style_override or (story.default_image_style if story else None)
+                if not style_id:
+                    raise ValueError("style_id is required for full generation")
 
-            blind = nodes.run_blind_test_evaluator(db=db, scene_id=scene_id, gemini=gemini)
+                logger.info(
+                    "full_pipeline started (scene_id=%s, panel_count=%s, style_id=%s)",
+                    scene_id,
+                    panel_count,
+                    style_id,
+                )
 
-            render_state = run_scene_render(
-                db=db,
-                scene_id=scene_id,
-                style_id=style_id,
-                enforce_qc=False,
-                prompt_override=prompt_override,
-                gemini=gemini,
-            )
+                t0 = time.perf_counter()
+                planning_state = run_scene_planning(
+                    db=db,
+                    scene_id=scene_id,
+                    panel_count=panel_count,
+                    genre=genre,
+                    gemini=gemini,
+                )
+                logger.info(
+                    "full_pipeline stage completed: planning (scene_id=%s, duration_ms=%.1f)",
+                    scene_id,
+                    (time.perf_counter() - t0) * 1000,
+                )
 
-            out: PipelineState = {
-                **planning_state,
-                **render_state,
-                "blind_test_report_artifact_id": str(blind.artifact_id),
-            }
-            return out
+                t1 = time.perf_counter()
+                blind = nodes.run_blind_test_evaluator(db=db, scene_id=scene_id, gemini=gemini)
+                logger.info(
+                    "full_pipeline stage completed: blind_test (scene_id=%s, duration_ms=%.1f)",
+                    scene_id,
+                    (time.perf_counter() - t1) * 1000,
+                )
+
+                t2 = time.perf_counter()
+                render_state = run_scene_render(
+                    db=db,
+                    scene_id=scene_id,
+                    style_id=style_id,
+                    enforce_qc=False,
+                    prompt_override=prompt_override,
+                    gemini=gemini,
+                )
+                logger.info(
+                    "full_pipeline stage completed: render (scene_id=%s, duration_ms=%.1f)",
+                    scene_id,
+                    (time.perf_counter() - t2) * 1000,
+                )
+
+                out: PipelineState = {
+                    **planning_state,
+                    **render_state,
+                    "blind_test_report_artifact_id": str(blind.artifact_id),
+                }
+                logger.info(
+                    "full_pipeline succeeded (scene_id=%s, duration_ms=%.1f)",
+                    scene_id,
+                    (time.perf_counter() - pipeline_started) * 1000,
+                )
+                return out

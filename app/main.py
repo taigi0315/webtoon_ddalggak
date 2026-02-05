@@ -14,7 +14,12 @@ from app.api.v1.router import api_router
 from app.core.settings import settings
 from app.core.logging import RequestIdFilter, StructuredJsonFormatter
 from app.core.metrics import get_metrics_payload
-from app.core.request_context import reset_request_id, set_request_id
+from app.core.request_context import (
+    get_node_name,
+    get_scene_id,
+    reset_request_id,
+    set_request_id,
+)
 from app.core.telemetry import setup_telemetry
 from app.db.base import Base
 from app.db.session import get_engine, init_engine
@@ -22,6 +27,18 @@ from app.services import job_queue
 
 
 logger = logging.getLogger("app")
+
+
+def _is_polling_request(method: str, path: str) -> bool:
+    if method != "GET":
+        return False
+    if path.startswith("/v1/stories/") and path.endswith("/progress"):
+        return True
+    if path.startswith("/v1/jobs/"):
+        return True
+    if path.startswith("/v1/scenes/") and (path.endswith("/renders") or path.endswith("/artifacts")):
+        return True
+    return False
 
 
 @asynccontextmanager
@@ -37,6 +54,9 @@ async def lifespan(app: FastAPI):
     stream_handler.setFormatter(formatter)
     stream_handler.addFilter(RequestIdFilter())
     root_logger.addHandler(stream_handler)
+
+    # Reduce noisy access logs; structured request_complete logs are our source of truth.
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
     if settings.log_file:
         log_path = Path(settings.log_file)
@@ -73,6 +93,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -108,13 +130,16 @@ async def request_context_middleware(request: Request, call_next):
             raise
 
         duration_ms = (time.perf_counter() - start) * 1000
-        logger.info(
+        request_logger = logger.debug if _is_polling_request(request.method, request.url.path) else logger.info
+        request_logger(
             "request_complete",
             extra={
                 "method": request.method,
                 "path": request.url.path,
                 "status": response.status_code,
                 "duration_ms": duration_ms,
+                "node_name": get_node_name(),
+                "scene_id": get_scene_id(),
             },
         )
         response.headers["x-request-id"] = request_id

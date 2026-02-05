@@ -761,16 +761,32 @@ prompt_closure_planner: |
 
 prompt_vertical_rhythm_planner: |
   {{ system_prompt_json }}
-  Map pixel distances to dramatic weight and webtoon pacing.
+  You are a Webtoon Rhythm Planner.
+  Map vertical spacing and panel width to emotional pacing and closure complexity.
 
-  Scene Data:
+  Panel Plan:
   {{ scene_data_json }}
+
+  Transition Map (optional):
+  {{ transition_map_json }}
+
+  Closure Plan (optional):
+  {{ closure_plan_json }}
+
+  Scene Intent (optional):
+  {{ scene_intent_json }}
 
   SPACING HEURISTICS:
   - Rapid Action: 30-100px (escalation + action)
   - Standard Flow: 200-400px (default)
-  - Narrative Pause: 600-800px (high emotion > 0.7 or release)
+  - Narrative Pause: 600-800px (high emotion or reaction hold)
   - Scene Transition: 1000px+ (scene_to_scene)
+
+  DECISION RULES:
+  - If transition_type is moment_to_moment and closure difficulty is low, keep spacing tight.
+  - If closure difficulty is high, increase spacing and mark scroll_reveal=true.
+  - Emotional peaks and cliffhangers should favor 100% panel width and is_thumb_stop=true.
+  - Avoid repeating identical spacing for all panels; rhythm must breathe.
 
   OUTPUT SCHEMA:
   {
@@ -781,6 +797,66 @@ prompt_vertical_rhythm_planner: |
         "panel_width_pct": 50|60|80|100,
         "is_thumb_stop": boolean,
         "scroll_reveal": boolean
+      }
+    ]
+  }
+
+prompt_metaphor_recommender: |
+  {{ system_prompt_json }}
+  You are a Visual Metaphor Director for webtoons.
+  Recommend symbolic visual cues that externalize emotion without extra dialogue.
+
+  Metaphor Lexicon:
+  {{ lexicon_json }}
+
+  Panel Semantics:
+  {{ semantics_json }}
+
+  RULES:
+  - Use metaphors only when they clarify emotion/subtext.
+  - Prefer 0-2 metaphor insertions per scene.
+  - Do not override core action readability.
+  - If no metaphor is needed, return an empty list.
+
+  OUTPUT SCHEMA:
+  {
+    "metaphor_directions": [
+      {
+        "panel_index": integer,
+        "emotion": "string",
+        "metaphor": "string",
+        "placement": "background|foreground|overlay|environment",
+        "intensity": 0.0-1.0,
+        "reason": "string"
+      }
+    ]
+  }
+
+prompt_presence_mapper: |
+  {{ system_prompt_json }}
+  You are a Character Presence Planner.
+  Track character visibility and implication across panels to prevent continuity drift.
+
+  Scene Data:
+  {{ scene_data_json }}
+
+  RULES:
+  - Every recurring character must be either shown or intentionally implied.
+  - Mark implication type when not fully shown (off_panel_voice, shadow, object_interaction, reflection).
+  - Keep focus character continuity stable across adjacent panels.
+
+  OUTPUT SCHEMA:
+  {
+    "presence_map": [
+      {
+        "character_name": "string",
+        "panel_presence": [
+          {
+            "panel_index": integer,
+            "state": "shown|implied|absent",
+            "implication_method": "off_panel_voice|shadow|object_interaction|reflection|none"
+          }
+        ]
       }
     ]
   }

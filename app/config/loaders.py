@@ -67,6 +67,11 @@ class QcRulesV1(BaseModel):
     version: str
     closeup_ratio_max: float = Field(ge=0.0, le=1.0)
     dialogue_ratio_max: float = Field(ge=0.0, le=1.0)
+    narration_ratio_max: float = Field(default=0.35, ge=0.0, le=1.0)
+    generic_dialogue_ratio_max: float = Field(default=0.4, ge=0.0, le=1.0)
+    min_silent_panel_ratio: float = Field(default=0.15, ge=0.0, le=1.0)
+    max_words_per_panel: int = Field(default=25, ge=1)
+    max_words_per_line: int = Field(default=15, ge=1)
     repeated_framing_run_length: int = Field(ge=2)
     require_environment_on_establishing: bool = True
     environment_keywords: list[str] = Field(default_factory=list)

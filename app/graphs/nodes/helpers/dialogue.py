@@ -1,5 +1,35 @@
 import re
 
+_NARRATION_LIKE_PHRASES = (
+    " he says",
+    " she says",
+    " he whispers",
+    " she whispers",
+    " he thinks",
+    " she thinks",
+    " he stares",
+    " she stares",
+    " he looks",
+    " she looks",
+    " he walks",
+    " she walks",
+    " he steps",
+    " she steps",
+    "as if",
+    "suddenly",
+    "meanwhile",
+)
+
+_GENERIC_DIALOGUE_PATTERNS = (
+    "as you know",
+    "let me explain",
+    "in other words",
+    "we need to",
+    "i cannot believe this is happening",
+    "this changes everything",
+    "i have a bad feeling about this",
+)
+
 
 def _extract_dialogue_lines(text: str) -> list[str]:
     lines = []
@@ -40,31 +70,24 @@ def _normalize_dialogue_script(raw: dict | None, panel_ids: list[int]) -> dict:
 
     def _is_narration_like(text: str) -> bool:
         lowered = text.lower()
-        return any(
-            phrase in lowered
-            for phrase in (
-                " he says",
-                " she says",
-                " he whispers",
-                " she whispers",
-                " he thinks",
-                " she thinks",
-                " he stares",
-                " she stares",
-                " he looks",
-                " she looks",
-                " he walks",
-                " she walks",
-                " he steps",
-                " she steps",
-            )
-        )
+        return any(phrase in lowered for phrase in _NARRATION_LIKE_PHRASES)
+
+    def _is_generic_dialogue(text: str) -> bool:
+        lowered = text.lower()
+        return any(p in lowered for p in _GENERIC_DIALOGUE_PATTERNS)
+
+    def _trim_words(text: str, limit: int = 15) -> str:
+        words = text.split()
+        if len(words) <= limit:
+            return text
+        return " ".join(words[:limit]).rstrip(" ,.;:") + "..."
 
     for panel_id in panel_ids:
         panel = panel_map.get(panel_id, {"panel_id": panel_id, "lines": [], "notes": None})
         lines = panel.get("lines")
         cleaned_lines = []
         caption_used = False
+        seen_texts: set[str] = set()
         if isinstance(lines, list):
             for line in lines:
                 if not isinstance(line, dict):
@@ -78,11 +101,18 @@ def _normalize_dialogue_script(raw: dict | None, panel_ids: list[int]) -> dict:
                     line_type = "speech"
                 if _is_narration_like(text) and line_type in {"speech", "thought"}:
                     continue
+                if _is_generic_dialogue(text) and line_type in {"speech", "thought"}:
+                    continue
                 if line_type == "caption":
                     if caption_used:
                         continue
                     caption_used = True
-                cleaned_lines.append({"speaker": speaker, "type": line_type, "text": text})
+                normalized_text = _trim_words(text, 15 if line_type in {"speech", "thought"} else 18)
+                dedupe_key = f"{line_type}:{normalized_text.lower()}"
+                if dedupe_key in seen_texts:
+                    continue
+                seen_texts.add(dedupe_key)
+                cleaned_lines.append({"speaker": speaker, "type": line_type, "text": normalized_text})
                 if len(cleaned_lines) >= 3:
                     break
         result_panels.append(

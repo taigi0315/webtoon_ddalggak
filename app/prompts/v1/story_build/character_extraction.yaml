@@ -17,6 +17,13 @@ prompt_character_extraction: |
   - Include evidence quotes showing where each character appears
   - Assign roles: "main" for central characters (max 2), "secondary" for others
   - For implied characters, create a descriptive name (e.g., "Jina's Mother" not just "mom")
+  - NEVER output "Narrator", "I", or "Voiceover" as a character name.
+    - If story is first-person, assign a concrete in-world name that matches the genre.
+  - Do not treat objects, places, or metaphoric labels as characters unless clearly personified and plot-active.
+  - Respect character hints when they are consistent with the story.
+
+  Character hints (optional):
+  {{ character_hints_json }}
 
   OUTPUT SCHEMA:
   {

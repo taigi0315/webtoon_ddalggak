@@ -15,9 +15,11 @@ const studioItems = [
   { label: "Dialogue Editor", href: "/studio/dialogue" }
 ];
 
-const pipelineItems = [
-  { label: "Episodes", href: "/episodes" },
-  { label: "Exports", href: "/exports" }
+// Note: Episodes and Exports are currently placeholder pages
+// TODO: Implement or remove these features
+const pipelineItems: { label: string; href: string }[] = [
+  // { label: "Episodes", href: "/episodes" },
+  // { label: "Exports", href: "/exports" }
 ];
 
 export default function SidebarNav() {

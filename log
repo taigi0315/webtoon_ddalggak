@@ -1,0 +1,1180 @@
+INFO:     Started reloader process [
+    65973
+] using WatchFiles
+INFO:     Started server process [
+    65975
+]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+{
+    "timestamp": "2026-02-05T07:23:30-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "7c96a297-757c-496b-bc08-b40b79e6d24c",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/projects",
+    "status": 200,
+    "duration_ms": 0.3013749992533121
+}
+INFO: 127.0.0.1: 55802 - "OPTIONS /v1/projects HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:31-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "2235140c-daab-4c2d-9db2-2c202058b53f",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories",
+    "status": 200,
+    "duration_ms": 0.6467499988502823
+}
+INFO: 127.0.0.1: 55803 - "OPTIONS /v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:31-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "a9b52202-bfeb-4bbf-9011-73b2695d1bdf",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects",
+    "status": 200,
+    "duration_ms": 20.42300000175601
+}
+INFO: 127.0.0.1: 55802 - "GET /v1/projects HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:31-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "34b21a7a-f1a4-4ec3-98a2-384204dc0d85",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories",
+    "status": 200,
+    "duration_ms": 20.692624999355758
+}
+INFO: 127.0.0.1: 55804 - "GET /v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:32-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "9c689b7e-d7da-4164-8efd-a32ff09bd2fd",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects",
+    "status": 200,
+    "duration_ms": 2.0581249991664663
+}
+INFO: 127.0.0.1: 55804 - "GET /v1/projects HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:34-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "098bd11d-0526-4c9d-8286-5ee9a1d431bc",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/styles/image",
+    "status": 200,
+    "duration_ms": 0.1503749990661163
+}
+INFO: 127.0.0.1: 55804 - "OPTIONS /v1/styles/image HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:34-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "62d323c6-4489-416b-a0c6-7b4aeebf53f4",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories",
+    "status": 200,
+    "duration_ms": 42.017208001198014
+}
+INFO: 127.0.0.1: 55802 - "GET /v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:34-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "0e15cf1c-2cd6-4c15-b91d-e867ad251b35",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/styles/image",
+    "status": 200,
+    "duration_ms": 41.66720799912582
+}
+INFO: 127.0.0.1: 55804 - "GET /v1/styles/image HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:38-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "0c2de325-67a7-4d9a-95e6-7f7981fb5932",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects",
+    "status": 200,
+    "duration_ms": 4.254999999830034
+}
+INFO: 127.0.0.1: 55804 - "GET /v1/projects HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:38-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "c1eb7d25-f13c-4836-b943-db926e78c89a",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories",
+    "status": 200,
+    "duration_ms": 3.943957999581471
+}
+INFO: 127.0.0.1: 55802 - "GET /v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "9780ce2b-efd7-4d7c-936e-6cc14a73c80d",
+    "node_name": "",
+    "scene_id": "",
+    "method": "POST",
+    "path": "/v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories",
+    "status": 200,
+    "duration_ms": 12.135749999288237
+}
+INFO: 127.0.0.1: 55810 - "POST /v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "955a00eb-bc4d-484c-a650-de94196f151b",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/generate/blueprint_async",
+    "status": 200,
+    "duration_ms": 0.14233300316845998
+}
+INFO: 127.0.0.1: 55811 - "OPTIONS /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/generate/blueprint_async HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "fa82f01d-3386-4c2f-9415-91b0da246c2d",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/scenes",
+    "status": 200,
+    "duration_ms": 0.7827080007700715
+}
+INFO: 127.0.0.1: 55812 - "OPTIONS /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/scenes HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "d862d7ea-b245-4de0-acdb-81312169899f",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters",
+    "status": 200,
+    "duration_ms": 0.9730839992698748
+}
+INFO: 127.0.0.1: 55813 - "OPTIONS /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "48933df7-147c-4052-b35e-ad412ba2f221",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress",
+    "status": 200,
+    "duration_ms": 0.892542000656249
+}
+INFO: 127.0.0.1: 55814 - "OPTIONS /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "a354260c-4168-4adb-9940-87d028d83407",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories",
+    "status": 200,
+    "duration_ms": 5.628875002003042
+}
+INFO: 127.0.0.1: 55810 - "GET /v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_enqueued job_id=9af9ca4c-563d-4bd2-95b7-5950d42471c5 type=story_blueprint scene_id= story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_started job_id=9af9ca4c-563d-4bd2-95b7-5950d42471c5 type=story_blueprint scene_id= story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c",
+    "request_id": "unknown",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "",
+    "scene_id": "",
+    "method": "POST",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/generate/blueprint_async",
+    "status": 202,
+    "duration_ms": 14.890499998728046
+}
+INFO: 127.0.0.1: 55811 - "POST /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/generate/blueprint_async HTTP/1.1"202 Accepted
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "c013a785-69b9-4958-acc6-d0875abe1189",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/scenes",
+    "status": 200,
+    "duration_ms": 11.18674999815994
+}
+INFO: 127.0.0.1: 55815 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/scenes HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "987fae1d-a40a-4674-af15-278df31693ef",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters",
+    "status": 200,
+    "duration_ms": 11.999375001323642
+}
+INFO: 127.0.0.1: 55813 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app.services.vertex_gemini",
+    "message": "gemini_client_init auth_mode=api_key project= location=us-central1 api_key=AIzaSy...4Z2k(len=39) text_model=gemini-2.5-flash image_model=gemini-2.5-flash-image",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "app.graphs.nodes.utils",
+    "message": "story_populator llm request started (target_scene_count=6, max_characters=4)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "story_populator",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:23:50-0800",
+    "level": "INFO",
+    "logger": "google_genai.models",
+    "message": "AFC is enabled with max remote calls: 10.",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "story_populator",
+    "scene_id": ""
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:24:05-0800",
+    "level": "INFO",
+    "logger": "httpx",
+    "message": "HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent \"HTTP/1.1 200 OK\"",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "story_populator",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:05-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build character extraction started (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, max_characters=1)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_extractor",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:05-0800",
+    "level": "INFO",
+    "logger": "app.graphs.nodes.utils",
+    "message": "character_extractor llm request started (max_characters=1)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_extractor",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:05-0800",
+    "level": "INFO",
+    "logger": "google_genai.models",
+    "message": "AFC is enabled with max remote calls: 10.",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_extractor",
+    "scene_id": ""
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:24:12-0800",
+    "level": "INFO",
+    "logger": "httpx",
+    "message": "HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent \"HTTP/1.1 200 OK\"",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_extractor",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:12-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build character extraction completed (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, extracted=1)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_extractor",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:12-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build character normalization started (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, input_characters=1)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_normalizer",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:12-0800",
+    "level": "INFO",
+    "logger": "app.graphs.nodes.utils",
+    "message": "character_normalizer llm request started (input_characters=1)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_normalizer",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:12-0800",
+    "level": "INFO",
+    "logger": "google_genai.models",
+    "message": "AFC is enabled with max remote calls: 10.",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_normalizer",
+    "scene_id": ""
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:24:21-0800",
+    "level": "INFO",
+    "logger": "httpx",
+    "message": "HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent \"HTTP/1.1 200 OK\"",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_normalizer",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:21-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build character normalization completed (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, normalized=1)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "llm_character_normalizer",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:21-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build script writer started (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, retry_count=0)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "webtoon_script_writer",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:21-0800",
+    "level": "INFO",
+    "logger": "google_genai.models",
+    "message": "AFC is enabled with max remote calls: 10.",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "webtoon_script_writer",
+    "scene_id": ""
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:24:55-0800",
+    "level": "INFO",
+    "logger": "httpx",
+    "message": "HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent \"HTTP/1.1 200 OK\"",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "webtoon_script_writer",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:55-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build script writer completed (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, beats=11)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "webtoon_script_writer",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:24:55-0800",
+    "level": "INFO",
+    "logger": "google_genai.models",
+    "message": "AFC is enabled with max remote calls: 10.",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "",
+    "scene_id": ""
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:16-0800",
+    "level": "INFO",
+    "logger": "httpx",
+    "message": "HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent \"HTTP/1.1 200 OK\"",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:25:16-0800",
+    "level": "INFO",
+    "logger": "google_genai.models",
+    "message": "AFC is enabled with max remote calls: 10.",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "studio_director",
+    "scene_id": ""
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:52-0800",
+    "level": "INFO",
+    "logger": "httpx",
+    "message": "HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent \"HTTP/1.1 200 OK\"",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "studio_director",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:25:52-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build studio_director completed (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, scenes=3)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "studio_director",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:25:52-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build persist bundle started (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, scenes=3, characters=1)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "persist_story_bundle",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:25:52-0800",
+    "level": "INFO",
+    "logger": "app.graphs.story_build",
+    "message": "story_build persist bundle completed (story_id=6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c, saved_scenes=3, saved_characters=1)",
+    "request_id": "5e7cc1d0-d1cb-4c39-92ee-53d51629345c",
+    "node_name": "persist_story_bundle",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:25:52-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_succeeded job_id=9af9ca4c-563d-4bd2-95b7-5950d42471c5 type=story_blueprint duration_ms=121419.1",
+    "request_id": "unknown",
+    "node_name": "",
+    "scene_id": ""
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/progress HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:52-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "a54ba755-1aa4-4052-a77b-032b7644bd66",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters",
+    "status": 200,
+    "duration_ms": 9.999207999499049
+}
+INFO: 127.0.0.1: 55827 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:52-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "d646f48b-4ccf-43ab-a85e-fd4820f74c92",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/scenes",
+    "status": 200,
+    "duration_ms": 11.0982089972822
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/scenes HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "9af42d4a-8439-4e80-8124-2c84881eec89",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/character-variant-suggestions",
+    "status": 200,
+    "duration_ms": 0.5407499993452802
+}
+INFO: 127.0.0.1: 55831 - "OPTIONS /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/character-variant-suggestions HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "dd8812d3-9db4-44e4-9cdd-f32dd893ca2d",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects",
+    "status": 200,
+    "duration_ms": 2.8688750026049092
+}
+INFO: 127.0.0.1: 55827 - "GET /v1/projects HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "8bbc6dfd-3be1-4bed-b326-bef7ce2f5ee9",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters",
+    "status": 200,
+    "duration_ms": 5.059208000602666
+}
+INFO: 127.0.0.1: 55830 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "c6e59e3e-8e57-4aec-b79a-5dd2c962f0db",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories",
+    "status": 200,
+    "duration_ms": 7.94533299995237
+}
+INFO: 127.0.0.1: 55816 - "GET /v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app.services.vertex_gemini",
+    "message": "gemini_client_init auth_mode=api_key project= location=us-central1 api_key=AIzaSy...4Z2k(len=39) text_model=gemini-2.5-flash image_model=gemini-2.5-flash-image",
+    "request_id": "b0d9e38c-50b1-415a-926c-2ec5dbddbe44",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "316e37ea-8261-46b9-b6ab-874aa7fa7a99",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/characters/e7971b27-9f63-4905-b128-d7e369797490/refs",
+    "status": 200,
+    "duration_ms": 0.4621250009222422
+}
+INFO: 127.0.0.1: 55830 - "OPTIONS /v1/characters/e7971b27-9f63-4905-b128-d7e369797490/refs HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "2893d305-9654-4ab5-bb5f-0de865fcc9c3",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters/e7971b27-9f63-4905-b128-d7e369797490/variants",
+    "status": 200,
+    "duration_ms": 0.6178330004331656
+}
+INFO: 127.0.0.1: 55827 - "OPTIONS /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters/e7971b27-9f63-4905-b128-d7e369797490/variants HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "a5033c48-1154-48f5-8e93-0f9e01711b6a",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/characters/e7971b27-9f63-4905-b128-d7e369797490/refs",
+    "status": 200,
+    "duration_ms": 9.466834002523683
+}
+INFO: 127.0.0.1: 55827 - "GET /v1/characters/e7971b27-9f63-4905-b128-d7e369797490/refs HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "d86af4a2-0729-4339-a8e2-3484505af8b0",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters/e7971b27-9f63-4905-b128-d7e369797490/variants",
+    "status": 200,
+    "duration_ms": 9.076917001948459
+}
+INFO: 127.0.0.1: 55830 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/characters/e7971b27-9f63-4905-b128-d7e369797490/variants HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "google_genai.models",
+    "message": "AFC is enabled with max remote calls: 10.",
+    "request_id": "b0d9e38c-50b1-415a-926c-2ec5dbddbe44",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:25:56-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "60f578b0-ecee-42a2-928e-93b52bd10906",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/media/b25e1482-97d7-4258-b3c1-eae5db2cbca7.png",
+    "status": 304,
+    "duration_ms": 2.201541999966139
+}
+INFO: 127.0.0.1: 55834 - "GET /media/b25e1482-97d7-4258-b3c1-eae5db2cbca7.png HTTP/1.1"304 Not Modified
+{
+    "timestamp": "2026-02-05T07:25:59-0800",
+    "level": "INFO",
+    "logger": "httpx",
+    "message": "HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent \"HTTP/1.1 200 OK\"",
+    "request_id": "b0d9e38c-50b1-415a-926c-2ec5dbddbe44",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:25:59-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "b0d9e38c-50b1-415a-926c-2ec5dbddbe44",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/character-variant-suggestions",
+    "status": 200,
+    "duration_ms": 3125.7890410015534
+}
+INFO: 127.0.0.1: 55832 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/character-variant-suggestions HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:04-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "0917a595-1bb1-4b5d-8d8e-fd24dde8b9e8",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects",
+    "status": 200,
+    "duration_ms": 2.3540410002169665
+}
+INFO: 127.0.0.1: 55832 - "GET /v1/projects HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:04-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "405690a1-c89c-401f-b6f6-98a140472d9d",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c",
+    "status": 200,
+    "duration_ms": 1.082999999198364
+}
+INFO: 127.0.0.1: 55840 - "OPTIONS /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:04-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "b08bfe8e-5305-4f41-a4c2-755eb062e787",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/renders",
+    "status": 200,
+    "duration_ms": 0.781249997089617
+}
+INFO: 127.0.0.1: 55832 - "OPTIONS /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/renders HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:04-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "d20c153a-e347-49bc-abbd-a590d6c238df",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/artifacts",
+    "status": 200,
+    "duration_ms": 1.8989160016644746
+}
+INFO: 127.0.0.1: 55841 - "OPTIONS /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/artifacts HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:04-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "54407c41-b32f-4fea-aae3-89a9221e3e11",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories",
+    "status": 200,
+    "duration_ms": 9.46016700254404
+}
+INFO: 127.0.0.1: 55838 - "GET /v1/projects/177cc774-f9b7-4ba7-a196-18cafcd0f4bd/stories HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:04-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "48b02a00-fa44-431c-9483-e5f40ac37176",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/scenes",
+    "status": 200,
+    "duration_ms": 8.658167000248795
+}
+INFO: 127.0.0.1: 55839 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c/scenes HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:04-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "01f9b250-aa0e-4d05-819b-78a3957ba9c6",
+    "node_name": "",
+    "scene_id": "",
+    "method": "GET",
+    "path": "/v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c",
+    "status": 200,
+    "duration_ms": 6.91216599807376
+}
+INFO: 127.0.0.1: 55842 - "GET /v1/stories/6c39ac8f-3f0e-4aae-98e8-a79ccda9fc5c HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55832 - "GET /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/artifacts HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55841 - "GET /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/renders HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "392f9c00-c15a-4a53-8da0-ecac17476cfb",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/generate/render_async",
+    "status": 200,
+    "duration_ms": 0.6742920013493858
+}
+INFO: 127.0.0.1: 55841 - "OPTIONS /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/generate/render_async HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "b8382d72-b949-46b3-80e6-e0a14247d4e4",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/scenes/f6f0eb99-7ae3-4114-a8fc-8dba3018033d/generate/render_async",
+    "status": 200,
+    "duration_ms": 2.054166998277651
+}
+INFO: 127.0.0.1: 55832 - "OPTIONS /v1/scenes/f6f0eb99-7ae3-4114-a8fc-8dba3018033d/generate/render_async HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "3c73b57b-54af-4343-a7de-b7445f20debf",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/scenes/c4046ee8-fb58-4092-af06-4a2aaae3eae3/generate/render_async",
+    "status": 200,
+    "duration_ms": 3.938917001505615
+}
+INFO: 127.0.0.1: 55842 - "OPTIONS /v1/scenes/c4046ee8-fb58-4092-af06-4a2aaae3eae3/generate/render_async HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_enqueued job_id=0c6a1385-6f60-4990-a740-330f07b808e5 type=scene_render scene_id=ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd story_id=",
+    "request_id": "f91aedac-9828-459d-9ad1-94e961c3fa4a",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_enqueued job_id=50722dfd-4977-4d1f-ba7b-055553d95e13 type=scene_render scene_id=f6f0eb99-7ae3-4114-a8fc-8dba3018033d story_id=",
+    "request_id": "ff057387-2df7-42fb-81f0-749400b4bc7e",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_enqueued job_id=e33e2264-aac2-401b-837a-7a74c11ea076 type=scene_render scene_id=c4046ee8-fb58-4092-af06-4a2aaae3eae3 story_id=",
+    "request_id": "48fa4073-f3e9-487a-81ac-a848032ac23a",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_started job_id=0c6a1385-6f60-4990-a740-330f07b808e5 type=scene_render scene_id=ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd story_id=",
+    "request_id": "unknown",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.api.v1.generation",
+    "message": "scene_render_job started (scene_id=ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd, style_id=CINEMATIC_MODERN_MANHWA, enforce_qc=False)",
+    "request_id": "f91aedac-9828-459d-9ad1-94e961c3fa4a",
+    "node_name": "scene_render_job",
+    "scene_id": "ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd"
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "f91aedac-9828-459d-9ad1-94e961c3fa4a",
+    "node_name": "",
+    "scene_id": "",
+    "method": "POST",
+    "path": "/v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/generate/render_async",
+    "status": 202,
+    "duration_ms": 7.87408299947856
+}
+INFO: 127.0.0.1: 55839 - "POST /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/generate/render_async HTTP/1.1"202 Accepted
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.vertex_gemini",
+    "message": "gemini_client_init auth_mode=api_key project= location=us-central1 api_key=AIzaSy...4Z2k(len=39) text_model=gemini-2.5-flash image_model=gemini-2.5-flash-image",
+    "request_id": "f91aedac-9828-459d-9ad1-94e961c3fa4a",
+    "node_name": "scene_render_job",
+    "scene_id": "ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd"
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "48fa4073-f3e9-487a-81ac-a848032ac23a",
+    "node_name": "",
+    "scene_id": "",
+    "method": "POST",
+    "path": "/v1/scenes/c4046ee8-fb58-4092-af06-4a2aaae3eae3/generate/render_async",
+    "status": 202,
+    "duration_ms": 6.844542000180809
+}
+INFO: 127.0.0.1: 55838 - "POST /v1/scenes/c4046ee8-fb58-4092-af06-4a2aaae3eae3/generate/render_async HTTP/1.1"202 Accepted
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "ff057387-2df7-42fb-81f0-749400b4bc7e",
+    "node_name": "",
+    "scene_id": "",
+    "method": "POST",
+    "path": "/v1/scenes/f6f0eb99-7ae3-4114-a8fc-8dba3018033d/generate/render_async",
+    "status": 202,
+    "duration_ms": 7.090499999321764
+}
+INFO: 127.0.0.1: 55842 - "POST /v1/scenes/f6f0eb99-7ae3-4114-a8fc-8dba3018033d/generate/render_async HTTP/1.1"202 Accepted
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "ERROR",
+    "logger": "app.services.job_queue",
+    "message": "job_failed job_id=0c6a1385-6f60-4990-a740-330f07b808e5 type=scene_render duration_ms=23.8",
+    "request_id": "unknown",
+    "node_name": "",
+    "scene_id": "",
+    "exc_info": "Traceback (most recent call last):\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/core/telemetry.py\", line 46, in trace_span\n    from opentelemetry import trace\nModuleNotFoundError: No module named 'opentelemetry'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/services/job_queue.py\", line 146, in _worker_loop\n    result = await asyncio.to_thread(job.handler, job)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/threads.py\", line 25, in to_thread\n    return await loop.run_in_executor(None, func_call)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py\", line 58, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/api/v1/generation.py\", line 153, in _handle_render_only_job\n    out = run_scene_render(\n          ^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/graphs/pipeline.py\", line 268, in run_scene_render\n    return app.invoke(state)\n           ^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/main.py\", line 3071, in invoke\n    for chunk in self.stream(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/main.py\", line 2646, in stream\n    for _ in runner.tick(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/_runner.py\", line 167, in tick\n    run_with_retry(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/_retry.py\", line 42, in run_with_retry\n    return task.proc.invoke(task.input, config)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/_internal/_runnable.py\", line 656, in invoke\n    input = context.run(step.invoke, input, config, **kwargs)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/_internal/_runnable.py\", line 400, in invoke\n    ret = self.func(*args, **kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/graphs/pipeline.py\", line 117, in _node_load_active_scene_artifacts\n    raise ValueError(\"panel_semantics and layout_template artifacts are required\")\nValueError: panel_semantics and layout_template artifacts are required\nDuring task with name 'load_artifacts' and id 'd5c13925-67c0-c8f8-f5ab-13bd9e489dbf'"
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_started job_id=50722dfd-4977-4d1f-ba7b-055553d95e13 type=scene_render scene_id=f6f0eb99-7ae3-4114-a8fc-8dba3018033d story_id=",
+    "request_id": "unknown",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.api.v1.generation",
+    "message": "scene_render_job started (scene_id=f6f0eb99-7ae3-4114-a8fc-8dba3018033d, style_id=CINEMATIC_MODERN_MANHWA, enforce_qc=False)",
+    "request_id": "ff057387-2df7-42fb-81f0-749400b4bc7e",
+    "node_name": "scene_render_job",
+    "scene_id": "f6f0eb99-7ae3-4114-a8fc-8dba3018033d"
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.vertex_gemini",
+    "message": "gemini_client_init auth_mode=api_key project= location=us-central1 api_key=AIzaSy...4Z2k(len=39) text_model=gemini-2.5-flash image_model=gemini-2.5-flash-image",
+    "request_id": "ff057387-2df7-42fb-81f0-749400b4bc7e",
+    "node_name": "scene_render_job",
+    "scene_id": "f6f0eb99-7ae3-4114-a8fc-8dba3018033d"
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "ERROR",
+    "logger": "app.services.job_queue",
+    "message": "job_failed job_id=50722dfd-4977-4d1f-ba7b-055553d95e13 type=scene_render duration_ms=12.3",
+    "request_id": "unknown",
+    "node_name": "",
+    "scene_id": "",
+    "exc_info": "Traceback (most recent call last):\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/core/telemetry.py\", line 46, in trace_span\n    from opentelemetry import trace\nModuleNotFoundError: No module named 'opentelemetry'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/services/job_queue.py\", line 146, in _worker_loop\n    result = await asyncio.to_thread(job.handler, job)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/threads.py\", line 25, in to_thread\n    return await loop.run_in_executor(None, func_call)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py\", line 58, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/api/v1/generation.py\", line 153, in _handle_render_only_job\n    out = run_scene_render(\n          ^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/graphs/pipeline.py\", line 268, in run_scene_render\n    return app.invoke(state)\n           ^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/main.py\", line 3071, in invoke\n    for chunk in self.stream(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/main.py\", line 2646, in stream\n    for _ in runner.tick(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/_runner.py\", line 167, in tick\n    run_with_retry(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/_retry.py\", line 42, in run_with_retry\n    return task.proc.invoke(task.input, config)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/_internal/_runnable.py\", line 656, in invoke\n    input = context.run(step.invoke, input, config, **kwargs)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/_internal/_runnable.py\", line 400, in invoke\n    ret = self.func(*args, **kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/graphs/pipeline.py\", line 117, in _node_load_active_scene_artifacts\n    raise ValueError(\"panel_semantics and layout_template artifacts are required\")\nValueError: panel_semantics and layout_template artifacts are required\nDuring task with name 'load_artifacts' and id 'a7cd97bd-6402-b31d-9537-6c195eeae3a0'"
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.job_queue",
+    "message": "job_started job_id=e33e2264-aac2-401b-837a-7a74c11ea076 type=scene_render scene_id=c4046ee8-fb58-4092-af06-4a2aaae3eae3 story_id=",
+    "request_id": "unknown",
+    "node_name": "",
+    "scene_id": ""
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.api.v1.generation",
+    "message": "scene_render_job started (scene_id=c4046ee8-fb58-4092-af06-4a2aaae3eae3, style_id=CUTE_CHIBI_SCHOOL_ROMANCE_MANHWA, enforce_qc=False)",
+    "request_id": "48fa4073-f3e9-487a-81ac-a848032ac23a",
+    "node_name": "scene_render_job",
+    "scene_id": "c4046ee8-fb58-4092-af06-4a2aaae3eae3"
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "INFO",
+    "logger": "app.services.vertex_gemini",
+    "message": "gemini_client_init auth_mode=api_key project= location=us-central1 api_key=AIzaSy...4Z2k(len=39) text_model=gemini-2.5-flash image_model=gemini-2.5-flash-image",
+    "request_id": "48fa4073-f3e9-487a-81ac-a848032ac23a",
+    "node_name": "scene_render_job",
+    "scene_id": "c4046ee8-fb58-4092-af06-4a2aaae3eae3"
+}
+{
+    "timestamp": "2026-02-05T07:26:08-0800",
+    "level": "ERROR",
+    "logger": "app.services.job_queue",
+    "message": "job_failed job_id=e33e2264-aac2-401b-837a-7a74c11ea076 type=scene_render duration_ms=10.3",
+    "request_id": "unknown",
+    "node_name": "",
+    "scene_id": "",
+    "exc_info": "Traceback (most recent call last):\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/core/telemetry.py\", line 46, in trace_span\n    from opentelemetry import trace\nModuleNotFoundError: No module named 'opentelemetry'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/services/job_queue.py\", line 146, in _worker_loop\n    result = await asyncio.to_thread(job.handler, job)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/threads.py\", line 25, in to_thread\n    return await loop.run_in_executor(None, func_call)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py\", line 58, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/api/v1/generation.py\", line 153, in _handle_render_only_job\n    out = run_scene_render(\n          ^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/graphs/pipeline.py\", line 268, in run_scene_render\n    return app.invoke(state)\n           ^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/main.py\", line 3071, in invoke\n    for chunk in self.stream(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/main.py\", line 2646, in stream\n    for _ in runner.tick(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/_runner.py\", line 167, in tick\n    run_with_retry(\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/pregel/_retry.py\", line 42, in run_with_retry\n    return task.proc.invoke(task.input, config)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/_internal/_runnable.py\", line 656, in invoke\n    input = context.run(step.invoke, input, config, **kwargs)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/venv/lib/python3.11/site-packages/langgraph/_internal/_runnable.py\", line 400, in invoke\n    ret = self.func(*args, **kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/cmm/Documents/Github/webtoon_ddalggak/app/graphs/pipeline.py\", line 117, in _node_load_active_scene_artifacts\n    raise ValueError(\"panel_semantics and layout_template artifacts are required\")\nValueError: panel_semantics and layout_template artifacts are required\nDuring task with name 'load_artifacts' and id 'ecbaa0a8-0fd8-e58e-9eca-c1dba5a3251b'"
+}
+{
+    "timestamp": "2026-02-05T07:26:12-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "d38418e8-bfa5-42d5-bd08-08ffbd198913",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/jobs/0c6a1385-6f60-4990-a740-330f07b808e5",
+    "status": 200,
+    "duration_ms": 0.4086250010004733
+}
+INFO: 127.0.0.1: 55842 - "OPTIONS /v1/jobs/0c6a1385-6f60-4990-a740-330f07b808e5 HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:12-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "e1d1b5a8-311f-4ce5-9891-b5055769df06",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/jobs/e33e2264-aac2-401b-837a-7a74c11ea076",
+    "status": 200,
+    "duration_ms": 0.4911659998469986
+}
+INFO: 127.0.0.1: 55838 - "OPTIONS /v1/jobs/e33e2264-aac2-401b-837a-7a74c11ea076 HTTP/1.1"200 OK
+{
+    "timestamp": "2026-02-05T07:26:12-0800",
+    "level": "INFO",
+    "logger": "app",
+    "message": "request_complete",
+    "request_id": "60c1fe73-a887-46df-bd90-0611dcd9efe4",
+    "node_name": "",
+    "scene_id": "",
+    "method": "OPTIONS",
+    "path": "/v1/jobs/50722dfd-4977-4d1f-ba7b-055553d95e13",
+    "status": 200,
+    "duration_ms": 0.6046249982318841
+}
+INFO: 127.0.0.1: 55839 - "OPTIONS /v1/jobs/50722dfd-4977-4d1f-ba7b-055553d95e13 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55844 - "GET /v1/jobs/0c6a1385-6f60-4990-a740-330f07b808e5 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55838 - "GET /v1/jobs/50722dfd-4977-4d1f-ba7b-055553d95e13 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55839 - "GET /v1/jobs/e33e2264-aac2-401b-837a-7a74c11ea076 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55839 - "GET /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/renders HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55838 - "GET /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/artifacts HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55838 - "GET /v1/jobs/0c6a1385-6f60-4990-a740-330f07b808e5 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55839 - "GET /v1/jobs/e33e2264-aac2-401b-837a-7a74c11ea076 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55844 - "GET /v1/jobs/50722dfd-4977-4d1f-ba7b-055553d95e13 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55844 - "GET /v1/jobs/0c6a1385-6f60-4990-a740-330f07b808e5 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55838 - "GET /v1/jobs/50722dfd-4977-4d1f-ba7b-055553d95e13 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55839 - "GET /v1/jobs/e33e2264-aac2-401b-837a-7a74c11ea076 HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55852 - "GET /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/artifacts HTTP/1.1"200 OK
+INFO: 127.0.0.1: 55851 - "GET /v1/scenes/ec48f5d6-7b56-4b32-b76e-2cd6d85a3fdd/renders HTTP/1.1"200 OK

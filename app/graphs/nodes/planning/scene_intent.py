@@ -13,6 +13,7 @@ from app.db.models import Story
 from app.services.artifacts import ArtifactService
 
 from ..utils import (
+    logger,
     ARTIFACT_SCENE_INTENT,
     _get_scene,
     _list_characters,
@@ -48,6 +49,10 @@ def run_scene_intent_extractor(
                 character_names = [c.name for c in characters]
                 summary = _summarize_text(scene.source_text)
 
+            if gemini is None:
+                logger.error("scene_intent fail-fast: Gemini client missing (scene_id=%s)", scene_id)
+                raise RuntimeError("scene_intent requires Gemini client (fallback disabled)")
+
             payload = {
                 "summary": summary,
                 "setting": _extract_setting(scene.source_text),
@@ -62,13 +67,14 @@ def run_scene_intent_extractor(
                 "character_presence_map": {},
             }
 
-            if gemini is not None:
-                llm = _maybe_json_from_gemini(
-                    gemini,
-                    _prompt_scene_intent(scene.source_text, character_names),
-                )
-                if isinstance(llm, dict):
-                    payload = {**payload, **llm}
+            llm = _maybe_json_from_gemini(
+                gemini,
+                _prompt_scene_intent(scene.source_text, character_names),
+            )
+            if not isinstance(llm, dict):
+                logger.error("scene_intent generation failed: invalid Gemini JSON (scene_id=%s)", scene_id)
+                raise RuntimeError("scene_intent failed: Gemini returned invalid JSON")
+            payload = {**payload, **llm}
 
             return ArtifactService(db).create_artifact(
                 scene_id=scene_id, type=ARTIFACT_SCENE_INTENT, payload=payload

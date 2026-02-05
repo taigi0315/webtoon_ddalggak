@@ -167,10 +167,14 @@ class GeminiClient:
         circuit_breaker_threshold: int = 5,
         circuit_breaker_timeout: int = 60,
     ):
+        api_key = api_key.strip() if isinstance(api_key, str) else api_key
+
         if not api_key and (not project or not location):
             raise RuntimeError(
                 "Either GEMINI_API_KEY or both GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION must be configured"
             )
+        if api_key and api_key.lower().startswith("your-api-key"):
+            raise RuntimeError("GEMINI_API_KEY is a placeholder value; set a real key in app/.env")
 
         self._text_model = text_model
         self._image_model = image_model
@@ -199,6 +203,23 @@ class GeminiClient:
                 recovery_timeout_seconds=circuit_breaker_timeout,
             ),
         }
+
+        def _mask(key: str | None) -> str:
+            if not key:
+                return "none"
+            if len(key) <= 10:
+                return f"{key[:3]}...({len(key)})"
+            return f"{key[:6]}...{key[-4:]}(len={len(key)})"
+
+        logger.info(
+            "gemini_client_init auth_mode=%s project=%s location=%s api_key=%s text_model=%s image_model=%s",
+            "api_key" if api_key else "vertex",
+            project or "",
+            location or "",
+            _mask(api_key),
+            text_model,
+            image_model,
+        )
 
         if project and location:
             self._client = genai.Client(vertexai=True, project=project, location=location)
@@ -412,7 +433,7 @@ class GeminiClient:
         self,
         prompt: str,
         model: str | None = None,
-        use_fallback: bool = True,
+        use_fallback: bool = False,
     ) -> str:
         """Generate text with optional fallback to alternate model.
 
@@ -434,6 +455,9 @@ class GeminiClient:
                 func=lambda: self._client.models.generate_content(
                     model=model_name,
                     contents=[prompt],
+                    config=types.GenerateContentConfig(
+                        httpOptions=types.HttpOptions(timeout=int(self._timeout_seconds * 1000)),
+                    ),
                 ),
                 model_name=model_name,
                 request_type="generate_text",
@@ -454,6 +478,9 @@ class GeminiClient:
                     func=lambda: self._client.models.generate_content(
                         model=fallback,
                         contents=[prompt],
+                        config=types.GenerateContentConfig(
+                            httpOptions=types.HttpOptions(timeout=int(self._timeout_seconds * 1000)),
+                        ),
                     ),
                     model_name=fallback,
                     request_type="generate_text",
@@ -466,7 +493,7 @@ class GeminiClient:
         prompt: str,
         model: str | None = None,
         reference_images: list[tuple[bytes, str]] | None = None,
-        use_fallback: bool = True,
+        use_fallback: bool = False,
     ) -> tuple[bytes, str]:
         """Generate an image with optional reference images for style/character consistency.
 
@@ -505,6 +532,7 @@ class GeminiClient:
                     model=model_name,
                     contents=build_contents(),
                     config=types.GenerateContentConfig(
+                        httpOptions=types.HttpOptions(timeout=int(self._timeout_seconds * 1000)),
                         image_config=_DEFAULT_IMAGE_CONFIG,
                         safety_settings=_DEFAULT_SAFETY_SETTINGS,
                     ),
@@ -529,6 +557,7 @@ class GeminiClient:
                         model=fallback,
                         contents=build_contents(),
                         config=types.GenerateContentConfig(
+                            httpOptions=types.HttpOptions(timeout=int(self._timeout_seconds * 1000)),
                             image_config=_DEFAULT_IMAGE_CONFIG,
                             safety_settings=_DEFAULT_SAFETY_SETTINGS,
                         ),

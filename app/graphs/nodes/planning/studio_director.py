@@ -51,8 +51,12 @@ class StudioDirectorResponse(BaseModel):
         for scene in scenes:
             if scene.image_style_id and scene.image_style_id.lower() != "default":
                 if not has_image_style(scene.image_style_id):
-                    logger.warning(f"StudioDirector suggested unknown style '{scene.image_style_id}', falling back to default")
-                    scene.image_style_id = "default"
+                    logger.error(
+                        "studio_director validation failed: unknown image_style_id '%s' in scene %s",
+                        scene.image_style_id,
+                        scene.scene_index,
+                    )
+                    raise ValueError(f"Unknown image_style_id from studio_director: {scene.image_style_id}")
         return scenes
 
 
@@ -101,44 +105,12 @@ def run_studio_director(
 ) -> dict[str, Any]:
     """Unified node for tone analysis, importance weighting, and budget-aware scene optimization."""
     if not script or "visual_beats" not in script:
-        return {"action": "proceed", "scenes": []}
+        logger.error("studio_director fail-fast: missing script or visual_beats")
+        raise ValueError("studio_director requires script with visual_beats")
 
     if gemini is None:
-        logger.warning("Gemini client missing in StudioDirector, using fallback splitter")
-        # Reuse minimalist grouping if no LLM
-        beats = script.get("visual_beats", [])
-        total_beats = len(beats)
-        beats_per_scene = max(1, (total_beats + max_scenes - 1) // max_scenes)
-        
-        scenes: list[dict] = []
-        for i in range(0, total_beats, beats_per_scene):
-            batch = beats[i : i + beats_per_scene]
-            idx = len(scenes) + 1
-            text_parts = []
-            for b in batch:
-                part = f"BEAT: {b.get('visual_action', '')}"
-                if b.get("dialogue"):
-                    part += f"\nDIALOGUE: {b.get('dialogue')}"
-                if b.get("sfx"):
-                    part += f"\nSFX: {b.get('sfx')}"
-                text_parts.append(part)
-            
-            source_text = "\n\n".join(text_parts)
-            scenes.append(
-                {
-                    "scene_index": idx,
-                    "summary": batch[0].get("visual_action", "")[:100],
-                    "primary_tone": "Neutral",
-                    "image_style_id": "default",
-                    "scene_emotion": "Neutral",
-                    "dramatic_intent": "Progress the story",
-                    "source_text": source_text,
-                    "beats": batch,
-                }
-            )
-            if len(scenes) >= max_scenes:
-                break
-        return {"action": "proceed", "scenes": scenes}
+        logger.error("studio_director fail-fast: Gemini client missing")
+        raise RuntimeError("studio_director requires Gemini client (fallback disabled)")
 
     from app.config.loaders import load_image_styles_v1
     from app.core.image_styles import get_style_semantic_hint
@@ -156,8 +128,8 @@ def run_studio_director(
 
     raw_result = _maybe_json_from_gemini(gemini, rendered_prompt)
     if not raw_result:
-        logger.error("StudioDirector failed to produce response")
-        return {"action": "proceed", "scenes": []}
+        logger.error("studio_director generation failed: empty/invalid Gemini response")
+        raise RuntimeError("studio_director failed: Gemini returned empty/invalid JSON")
     
     try:
         validated = StudioDirectorResponse.model_validate(raw_result)
@@ -173,6 +145,5 @@ def run_studio_director(
         
         return result_dict
     except Exception as e:
-        logger.error(f"StudioDirector validation error: {e}, raw_result={raw_result}")
-        # Return what we can or empty
-        return raw_result if isinstance(raw_result, dict) else {"action": "proceed", "scenes": []}
+        logger.error(f"studio_director validation error: {e}, raw_result={raw_result}")
+        raise RuntimeError("studio_director failed: response validation error") from e

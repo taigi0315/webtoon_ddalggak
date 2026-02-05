@@ -66,8 +66,6 @@ def compile_visual_plan_bundle_llm(
 ) -> list[dict]:
     """LLM-enhanced visual plan compilation with beat extraction.
 
-    Falls back to heuristic compilation if LLM fails.
-
     Args:
         scenes: List of scene dicts with source_text
         characters: List of character dicts
@@ -77,7 +75,8 @@ def compile_visual_plan_bundle_llm(
         List of visual plan dicts for each scene
     """
     if gemini is None:
-        return compile_visual_plan_bundle(scenes, characters)
+        logger.error("visual_plan_compiler fail-fast: Gemini client missing")
+        raise RuntimeError("visual_plan_compiler requires Gemini client (fallback disabled)")
 
     prompt = _prompt_visual_plan(scenes, characters)
     result = _maybe_json_from_gemini(gemini, prompt)
@@ -110,9 +109,8 @@ def compile_visual_plan_bundle_llm(
         if plans:
             return plans
 
-    # Fallback to heuristic
-    logger.info("Falling back to heuristic visual plan compilation")
-    return compile_visual_plan_bundle(scenes, characters)
+    logger.error("visual_plan_compiler generation failed: invalid/empty Gemini JSON")
+    raise RuntimeError("visual_plan_compiler failed: Gemini returned invalid JSON")
 
 
 def compute_scene_chunker(source_text: str, max_scenes: int = 6) -> list[str]:

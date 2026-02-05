@@ -6,11 +6,14 @@ prompt_blind_test_critic: |
   - Original Story: {{ story_text }}
   - Episode Intent: {{ episode_intent }}
   - Blind Test Reports: {{ reports_json }}
+  - Episode Quality Signals: {{ quality_signals_json }}
   
   TASK:
   1. IDENTIFY NARRATIVE GAPS: Check if the blind reader (who only saw the visual plan) missed any "essential plot points" or "emotional peaks" from the original story.
   2. ANALYZE FAILURES: If there are major discrepancies, diagnose WHY. (e.g., "The scene skip at Beat 5 removed the critical realization", "The dialogue in Scene 3 is too vague").
   3. DECIDE: Should we proceed or rewrite?
+     - If rhythm/emotion signals are weak (low silence ratio, weak rhythm diversity, low composite score), prefer rewrite.
+     - Prioritize emotional readability over literal plot completeness.
   
   OUTPUT REQUIREMENTS:
   Return a JSON object:

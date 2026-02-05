@@ -2,6 +2,11 @@
   "version": "v1",
   "closeup_ratio_max": 0.5,
   "dialogue_ratio_max": 0.6,
+  "narration_ratio_max": 0.35,
+  "generic_dialogue_ratio_max": 0.4,
+  "min_silent_panel_ratio": 0.15,
+  "max_words_per_panel": 25,
+  "max_words_per_line": 15,
   "repeated_framing_run_length": 3,
   "require_environment_on_establishing": true,
   "environment_keywords": [

@@ -23,7 +23,8 @@ def run_metaphor_recommender(
 ) -> Any:
     """Recommend visual metaphors based on emotional intensity and character state."""
     if gemini is None:
-        return None
+        logger.error("metaphor_recommender fail-fast: Gemini client missing (scene_id=%s)", scene_id)
+        raise RuntimeError("metaphor_recommender requires Gemini client (fallback disabled)")
 
     # Check for existing artifact
     svc = ArtifactService(db)
@@ -34,8 +35,8 @@ def run_metaphor_recommender(
     # We need panel semantics to understand character emotions
     semantics_art = svc.get_latest_artifact(scene_id, ARTIFACT_PANEL_SEMANTICS)
     if not semantics_art:
-        logger.warning(f"Panel semantics missing for scene {scene_id}, cannot recommend metaphors")
-        return None
+        logger.error(f"metaphor_recommender fail-fast: panel semantics missing (scene_id={scene_id})")
+        raise ValueError("metaphor_recommender requires panel_semantics artifact")
 
     # Load lexicon
     try:
@@ -52,8 +53,8 @@ def run_metaphor_recommender(
 
     result = _maybe_json_from_gemini(gemini, rendered_prompt)
     if not result or "metaphor_directions" not in result:
-        logger.error(f"Failed to recommend metaphors for scene {scene_id}")
-        return None
+        logger.error(f"metaphor_recommender generation failed: invalid Gemini JSON (scene_id={scene_id})")
+        raise RuntimeError("metaphor_recommender failed: Gemini returned invalid JSON")
         
     payload = {"metaphor_directions": result["metaphor_directions"]}
     return svc.create_artifact(scene_id, ARTIFACT_METAPHOR_DIRECTIONS, payload)

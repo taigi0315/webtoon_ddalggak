@@ -66,31 +66,28 @@ def run_art_director(
         if isinstance(intent_data, dict):
             scene_intent = intent_data.get("intent", "") or intent_data.get("narrative_intent", "")
     
-    # Generate art direction
     if gemini is None:
-        # Fallback: basic art direction
-        logger.warning(f"No Gemini client provided, using fallback art direction for scene {scene_id}")
-        art_direction = _fallback_art_direction(image_style_id)
-    else:
-        prompt = _build_art_direction_prompt(
-            image_style_id=image_style_id,
-            image_style_description=image_style_description,
-            scene_source_text=scene.source_text or "",
-            scene_intent=scene_intent,
-        )
-        
-        result = _maybe_json_from_gemini(gemini, prompt)
-        
-        if result and isinstance(result, dict):
-            art_direction = {
-                "lighting": result.get("lighting", ""),
-                "color_temperature": result.get("color_temperature", ""),
-                "atmosphere_keywords": result.get("atmosphere_keywords", []),
-                "reasoning": result.get("reasoning", ""),
-            }
-        else:
-            logger.warning(f"Failed to parse art direction from LLM, using fallback for scene {scene_id}")
-            art_direction = _fallback_art_direction(image_style_id)
+        logger.error("art_director fail-fast: Gemini client missing (scene_id=%s)", scene_id)
+        raise RuntimeError("art_director requires Gemini client (fallback disabled)")
+
+    prompt = _build_art_direction_prompt(
+        image_style_id=image_style_id,
+        image_style_description=image_style_description,
+        scene_source_text=scene.source_text or "",
+        scene_intent=scene_intent,
+    )
+
+    result = _maybe_json_from_gemini(gemini, prompt)
+    if not result or not isinstance(result, dict):
+        logger.error("art_director generation failed: invalid Gemini JSON (scene_id=%s)", scene_id)
+        raise RuntimeError("art_director failed: Gemini returned invalid JSON")
+
+    art_direction = {
+        "lighting": result.get("lighting", ""),
+        "color_temperature": result.get("color_temperature", ""),
+        "atmosphere_keywords": result.get("atmosphere_keywords", []),
+        "reasoning": result.get("reasoning", ""),
+    }
     
     # Validate and correct art direction
     art_direction = _validate_art_direction(art_direction, image_style_id)
@@ -133,27 +130,6 @@ def _build_art_direction_prompt(
         scene_source_text=scene_source_text,
         scene_intent=scene_intent,
     )
-
-
-def _fallback_art_direction(image_style_id: str) -> dict:
-    """Generate fallback art direction when LLM is unavailable.
-    
-    Args:
-        image_style_id: User-selected image style ID
-        
-    Returns:
-        Basic art direction dict
-    """
-    # Check if style is monochrome
-    is_monochrome = _is_monochrome_style(image_style_id)
-    
-    return {
-        "lighting": "balanced natural lighting",
-        "color_temperature": "N/A (monochrome)" if is_monochrome else "neutral",
-        "atmosphere_keywords": ["neutral", "balanced"],
-        "compatible_with_style": True,
-    }
-
 
 def _validate_art_direction(art_direction: dict, image_style_id: str) -> dict:
     """Validate and correct art direction output.

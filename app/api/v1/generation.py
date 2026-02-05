@@ -19,7 +19,7 @@ from app.graphs.pipeline import run_full_pipeline, run_scene_planning, run_scene
 from app.services.artifacts import ArtifactService
 from app.services import job_queue
 from app.services.vertex_gemini import GeminiClient
-from app.core.request_context import get_request_id, reset_request_id, set_request_id
+from app.core.request_context import get_request_id, log_context, reset_request_id, set_request_id
 
 
 router = APIRouter(tags=["generation"])
@@ -71,12 +71,44 @@ class SceneRenderResponse(BaseModel):
     qc_report_artifact_id: uuid.UUID
 
 
+class GenerateRenderAsyncRequest(BaseModel):
+    style_id: str | None = None
+    prompt_override: str | None = None
+    enforce_qc: bool = False
+
+
 class SceneWorkflowStatusResponse(BaseModel):
     scene_id: uuid.UUID
     planning_locked: bool
     planning_complete: bool
     render_complete: bool
     latest_artifacts: dict[str, uuid.UUID | None]
+
+
+def _ensure_render_prerequisites(
+    db,
+    scene_id: uuid.UUID,
+    gemini: GeminiClient,
+    panel_count: int = 3,
+) -> None:
+    svc = ArtifactService(db)
+    has_semantics = svc.get_latest_artifact(scene_id, nodes.ARTIFACT_PANEL_SEMANTICS) is not None
+    has_layout = svc.get_latest_artifact(scene_id, nodes.ARTIFACT_LAYOUT_TEMPLATE) is not None
+    if has_semantics and has_layout:
+        return
+
+    logger.info(
+        "scene_render prerequisites missing; running planning first (scene_id=%s, has_semantics=%s, has_layout=%s)",
+        scene_id,
+        has_semantics,
+        has_layout,
+    )
+    run_scene_planning(
+        db=db,
+        scene_id=scene_id,
+        panel_count=panel_count,
+        gemini=gemini,
+    )
 
 
 def _build_gemini_client() -> GeminiClient:
@@ -97,27 +129,94 @@ def _handle_full_generation_job(job: job_queue.JobRecord) -> dict | None:
     SessionLocal = get_sessionmaker()
     db = SessionLocal()
     try:
-        _scene_or_404(db, scene_id)
-        if not has_image_style(payload.style_id):
-            payload.style_id = "default"
-        
-        # DEBUG: Log request parameters
-        logger.info(
-            f"Full generation job for scene {scene_id}: "
-            f"panel_count={payload.panel_count}, style_id={payload.style_id}"
-        )
-        
-        gemini = _build_gemini_client()
-        out = run_full_pipeline(
-            db=db,
-            scene_id=scene_id,
-            panel_count=payload.panel_count,
-            style_id=payload.style_id,
-            genre=payload.genre,
-            prompt_override=payload.prompt_override,
-            gemini=gemini,
-        )
-        return out
+        with log_context(node_name="scene_full_job", scene_id=scene_id):
+            _scene_or_404(db, scene_id)
+            if not has_image_style(payload.style_id):
+                payload.style_id = "default"
+
+            logger.info(
+                "scene_full_job started (scene_id=%s, panel_count=%s, style_id=%s)",
+                scene_id,
+                payload.panel_count,
+                payload.style_id,
+            )
+
+            gemini = _build_gemini_client()
+            out = run_full_pipeline(
+                db=db,
+                scene_id=scene_id,
+                panel_count=payload.panel_count,
+                style_id=payload.style_id,
+                genre=payload.genre,
+                prompt_override=payload.prompt_override,
+                gemini=gemini,
+            )
+            logger.info("scene_full_job finished (scene_id=%s)", scene_id)
+            return out
+    finally:
+        db.close()
+        reset_request_id(token)
+
+
+def _handle_render_only_job(job: job_queue.JobRecord) -> dict | None:
+    payload = GenerateRenderAsyncRequest(**job.payload["request"])
+    scene_id = uuid.UUID(job.payload["scene_id"])
+    token = set_request_id(job.request_id or str(job.job_id))
+    SessionLocal = get_sessionmaker()
+    db = SessionLocal()
+    try:
+        with log_context(node_name="scene_render_job", scene_id=scene_id):
+            _scene_or_404(db, scene_id)
+            logger.info(
+                "scene_render_job started (scene_id=%s, style_id=%s, enforce_qc=%s)",
+                scene_id,
+                payload.style_id,
+                payload.enforce_qc,
+            )
+            if payload.style_id and not has_image_style(payload.style_id):
+                payload.style_id = "default"
+            gemini = _build_gemini_client()
+            _ensure_render_prerequisites(db=db, scene_id=scene_id, gemini=gemini, panel_count=3)
+            out = run_scene_render(
+                db=db,
+                scene_id=scene_id,
+                style_id=payload.style_id,
+                enforce_qc=payload.enforce_qc,
+                prompt_override=payload.prompt_override,
+                gemini=gemini,
+            )
+            logger.info("scene_render_job finished (scene_id=%s)", scene_id)
+            return out
+    finally:
+        db.close()
+        reset_request_id(token)
+
+
+def _handle_plan_only_job(job: job_queue.JobRecord) -> dict | None:
+    payload = ScenePlanRequest(**job.payload["request"])
+    scene_id = uuid.UUID(job.payload["scene_id"])
+    token = set_request_id(job.request_id or str(job.job_id))
+    SessionLocal = get_sessionmaker()
+    db = SessionLocal()
+    try:
+        with log_context(node_name="scene_plan_job", scene_id=scene_id):
+            _scene_or_404(db, scene_id)
+            logger.info(
+                "scene_plan_job started (scene_id=%s, panel_count=%s, genre=%s)",
+                scene_id,
+                payload.panel_count,
+                payload.genre,
+            )
+            gemini = _build_gemini_client()
+            out = run_scene_planning(
+                db=db,
+                scene_id=scene_id,
+                panel_count=payload.panel_count,
+                genre=payload.genre,
+                gemini=gemini,
+            )
+            logger.info("scene_plan_job finished (scene_id=%s)", scene_id)
+            return out
     finally:
         db.close()
         reset_request_id(token)
@@ -149,6 +248,7 @@ def render_scene(scene_id: uuid.UUID, payload: SceneRenderRequest, db=DbSessionD
     if payload.style_id and not has_image_style(payload.style_id):
         payload.style_id = "default"
     gemini = _build_gemini_client()
+    _ensure_render_prerequisites(db=db, scene_id=scene_id, gemini=gemini, panel_count=3)
     out = run_scene_render(
         db=db,
         scene_id=scene_id,
@@ -275,4 +375,59 @@ def generate_full_async(
     )
 
 
+@router.post("/scenes/{scene_id}/plan_async", response_model=JobStatusRead)
+def plan_scene_async(
+    scene_id: uuid.UUID,
+    payload: ScenePlanRequest,
+    response: Response,
+    db=DbSessionDep,
+):
+    _scene_or_404(db, scene_id)
 
+    job = job_queue.enqueue_job(
+        "scene_plan",
+        {"scene_id": str(scene_id), "request": payload.model_dump()},
+        _handle_plan_only_job,
+        request_id=get_request_id(),
+    )
+    response.status_code = 202
+    return JobStatusRead(
+        job_id=job.job_id,
+        job_type=job.job_type,
+        status=job.status,
+        created_at=job.created_at.isoformat(),
+        updated_at=job.updated_at.isoformat(),
+        progress=job.progress,
+        result=job.result,
+        error=job.error,
+    )
+
+
+@router.post("/scenes/{scene_id}/generate/render_async", response_model=JobStatusRead)
+def generate_render_async(
+    scene_id: uuid.UUID,
+    payload: GenerateRenderAsyncRequest,
+    response: Response,
+    db=DbSessionDep,
+):
+    _scene_or_404(db, scene_id)
+    if payload.style_id and not has_image_style(payload.style_id):
+        payload.style_id = "default"
+
+    job = job_queue.enqueue_job(
+        "scene_render",
+        {"scene_id": str(scene_id), "request": payload.model_dump()},
+        _handle_render_only_job,
+        request_id=get_request_id(),
+    )
+    response.status_code = 202
+    return JobStatusRead(
+        job_id=job.job_id,
+        job_type=job.job_type,
+        status=job.status,
+        created_at=job.created_at.isoformat(),
+        updated_at=job.updated_at.isoformat(),
+        progress=job.progress,
+        result=job.result,
+        error=job.error,
+    )

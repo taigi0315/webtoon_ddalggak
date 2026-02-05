@@ -28,6 +28,7 @@ from .planning import (
     compile_visual_plan_bundle,
     compile_visual_plan_bundle_llm,
     compute_scene_chunker,
+    run_story_populator,
     # Scene intent
     run_scene_intent_extractor,
     # Panel planning
@@ -56,6 +57,7 @@ __all__ = [
     "compile_visual_plan_bundle",
     "compile_visual_plan_bundle_llm",
     "compute_scene_chunker",
+    "run_story_populator",
     # Scene intent
     "run_scene_intent_extractor",
     # Panel plan

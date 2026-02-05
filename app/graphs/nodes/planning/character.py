@@ -32,6 +32,36 @@ FORBIDDEN_STYLE_KEYWORDS = [
     "willowy",
 ]
 
+_NARRATOR_LIKE_NAMES = {
+    "narrator",
+    "the narrator",
+    "voiceover",
+    "voice-over",
+    "inner voice",
+    "first person narrator",
+    "i",
+    "me",
+    "myself",
+}
+
+
+def _canonicalize_character_name(raw_name: str, source_text: str, character_hints: list[dict] | None = None) -> str:
+    name = str(raw_name or "").strip()
+    if not name:
+        return ""
+    lowered = name.lower()
+    if lowered in _NARRATOR_LIKE_NAMES:
+        if character_hints:
+            for hint in character_hints:
+                hinted_name = str((hint or {}).get("name") or "").strip()
+                if hinted_name:
+                    return hinted_name
+        # Keep a concrete, render-friendly fallback name instead of "Narrator".
+        if re.search(r"\b(dragon|beast|quest|sword|magic|flame)\b", source_text or "", re.IGNORECASE):
+            return "Kael"
+        return "Min"
+    return name
+
 
 def compute_character_profiles(source_text: str, max_characters: int = 6) -> list[dict]:
     """Extract character profiles from story text using heuristics.
@@ -120,9 +150,10 @@ def normalize_character_profiles(profiles: Iterable[dict]) -> list[dict]:
 def compute_character_profiles_llm(
     source_text: str,
     max_characters: int = 6,
+    character_hints: list[dict] | None = None,
     gemini: GeminiClient | None = None,
 ) -> list[dict]:
-    """LLM-enhanced character extraction with fallback to heuristic.
+    """LLM-enhanced character extraction.
 
     Extracts both explicit and implied characters with evidence.
 
@@ -135,17 +166,24 @@ def compute_character_profiles_llm(
         List of character profile dicts
     """
     if gemini is None:
-        return compute_character_profiles(source_text, max_characters)
+        logger.error("character_extractor fail-fast: Gemini client missing")
+        raise RuntimeError("character_extractor requires Gemini client (fallback disabled)")
 
-    prompt = _prompt_character_extraction(source_text, max_characters)
+    prompt = _prompt_character_extraction(source_text, max_characters, character_hints=character_hints or [])
+    logger.info("character_extractor llm request started (max_characters=%s)", max_characters)
     result = _maybe_json_from_gemini(gemini, prompt)
 
     if result and isinstance(result.get("characters"), list):
         profiles = []
+        seen_names: set[str] = set()
         for char in result["characters"][:max_characters]:
-            name = char.get("name", "").strip()
+            name = _canonicalize_character_name(char.get("name", ""), source_text, character_hints=character_hints)
             if not name:
                 continue
+            key = name.lower()
+            if key in seen_names:
+                continue
+            seen_names.add(key)
             profiles.append({
                 "name": name,
                 "role": char.get("role", "secondary"),
@@ -156,9 +194,21 @@ def compute_character_profiles_llm(
         if profiles:
             return profiles
 
-    # Fallback to heuristic
-    logger.info("Falling back to heuristic character extraction")
-    return compute_character_profiles(source_text, max_characters)
+    err_type = getattr(gemini, "last_error_type", None)
+    req_id = getattr(gemini, "last_request_id", None)
+    hint = ""
+    if err_type == "invalid_request":
+        hint = " (hint: check GEMINI_API_KEY / Google AI Studio key validity)"
+    logger.error(
+        "character_extractor generation failed: invalid/empty Gemini JSON (error_type=%s, request_id=%s)%s",
+        err_type,
+        req_id,
+        hint,
+    )
+    raise RuntimeError(
+        f"character_extractor failed: Gemini returned invalid JSON"
+        f"{' [invalid_request: check API key]' if err_type == 'invalid_request' else ''}"
+    )
 
 
 def normalize_character_profiles_llm(
@@ -168,8 +218,6 @@ def normalize_character_profiles_llm(
 ) -> list[dict]:
     """LLM-enhanced character normalization with appearance details.
 
-    Falls back to heuristic normalization if LLM fails.
-
     Args:
         profiles: List of character profile dicts to normalize
         source_text: Story text for context
@@ -178,10 +226,14 @@ def normalize_character_profiles_llm(
     Returns:
         List of normalized character profile dicts with appearance details
     """
-    if gemini is None or not profiles:
+    if not profiles:
         return normalize_character_profiles(profiles)
+    if gemini is None:
+        logger.error("character_normalizer fail-fast: Gemini client missing")
+        raise RuntimeError("character_normalizer requires Gemini client (fallback disabled)")
 
     prompt = _prompt_character_normalization(profiles, source_text)
+    logger.info("character_normalizer llm request started (input_characters=%s)", len(profiles))
     result = _maybe_json_from_gemini(gemini, prompt)
 
     if result and isinstance(result.get("characters"), list):
@@ -229,9 +281,21 @@ def normalize_character_profiles_llm(
         if normalized:
             return normalized
 
-    # Fallback to heuristic
-    logger.info("Falling back to heuristic character normalization")
-    return normalize_character_profiles(profiles)
+    err_type = getattr(gemini, "last_error_type", None)
+    req_id = getattr(gemini, "last_request_id", None)
+    hint = ""
+    if err_type == "invalid_request":
+        hint = " (hint: check GEMINI_API_KEY / Google AI Studio key validity)"
+    logger.error(
+        "character_normalizer generation failed: invalid/empty Gemini JSON (error_type=%s, request_id=%s)%s",
+        err_type,
+        req_id,
+        hint,
+    )
+    raise RuntimeError(
+        f"character_normalizer failed: Gemini returned invalid JSON"
+        f"{' [invalid_request: check API key]' if err_type == 'invalid_request' else ''}"
+    )
 
 
 def _sanitize_character_output(char: dict, name: str) -> dict:
@@ -304,4 +368,3 @@ def _sanitize_character_output(char: dict, name: str) -> dict:
         char["description"] = _remove_keywords(char["description"])
     
     return char
-

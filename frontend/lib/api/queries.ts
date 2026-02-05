@@ -16,6 +16,7 @@ import {
 
   storyProgressSchema,
   jobStatusSchema,
+  sceneWorkflowStatusSchema,
   sceneGenerateFullSchema,
   characterRefsSchema,
   characterRefSchema,
@@ -177,6 +178,11 @@ export async function fetchScene(sceneId: string) {
   return sceneSchema.parse(payload);
 }
 
+export async function fetchSceneStatus(sceneId: string) {
+  const payload = await fetchJson(`/v1/scenes/${sceneId}/status`);
+  return sceneWorkflowStatusSchema.parse(payload);
+}
+
 export async function fetchSceneArtifacts(sceneId: string) {
   const payload = await fetchJson(`/v1/scenes/${sceneId}/artifacts`);
   return artifactsSchema.parse(payload);
@@ -185,6 +191,21 @@ export async function fetchSceneArtifacts(sceneId: string) {
 export async function fetchSceneRenders(sceneId: string) {
   const payload = await fetchJson(`/v1/scenes/${sceneId}/renders`);
   return artifactsSchema.parse(payload);
+}
+
+export async function planSceneAsync(params: {
+  sceneId: string;
+  panelCount?: number;
+  genre?: string | null;
+}) {
+  const payload = await fetchJson(`/v1/scenes/${params.sceneId}/plan_async`, {
+    method: "POST",
+    body: JSON.stringify({
+      panel_count: params.panelCount ?? 3,
+      genre: params.genre ?? null
+    })
+  });
+  return jobStatusSchema.parse(payload);
 }
 
 export async function fetchImageStyles() {
@@ -240,6 +261,23 @@ export async function generateSceneFullAsync(params: {
       style_id: params.styleId,
       genre: params.genre ?? null,
       prompt_override: params.promptOverride ?? null
+    })
+  });
+  return jobStatusSchema.parse(payload);
+}
+
+export async function generateSceneRenderAsync(params: {
+  sceneId: string;
+  styleId?: string | null;
+  promptOverride?: string | null;
+  enforceQc?: boolean;
+}) {
+  const payload = await fetchJson(`/v1/scenes/${params.sceneId}/generate/render_async`, {
+    method: "POST",
+    body: JSON.stringify({
+      style_id: params.styleId ?? null,
+      prompt_override: params.promptOverride ?? null,
+      enforce_qc: params.enforceQc ?? false
     })
   });
   return jobStatusSchema.parse(payload);
@@ -464,12 +502,14 @@ export async function generateCharacterRefs(params: {
   characterId: string;
   refTypes?: string[];
   countPerType?: number;
+  styleId?: string | null;
 }) {
   const payload = await fetchJson(`/v1/characters/${params.characterId}/generate-refs`, {
     method: "POST",
     body: JSON.stringify({
       ref_types: params.refTypes ?? ["face"],
-      count_per_type: params.countPerType ?? 2
+      count_per_type: params.countPerType ?? 2,
+      style_id: params.styleId ?? null
     })
   });
   return characterGenerateRefsResponseSchema.parse(payload);

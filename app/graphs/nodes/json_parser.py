@@ -187,6 +187,7 @@ def _maybe_json_from_gemini(
     gemini: GeminiClient,
     prompt: str,
     expected_schema: str | None = None,
+    allow_repair: bool = False,
 ) -> dict | list | None:
     """
     Multi-tier JSON extraction with self-repair.
@@ -227,6 +228,13 @@ def _maybe_json_from_gemini(
         except json.JSONDecodeError:
             increment_json_parse_failure("array")
             pass
+
+    if not allow_repair:
+        logger.warning(
+            "All direct JSON parsing methods failed (repair disabled, fail-fast). Text preview: %s",
+            text[:300] if text else "empty",
+        )
+        return None
 
     logger.info(
         "All direct JSON parsing failed, attempting LLM repair. Preview: %s",

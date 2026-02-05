@@ -103,6 +103,14 @@ export const jobStatusSchema = z.object({
   error: z.string().nullable().optional()
 });
 
+export const sceneWorkflowStatusSchema = z.object({
+  scene_id: z.string().uuid(),
+  planning_locked: z.boolean(),
+  planning_complete: z.boolean(),
+  render_complete: z.boolean(),
+  latest_artifacts: z.record(z.string(), z.string().uuid().nullable())
+});
+
 
 
 export const sceneGenerateFullSchema = z.object({
@@ -173,6 +181,7 @@ export type ArtifactIdResponse = z.infer<typeof artifactIdSchema>;
 export type Artifact = z.infer<typeof artifactSchema>;
 export type StyleItem = z.infer<typeof styleItemSchema>;
 export type StoryGenerateResponse = z.infer<typeof storyGenerateResponseSchema>;
+export type SceneWorkflowStatus = z.infer<typeof sceneWorkflowStatusSchema>;
 
 export type CharacterRef = z.infer<typeof characterRefSchema>;
 export type CharacterVariant = z.infer<typeof characterVariantSchema>;
@@ -399,4 +408,3 @@ export type ActorCharacterRead = z.infer<typeof actorCharacterReadSchema>;
 export type GenerateActorResponse = z.infer<typeof generateActorResponseSchema>;
 export type DeleteActorResponse = z.infer<typeof deleteActorResponseSchema>;
 export type DeleteVariantResponse = z.infer<typeof deleteVariantResponseSchema>;
-

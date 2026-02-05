@@ -33,8 +33,9 @@ def run_transition_type_classifier(
     gemini: GeminiClient | None = None,
 ) -> Any:
     """Classify transitions between visual beats and persist as artifact."""
-    if gemini is None or not visual_beats or len(visual_beats) < 2:
-        return None
+    if gemini is None:
+        logger.error("transition_classifier fail-fast: Gemini client missing (scene_id=%s)", scene_id)
+        raise RuntimeError("transition_classifier requires Gemini client (fallback disabled)")
 
     # Check for existing artifact
     svc = ArtifactService(db)
@@ -42,14 +43,22 @@ def run_transition_type_classifier(
     if existing:
         return existing
 
+    if not visual_beats or len(visual_beats) < 2:
+        logger.info(
+            "transition_classifier skipped: insufficient beats (scene_id=%s, beats=%d); writing empty transitions",
+            scene_id,
+            len(visual_beats or []),
+        )
+        return svc.create_artifact(scene_id, ARTIFACT_TRANSITION_MAP, {"transitions": []})
+
     rendered_prompt = _prompt_transition_classifier(
         visual_beats_json=json.dumps(visual_beats, ensure_ascii=False, indent=2)
     )
 
     result = _maybe_json_from_gemini(gemini, rendered_prompt)
     if not result or "transitions" not in result:
-        logger.error(f"Failed to classify transitions for scene {scene_id}")
-        return None
+        logger.error(f"transition_classifier generation failed: invalid Gemini JSON (scene_id={scene_id})")
+        raise RuntimeError("transition_classifier failed: Gemini returned invalid JSON")
         
     # Create versioned artifact
     payload = {"transitions": result["transitions"]}

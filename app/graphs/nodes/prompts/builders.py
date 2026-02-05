@@ -233,13 +233,19 @@ def _prompt_blind_test(scene_text: str, panel_semantics: dict) -> str:
     )
 
 
-def _prompt_character_extraction(source_text: str, max_characters: int) -> str:
+def _prompt_character_extraction(
+    source_text: str,
+    max_characters: int,
+    character_hints: list[dict] | None = None,
+) -> str:
     """Prompt for LLM-based character extraction."""
+    hints_json = json.dumps(character_hints or [], ensure_ascii=False, indent=2)
     return render_prompt(
         "prompt_character_extraction",
         system_prompt_json=SYSTEM_PROMPT_JSON,
         global_constraints=GLOBAL_CONSTRAINTS,
         max_characters=max_characters,
+        character_hints_json=hints_json,
         source_text=source_text,
     )
 
