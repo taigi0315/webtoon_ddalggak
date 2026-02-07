@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.api.deps import DbSessionDep
-from app.core.settings import settings
+from app.core.gemini_factory import build_gemini_client
 from app.db.models import Artifact, Scene
 from app.graphs import nodes
 from app.services.artifacts import ArtifactService
@@ -36,7 +36,7 @@ def _scene_or_404(db, scene_id: uuid.UUID) -> Scene:
 
 
 def _build_gemini_client() -> GeminiClient:
-    return nodes._build_gemini_client()
+    return build_gemini_client()
 
 
 @router.post("/scenes/{scene_id}/review/regenerate", response_model=ArtifactIdResponse)

@@ -15,33 +15,16 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from app.core.gemini_factory import build_gemini_client
 from app.core.settings import settings
 from app.db.models import Character, CharacterReferenceImage, CharacterVariant, Image
 from app.prompts.loader import render_prompt
 from app.services.storage import LocalMediaStore
-from app.services.vertex_gemini import GeminiClient
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-
-
-def _build_gemini_client() -> GeminiClient:
-    """Build Gemini client for image generation."""
-    if not settings.google_cloud_project and not settings.gemini_api_key:
-        raise RuntimeError("Gemini is not configured")
-
-    return GeminiClient(
-        project=settings.google_cloud_project,
-        location=settings.google_cloud_location,
-        api_key=settings.gemini_api_key,
-        text_model=settings.gemini_text_model,
-        image_model=settings.gemini_image_model,
-        timeout_seconds=settings.gemini_timeout_seconds,
-        max_retries=settings.gemini_max_retries,
-        initial_backoff_seconds=settings.gemini_initial_backoff_seconds,
-    )
 
 
 def _save_image(image_bytes: bytes, mime_type: str) -> str:
@@ -136,7 +119,7 @@ def generate_character_profile_sheet(
     logger.info(f"Generating profile sheet for {project_info} with style: {image_style_id}")
 
     # Generate image
-    client = _build_gemini_client()
+    client = build_gemini_client()
     image_bytes, mime_type = client.generate_image(prompt=prompt)
 
     # Save image
@@ -303,7 +286,7 @@ def generate_variant_from_reference(
     ref_bytes, ref_mime = _load_image_bytes(ref_image.image_url)
 
     # Generate with reference
-    gemini = _build_gemini_client()
+    gemini = build_gemini_client()
     image_bytes, mime_type = gemini.generate_image(
         prompt=prompt,
         reference_images=[(ref_bytes, ref_mime)],

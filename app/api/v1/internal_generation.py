@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import DbSessionDep
 from app.config.loaders import has_image_style
+from app.core.gemini_factory import build_gemini_client
 from app.db.models import Scene
 from app.graphs import nodes
 from app.services.vertex_gemini import GeminiClient
@@ -26,7 +27,7 @@ class GenerateRenderSpecRequest(BaseModel):
 
 
 def _build_gemini_client() -> GeminiClient:
-    return nodes._build_gemini_client()
+    return build_gemini_client()
 
 
 def _scene_or_404(db, scene_id: uuid.UUID) -> Scene:

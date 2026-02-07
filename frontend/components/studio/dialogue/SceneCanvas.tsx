@@ -8,17 +8,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSceneRenders } from "@/lib/api/queries";
-import type { Scene, Artifact } from "@/lib/api/types";
+import type { Scene } from "@/lib/api/types";
+import { getLatestArtifact } from "@/lib/utils/artifacts";
 import { getImageUrl } from "@/lib/utils/media";
 import { DialogueBubbleComponent } from "./DialogueBubble";
 import { estimateBubbleHeight, mapDialogueTypeToBubbleType } from "./utils";
 import type { DialogueBubble, ToolType } from "./types";
-
-function getLatestArtifact(artifacts: Artifact[], type: string) {
-    return artifacts
-        .filter((artifact) => artifact.type === type)
-        .sort((a, b) => b.version - a.version)[0];
-}
 
 interface SceneCanvasProps {
     scene: Scene;

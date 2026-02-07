@@ -35,6 +35,7 @@ import type {
   CharacterVariantSuggestion,
   LibraryCharacter
 } from "@/lib/api/types";
+import { getImageUrl as getMediaUrl } from "@/lib/utils/media";
 
 export default function CharacterStudioPage() {
   const queryClient = useQueryClient();
@@ -428,12 +429,7 @@ function CharacterDetail({
     });
   };
 
-  const getImageUrl = (ref: CharacterRef) => {
-    if (ref.image_url.startsWith("/media/")) {
-      return `http://localhost:8000${ref.image_url}`;
-    }
-    return ref.image_url;
-  };
+  const getImageUrl = (ref: CharacterRef) => getMediaUrl(ref.image_url);
 
   const primaryRef = refsQuery.data?.find((r) => r.is_primary);
   const previewRef =
@@ -1074,7 +1070,7 @@ function LoadCharacterFromLibrary({
                         <div className="aspect-square bg-slate-100 rounded mb-2 overflow-hidden">
                           {char.primary_reference_image ? (
                              <img 
-                               src={char.primary_reference_image.image_url.startsWith("/media/") ? `http://localhost:8000${char.primary_reference_image.image_url}` : char.primary_reference_image.image_url} 
+                               src={getMediaUrl(char.primary_reference_image.image_url)}
                                alt={char.name} 
                                className="w-full h-full object-cover" 
                              />

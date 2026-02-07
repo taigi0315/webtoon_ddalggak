@@ -16,13 +16,9 @@ import {
   generateSceneRenderAsync,
   fetchJob
 } from "@/lib/api/queries";
-import type { Scene, Artifact } from "@/lib/api/types";
-
-function getLatestArtifact(artifacts: Artifact[], type: string) {
-  return artifacts
-    .filter((artifact) => artifact.type === type)
-    .sort((a, b) => b.version - a.version)[0];
-}
+import type { Scene } from "@/lib/api/types";
+import { getLatestArtifact } from "@/lib/utils/artifacts";
+import { getImageUrl } from "@/lib/utils/media";
 
 export default function ScenesPage() {
   const [projectId, setProjectId] = useState("");
@@ -566,13 +562,7 @@ function SceneDetail({
     }
   };
 
-  const getImageUrl = (url: string) => {
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    if (url.startsWith("/media/")) return `http://localhost:8000${url}`;
-    if (url.startsWith("media/")) return `http://localhost:8000/${url}`;
-    if (url.startsWith("/")) return `http://localhost:8000${url}`;
-    return `http://localhost:8000/${url}`;
-  };
+  // getImageUrl imported from @/lib/utils/media
 
   const extractImageUrl = (payload: Artifact["payload"] | undefined) => {
     if (!payload || typeof payload !== "object") return null;

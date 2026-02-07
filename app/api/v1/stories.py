@@ -33,28 +33,12 @@ from app.services.story_analysis import (
     estimate_scene_count_heuristic,
     estimate_scene_count_llm,
 )
+from app.core.gemini_factory import GeminiNotConfiguredError, build_gemini_client
 from app.core.request_context import get_request_id, reset_request_id, set_request_id
-from app.services.vertex_gemini import GeminiClient
 
 
 router = APIRouter(tags=["stories"])
 logger = logging.getLogger(__name__)
-
-
-def _build_gemini_client() -> GeminiClient:
-    if not settings.google_cloud_project and not settings.gemini_api_key:
-        raise HTTPException(status_code=500, detail="Gemini is not configured")
-
-    return GeminiClient(
-        project=settings.google_cloud_project,
-        location=settings.google_cloud_location,
-        api_key=settings.gemini_api_key,
-        text_model=settings.gemini_text_model,
-        image_model=settings.gemini_image_model,
-        timeout_seconds=settings.gemini_timeout_seconds,
-        max_retries=settings.gemini_max_retries,
-        initial_backoff_seconds=settings.gemini_initial_backoff_seconds,
-    )
 
 
 @router.post("/projects/{project_id}/stories", response_model=StoryRead)
@@ -155,7 +139,7 @@ def generate_story_blueprint(story_id: uuid.UUID, payload: StoryGenerateRequest,
     if payload.style_id and not has_image_style(payload.style_id):
         raise HTTPException(status_code=400, detail="unknown style_id")
 
-    gemini = _build_gemini_client()
+    gemini = build_gemini_client()
 
     planning_mode = "characters_only"
 
@@ -238,7 +222,7 @@ def _handle_story_blueprint_job(job: job_queue.JobRecord) -> dict | None:
             new_value={"generation_status": "running"},
         )
 
-        gemini = _build_gemini_client()
+        gemini = build_gemini_client()
         planning_mode = "characters_only"
         run_story_build_graph(
             db=db,

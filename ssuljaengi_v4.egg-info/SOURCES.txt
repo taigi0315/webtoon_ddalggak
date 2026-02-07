@@ -9,7 +9,9 @@ ssuljaengi_v4.egg-info/requires.txt
 ssuljaengi_v4.egg-info/top_level.txt
 tests/test_art_director.py
 tests/test_art_director_integration.py
+tests/test_bubble_opacity.py
 tests/test_casting.py
+tests/test_casting_utils.py
 tests/test_character_consistency.py
 tests/test_character_library.py
 tests/test_character_normalization.py
@@ -23,9 +25,11 @@ tests/test_dialogue_layer.py
 tests/test_environment_anchors.py
 tests/test_episode_guardrails.py
 tests/test_episodes.py
+tests/test_exceptions.py
 tests/test_exports.py
 tests/test_gemini_endpoints.py
 tests/test_gemini_error_handling.py
+tests/test_gemini_factory.py
 tests/test_generation_batch.py
 tests/test_generation_full.py
 tests/test_genre_guidelines_deprecation.py
@@ -36,12 +40,14 @@ tests/test_image_style_authority.py
 tests/test_json_parsing.py
 tests/test_json_repair.py
 tests/test_layers.py
+tests/test_node_utils.py
 tests/test_panel_plan_features.py
 tests/test_planning_lock.py
 tests/test_prompt_layering.py
 tests/test_prompt_validation.py
 tests/test_prompts_loader.py
 tests/test_prompts_metadata.py
+tests/test_qc_report.py
 tests/test_render_history.py
 tests/test_review_endpoints.py
 tests/test_script_writer.py
