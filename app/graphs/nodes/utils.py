@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import loaders
+from app.core.gemini_factory import build_gemini_client
 from app.core.telemetry import trace_span
 from app.core.settings import settings
 from app.db.models import Character, CharacterReferenceImage, Scene, Story, StoryCharacter
@@ -96,23 +97,8 @@ logger = logging.getLogger(__name__)
 
 
 def _build_gemini_client() -> GeminiClient:
-    if not settings.google_cloud_project and not settings.gemini_api_key:
-        raise RuntimeError("Gemini is not configured")
-
-    return GeminiClient(
-        project=settings.google_cloud_project,
-        location=settings.google_cloud_location,
-        api_key=settings.gemini_api_key,
-        text_model=settings.gemini_text_model,
-        image_model=settings.gemini_image_model,
-        timeout_seconds=settings.gemini_timeout_seconds,
-        max_retries=settings.gemini_max_retries,
-        initial_backoff_seconds=settings.gemini_initial_backoff_seconds,
-        fallback_text_model=settings.gemini_fallback_text_model,
-        fallback_image_model=settings.gemini_fallback_image_model,
-        circuit_breaker_threshold=settings.gemini_circuit_breaker_threshold,
-        circuit_breaker_timeout=settings.gemini_circuit_breaker_timeout,
-    )
+    """Deprecated: Use app.core.gemini_factory.build_gemini_client() directly."""
+    return build_gemini_client()
 
 
 _BLANK_PNG_BYTES = (

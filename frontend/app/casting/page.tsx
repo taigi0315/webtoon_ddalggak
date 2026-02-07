@@ -24,6 +24,7 @@ import type {
     CharacterTraitsInput,
     StyleItem
 } from "@/lib/api/types";
+import { getImageUrl } from "@/lib/utils/media";
 
 type GenerationState = {
     imageUrl: string | null;
@@ -257,13 +258,6 @@ function LibraryTab({
         }
     });
 
-    const getImageUrl = (url: string) => {
-        if (url.startsWith("/media/")) {
-            return `http://localhost:8000${url}`;
-        }
-        return url;
-    };
-
     if (isLoading) {
         return <div className="text-center py-12 text-slate-500">Loading actor library...</div>;
     }
@@ -376,13 +370,6 @@ function ActorDetail({
 
     const imageUrl =
         previewVariant?.reference_image_url ?? previewVariant?.generated_image_urls?.[0];
-
-    const getImageUrl = (url: string) => {
-        if (url.startsWith("/media/")) {
-            return `http://localhost:8000${url}`;
-        }
-        return url;
-    };
 
     return (
         <div className="grid gap-6 lg:grid-cols-[1fr,320px]">
@@ -651,13 +638,6 @@ function GenerateTab({
     const [displayName, setDisplayName] = useState("");
     const [description, setDescription] = useState("");
 
-    const getImageUrl = (url: string) => {
-        if (url.startsWith("/media/")) {
-            return `http://localhost:8000${url}`;
-        }
-        return url;
-    };
-
     return (
         <div className="grid gap-6 lg:grid-cols-[1fr,360px]">
             {/* Preview */}
@@ -921,13 +901,10 @@ function ImportTab({
         setPreviewUrl(url);
     };
 
-    const getImageUrl = (url: string) => {
+    const getImportPreviewUrl = (url: string) => {
         if (!url) return "";
         if (url.startsWith("blob:")) return url;
-        if (url.startsWith("/media/")) {
-            return `http://localhost:8000${url}`;
-        }
-        return url;
+        return getImageUrl(url);
     };
 
     const isPending = importUrlMutation.isPending || importFileMutation.isPending;
@@ -947,7 +924,7 @@ function ImportTab({
                     {previewUrl ? (
                         <div className="relative h-[480px] w-full overflow-hidden rounded-xl bg-slate-100">
                             <img
-                                src={getImageUrl(previewUrl)}
+                                src={getImportPreviewUrl(previewUrl)}
                                 alt="Import preview"
                                 className="mx-auto h-full object-contain"
                                 onError={(e) => {

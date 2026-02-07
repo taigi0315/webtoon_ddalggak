@@ -18,8 +18,9 @@ from app.graphs import nodes
 from app.graphs.pipeline import run_full_pipeline, run_scene_planning, run_scene_render
 from app.services.artifacts import ArtifactService
 from app.services import job_queue
-from app.services.vertex_gemini import GeminiClient
+from app.core.gemini_factory import build_gemini_client
 from app.core.request_context import get_request_id, log_context, reset_request_id, set_request_id
+from app.services.vertex_gemini import GeminiClient
 
 
 router = APIRouter(tags=["generation"])
@@ -112,7 +113,7 @@ def _ensure_render_prerequisites(
 
 
 def _build_gemini_client() -> GeminiClient:
-    return nodes._build_gemini_client()
+    return build_gemini_client()
 
 
 def _scene_or_404(db, scene_id: uuid.UUID) -> Scene:

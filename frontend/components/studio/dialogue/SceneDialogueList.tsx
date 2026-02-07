@@ -11,13 +11,8 @@ import {
     fetchDialogueSuggestions,
     fetchSceneArtifacts
 } from "@/lib/api/queries";
-import type { Artifact, DialogueLine, DialoguePanel } from "@/lib/api/types";
-
-function getLatestArtifact(artifacts: Artifact[], type: string) {
-    return artifacts
-        .filter((artifact) => artifact.type === type)
-        .sort((a, b) => b.version - a.version)[0];
-}
+import type { DialogueLine, DialoguePanel } from "@/lib/api/types";
+import { getLatestArtifact } from "@/lib/utils/artifacts";
 
 interface SceneDialogueListProps {
     sceneId: string;

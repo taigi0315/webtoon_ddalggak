@@ -23,6 +23,7 @@ import type {
   CharacterTraitsInput,
   StyleItem
 } from "@/lib/api/types";
+import { getImageUrl } from "@/lib/utils/media";
 
 type GenerationState = {
   imageUrl: string | null;
@@ -296,13 +297,6 @@ function LibraryTab({
     }
   });
 
-  const getImageUrl = (url: string) => {
-    if (url.startsWith("/media/")) {
-      return `http://localhost:8000${url}`;
-    }
-    return url;
-  };
-
   if (isLoading) {
     return <div className="text-center py-12 text-slate-500">Loading actor library...</div>;
   }
@@ -420,13 +414,6 @@ function ActorDetail({
 
   const imageUrl =
     previewVariant?.reference_image_url ?? previewVariant?.generated_image_urls?.[0];
-
-  const getImageUrl = (url: string) => {
-    if (url.startsWith("/media/")) {
-      return `http://localhost:8000${url}`;
-    }
-    return url;
-  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr,320px]">
@@ -723,13 +710,6 @@ function GenerateTab({
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
 
-  const getImageUrl = (url: string) => {
-    if (url.startsWith("/media/")) {
-      return `http://localhost:8000${url}`;
-    }
-    return url;
-  };
-
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr,360px]">
       {/* Preview */}
@@ -944,13 +924,6 @@ function ImportTab({
       traits,
       imageStyleId: imageStyleId !== "default" ? imageStyleId : null
     });
-  };
-
-  const getImageUrl = (url: string) => {
-    if (url.startsWith("/media/")) {
-      return `http://localhost:8000${url}`;
-    }
-    return url;
   };
 
   return (

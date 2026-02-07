@@ -6,22 +6,18 @@ independent of project/story context. Actors are global and can be
 "cast" into any project or story.
 """
 
+import json
 import logging
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
-
-logger = logging.getLogger(__name__)
 from sqlalchemy import select
-import json
-import shutil
-import uuid
-import os
-from pathlib import Path
 
 from app.api.deps import DbSessionDep
 from app.core.settings import settings
+
+logger = logging.getLogger(__name__)
 from app.api.v1.schemas import (
     ActorCharacterRead,
     ActorVariantRead,
