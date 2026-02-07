@@ -341,6 +341,107 @@ def suggest_character_variants(
     return suggestions
 
 
+def detect_outfit_context(text: str) -> tuple[str | None, str | None]:
+    """Detect a dramatic outfit context from text.
+
+    Returns:
+        (outfit_description, trigger_type)
+    """
+    text = (text or "").strip()
+    if not text:
+        return None, None
+
+    events = _detect_special_events(text)
+    if events:
+        event_type = events[0]["event_type"]
+        outfit = _OUTFIT_SUGGESTIONS.get(event_type)
+        if outfit:
+            return outfit, "special_event"
+
+    activities = _detect_activity_changes(text)
+    if activities:
+        activity_type = activities[0]["activity_type"]
+        outfit = _OUTFIT_SUGGESTIONS.get(activity_type)
+        if outfit:
+            return outfit, "activity_change"
+
+    return None, None
+
+
+def build_variant_plan_for_scenes(
+    scenes: list[dict],
+    character_names: list[str],
+) -> list[dict]:
+    """Build a scene-range variant plan based on dramatic outfit changes.
+
+    Each plan item includes character_name, outfit, scene_ids, and scene_range.
+    """
+    if not scenes or not character_names:
+        return []
+
+    plans: list[dict] = []
+    for name in character_names:
+        current_outfit: str | None = None
+        current_scene_ids: list[str] = []
+        current_range_start: int | None = None
+
+        for idx, scene in enumerate(scenes, start=1):
+            scene_text = str(scene.get("source_text") or "")
+            if name.lower() not in scene_text.lower():
+                continue
+
+            outfit, trigger = detect_outfit_context(scene_text)
+            if not outfit:
+                if current_outfit and current_scene_ids:
+                    plans.append(
+                        {
+                            "character_name": name,
+                            "variant_type": "outfit_change",
+                            "override_attributes": {"outfit": current_outfit},
+                            "scene_ids": list(current_scene_ids),
+                            "scene_range": f"{current_range_start}-{idx - 1}",
+                            "trigger": trigger or "revert_to_base",
+                        }
+                    )
+                current_outfit = None
+                current_scene_ids = []
+                current_range_start = None
+                continue
+
+            if outfit != current_outfit:
+                if current_outfit and current_scene_ids:
+                    plans.append(
+                        {
+                            "character_name": name,
+                            "variant_type": "outfit_change",
+                            "override_attributes": {"outfit": current_outfit},
+                            "scene_ids": list(current_scene_ids),
+                            "scene_range": f"{current_range_start}-{idx - 1}",
+                            "trigger": trigger or "change",
+                        }
+                    )
+                current_outfit = outfit
+                current_scene_ids = []
+                current_range_start = idx
+
+            if scene.get("scene_id"):
+                current_scene_ids.append(str(scene["scene_id"]))
+
+        if current_outfit and current_scene_ids:
+            plans.append(
+                {
+                    "character_name": name,
+                    "variant_type": "outfit_change",
+                    "override_attributes": {"outfit": current_outfit},
+                    "scene_ids": list(current_scene_ids),
+                    "scene_range": f"{current_range_start}-{len(scenes)}",
+                    "trigger": "end",
+                }
+            )
+
+    return plans
+
+
 def suggest_variants_llm_prompt(
     story_text: str,
     character_names: list[str],

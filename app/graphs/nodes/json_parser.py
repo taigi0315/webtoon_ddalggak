@@ -194,10 +194,20 @@ def _maybe_json_from_gemini(
     """
     full_prompt = f"{SYSTEM_PROMPT_JSON}\n\n{prompt}"
 
-    try:
-        text = gemini.generate_text(prompt=full_prompt)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("gemini prompt failed: %s", exc)
+    text: str | None = None
+    for attempt in range(2):
+        try:
+            text = gemini.generate_text(prompt=full_prompt)
+            break
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc)
+            if attempt == 0 and ("empty content" in msg or "no textual content" in msg):
+                logger.warning("gemini returned empty content; retrying once")
+                continue
+            logger.warning("gemini prompt failed: %s", exc)
+            return None
+
+    if text is None:
         return None
 
     try:

@@ -68,6 +68,9 @@ class Scene(Base):
     scene_importance: Mapped[str | None] = mapped_column(String(24), nullable=True)
     planning_locked: Mapped[bool] = mapped_column(nullable=False, default=False)
     image_style_override: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    selected_render_artifact_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("artifacts.artifact_id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[object] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()

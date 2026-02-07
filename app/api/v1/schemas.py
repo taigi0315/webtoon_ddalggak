@@ -265,6 +265,8 @@ class CharacterGenerateRefsRequest(BaseModel):
     ref_types: list[str] = Field(default=["face"], min_length=1)
     count_per_type: int = Field(default=2, ge=1, le=5)
     style_id: str | None = None
+    story_id: uuid.UUID | None = None
+    auto_approve: bool = True
 
 
 class CharacterGenerateRefsResponse(BaseModel):

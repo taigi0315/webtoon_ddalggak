@@ -391,12 +391,25 @@ VISUAL_STYLE_PROMPTS = {k: v["prompt"] for k, v in IMAGE_STYLE_PROFILES.items()}
 
 def get_style_semantic_hint(style_id: str) -> str:
     """Return a semantic description of the style for LLM reasoning."""
+    from app.config.loaders import load_style_guide_text
+
+    if style_id:
+        guide = load_style_guide_text(style_id)
+        if guide:
+            return _truncate_style_text(guide)
+
     profile = IMAGE_STYLE_PROFILES.get(style_id)
     if not profile:
         return f"Unknown style ID: {style_id}"
-    
+
     vibe = profile["aesthetic_vibe"]
     elements = ", ".join(profile["visual_elements"])
     range_ = profile["emotional_range"]
-    
+
     return f"AESTHETIC: {vibe}\nELEMENTS: {elements}\nBEST FOR: {range_}"
+
+
+def _truncate_style_text(text: str, max_chars: int = 4000) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1] + "…"

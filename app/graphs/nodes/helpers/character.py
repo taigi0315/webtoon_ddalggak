@@ -145,10 +145,12 @@ def _inject_character_identities(
                 variant = variants_by_character.get(c.character_id)
                 if not variant:
                     # Fallback to searching first variant for this character if it's a tuple map
-                    for (cid, vtype), v in variants_by_character.items():
-                        if cid == c.character_id:
-                            variant = v
-                            break
+                    for key, v in variants_by_character.items():
+                        if isinstance(key, tuple) and len(key) == 2:
+                            cid, _vtype = key
+                            if cid == c.character_id:
+                                variant = v
+                                break
 
         variant_outfit = None
         if variant and isinstance(variant.override_attributes, dict):

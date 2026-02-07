@@ -12,6 +12,7 @@ from app.core.metrics import track_graph_node
 from app.core.request_context import log_context
 from app.core.telemetry import trace_span
 from app.services.artifacts import ArtifactService
+from app.services.scene_importance import analyze_scene_importance
 
 from ..utils import (
     ARTIFACT_SCENE_INTENT,
@@ -64,8 +65,14 @@ def run_panel_plan_generator(
                 scene = _get_scene(db, scene_id)
                 characters = _list_characters(db, scene.story_id)
                 character_names = [c.name for c in characters]
-                panel_count = max(1, min(int(panel_count), 5))
+                panel_count = max(1, min(int(panel_count), 3))
                 importance = scene.scene_importance
+                if not importance:
+                    analysis = analyze_scene_importance(scene.source_text or "")
+                    importance = analysis.importance.value
+                    scene.scene_importance = importance
+                    db.add(scene)
+                    db.commit()
 
                 if importance:
                     panel_count = _panel_count_for_importance(importance, scene.source_text, panel_count)
@@ -94,19 +101,23 @@ def run_panel_plan_generator(
                     f"importance={importance}"
                 )
 
-                llm = _maybe_json_from_gemini(
-                    gemini,
-                    _prompt_panel_plan(
-                        scene.source_text,
-                        panel_count,
-                        scene_intent=scene_intent,
-                        scene_importance=importance,
-                        character_names=character_names,
-                        qc_rules=qc_rules,
-                    ),
+                prompt = _prompt_panel_plan(
+                    scene.source_text,
+                    panel_count,
+                    scene_intent=scene_intent,
+                    scene_importance=importance,
+                    character_names=character_names,
+                    qc_rules=qc_rules,
                 )
+                llm = _maybe_json_from_gemini(gemini, prompt)
                 if not isinstance(llm, dict) or not isinstance(llm.get("panels"), list):
-                    logger.error("panel_plan generation failed: invalid Gemini JSON (scene_id=%s)", scene_id)
+                    logger.error(
+                        "panel_plan generation failed: invalid Gemini JSON (scene_id=%s request_id=%s model=%s prompt_len=%s)",
+                        scene_id,
+                        gemini.last_request_id,
+                        gemini.last_model,
+                        len(prompt),
+                    )
                     raise RuntimeError("panel_plan failed: Gemini returned invalid JSON")
 
                 plan = {"panels": llm["panels"]}

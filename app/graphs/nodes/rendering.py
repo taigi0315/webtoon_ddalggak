@@ -9,9 +9,11 @@ from app.core.request_context import log_context
 from app.graphs.nodes.helpers.character import _active_variants_by_character
 from app.graphs.nodes.helpers.media import _load_character_reference_images
 from app.graphs.nodes.helpers.scene import _get_scene, _list_characters
+from app.graphs.nodes.prompts.builders import _prompt_variant_plan
 from app.graphs.nodes.utils import _character_ids_with_reference_images, _render_image_from_prompt
-from app.config.loaders import has_image_style
+from app.config.loaders import has_image_style, load_character_style_text
 from app.core.image_styles import get_style_semantic_hint
+from app.db.models import CharacterReferenceImage, CharacterVariant
 
 
 def compute_prompt_compiler(
@@ -74,6 +76,13 @@ def run_prompt_compiler(
                         f"Layout/template panel count mismatch: panel_semantics={panel_count} layout={layout_count}"
                     )
 
+                variant_overrides, variant_ref_ids = _resolve_scene_variant_overrides(
+                    db=db,
+                    scene=scene,
+                )
+                if variant_overrides:
+                    variants_by_character = {**variants_by_character, **variant_overrides}
+
                 prompt = prompt_override
                 if not prompt:
                     prompt = _compile_prompt(
@@ -107,6 +116,7 @@ def run_prompt_compiler(
                     "panel_count": panel_count,
                     "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
                     "active_char_ids": active_char_ids,
+                    "variant_ref_ids": {str(k): str(v) for k, v in variant_ref_ids.items()},
                 }
                 return svc.create_artifact(scene_id=scene_id, type=ARTIFACT_RENDER_SPEC, payload=payload)
 
@@ -129,6 +139,7 @@ def generate_character_reference_image(
     style_prompt = get_character_style_prompt(character.gender, character.age_range)
     identity = character.identity_line or character.description or character.name
     effective_style_id = style_id if style_id and has_image_style(style_id) else None
+    character_style_guide = load_character_style_text(effective_style_id) if effective_style_id else None
 
     prompt_parts = [
         "High-quality character reference image.",
@@ -139,9 +150,9 @@ def generate_character_reference_image(
     if style_prompt:
         prompt_parts.append(style_prompt)
     if effective_style_id:
-        prompt_parts.append(
-            f"Style direction ({effective_style_id}): {get_style_semantic_hint(effective_style_id)}"
-        )
+        prompt_parts.append(f"Image style guide ({effective_style_id}): {get_style_semantic_hint(effective_style_id)}")
+    if character_style_guide:
+        prompt_parts.append(f"Character style guide ({effective_style_id}): {character_style_guide}")
     prompt_parts.append("Plain background, clean silhouette, full body if possible.")
 
     prompt = " ".join([part for part in prompt_parts if part])
@@ -212,6 +223,7 @@ def generate_character_variant_reference_image(
     variant_type: str,
     override_attributes: dict,
     base_reference: CharacterReferenceImage,
+    style_id: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> CharacterReferenceImage:
     character = db.get(Character, character_id)
@@ -224,6 +236,11 @@ def generate_character_variant_reference_image(
     gemini = gemini or _build_gemini_client()
 
     style_prompt = get_character_style_prompt(character.gender, character.age_range)
+    effective_style_id = style_id if style_id and has_image_style(style_id) else None
+    image_style_guide = get_style_semantic_hint(effective_style_id) if effective_style_id else None
+    character_style_guide = (
+        load_character_style_text(effective_style_id) if effective_style_id else None
+    )
     identity = character.identity_line or character.description or character.name
     variant_text = _format_variant_attributes(override_attributes)
 
@@ -240,6 +257,12 @@ def generate_character_variant_reference_image(
         prompt_parts.append(variant_text)
     if style_prompt:
         prompt_parts.append(style_prompt)
+    if image_style_guide:
+        prompt_parts.append(f"Image style guide ({effective_style_id}): {image_style_guide}")
+    if character_style_guide:
+        prompt_parts.append(
+            f"Character style guide ({effective_style_id}): {character_style_guide}"
+        )
     prompt_parts.append("Plain background, clean silhouette.")
 
     prompt = " ".join([part for part in prompt_parts if part])
@@ -269,12 +292,122 @@ def generate_character_variant_reference_image(
             "variant_type": variant_type,
             "override_attributes": override_attributes,
             "base_reference_id": str(base_reference.reference_image_id),
+            "style_id": effective_style_id,
         },
     )
     db.add(ref)
     db.commit()
     db.refresh(ref)
     return ref
+
+
+def _resolve_scene_variant_overrides(
+    db: Session,
+    scene: Scene,
+) -> tuple[dict[uuid.UUID, CharacterVariant], dict[uuid.UUID, uuid.UUID]]:
+    """Select pre-generated variants for this scene by scene_id mapping."""
+    variants = list(
+        db.execute(
+            select(CharacterVariant).where(CharacterVariant.story_id == scene.story_id)
+        ).scalars().all()
+    )
+    overrides: dict[uuid.UUID, CharacterVariant] = {}
+    ref_ids: dict[uuid.UUID, uuid.UUID] = {}
+    scene_id_str = str(scene.scene_id)
+
+    for variant in variants:
+        if not isinstance(variant.override_attributes, dict):
+            continue
+        scene_ids = variant.override_attributes.get("scene_ids") or []
+        if scene_id_str in scene_ids and variant.reference_image_id:
+            overrides[variant.character_id] = variant
+            ref_ids[variant.character_id] = variant.reference_image_id
+
+    return overrides, ref_ids
+
+
+def _build_scene_list_for_variant_plan(scenes: list[Scene], max_scenes: int = 20) -> str:
+    lines: list[str] = []
+    for idx, scene in enumerate(scenes[:max_scenes], start=1):
+        text = (scene.source_text or "").strip()
+        if len(text) > 480:
+            text = text[:480].rstrip() + "..."
+        lines.append(f"Scene {idx} (id={scene.scene_id}): {text}")
+    if len(scenes) > max_scenes:
+        lines.append(f"... {len(scenes) - max_scenes} more scenes omitted")
+    return "\n".join(lines).strip()
+
+
+def generate_character_variant_plan_for_story(
+    db: Session,
+    story_id: uuid.UUID,
+    gemini: GeminiClient | None = None,
+) -> list[dict]:
+    story = db.get(Story, story_id)
+    if story is None:
+        raise ValueError("story not found")
+
+    scenes = list(
+        db.execute(select(Scene).where(Scene.story_id == story_id).order_by(Scene.created_at.asc()))
+        .scalars()
+        .all()
+    )
+    if not scenes:
+        return []
+
+    characters = _list_characters(db, story_id)
+    character_names = [c.name for c in characters if c.name]
+    if not character_names:
+        return []
+
+    if gemini is None:
+        gemini = _build_gemini_client()
+
+    scene_list = _build_scene_list_for_variant_plan(scenes)
+    prompt = _prompt_variant_plan(story_id, story.title, scene_list, character_names)
+    raw = _maybe_json_from_gemini(
+        gemini,
+        prompt,
+        expected_schema=(
+            "{ variants: [{ character_name: string, variant_type: string, "
+            "override_attributes: { scene_ids: string[], scene_range: string } }] }"
+        ),
+    )
+
+    variants = []
+    if isinstance(raw, dict):
+        variants = raw.get("variants") if isinstance(raw.get("variants"), list) else []
+    if not variants:
+        raise RuntimeError("variant_plan failed: Gemini returned empty or invalid JSON")
+
+    by_name = {c.name.lower(): c for c in characters if c.name}
+    normalized: list[dict] = []
+    for item in variants:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("character_name") or "").strip()
+        if not name:
+            continue
+        character = by_name.get(name.lower())
+        if not character:
+            continue
+        variant_type = str(item.get("variant_type") or "outfit_change").strip()
+        override_attributes = item.get("override_attributes") if isinstance(item.get("override_attributes"), dict) else {}
+        scene_ids = override_attributes.get("scene_ids") if isinstance(override_attributes.get("scene_ids"), list) else []
+        outfit = override_attributes.get("outfit") or override_attributes.get("clothing") or override_attributes.get("appearance_change")
+        if not scene_ids:
+            continue
+        # Require explicit outfit/appearance change; skip if only background or scene mapping was provided.
+        if not outfit:
+            continue
+        normalized.append(
+            {
+                "character_id": character.character_id,
+                "variant_type": variant_type,
+                "override_attributes": override_attributes,
+            }
+        )
+    return normalized
 
 def generate_character_variant_suggestions(
     db: Session,
@@ -293,13 +426,7 @@ def generate_character_variant_suggestions(
         return []
 
     if gemini is None:
-        try:
-            gemini = _build_gemini_client()
-        except Exception:  # noqa: BLE001
-            gemini = None
-
-    if gemini is None:
-        return []
+        gemini = _build_gemini_client()
 
     prompt = _prompt_variant_suggestions(story_id, story.title, scene_text, character_names)
     raw = _maybe_json_from_gemini(
@@ -307,12 +434,12 @@ def generate_character_variant_suggestions(
         prompt,
         expected_schema="{ suggestions: [{ character_name: string, variant_type: string, override_attributes: object }] }",
     )
-    if not isinstance(raw, dict):
-        return []
+    suggestions = []
+    if isinstance(raw, dict):
+        suggestions = raw.get("suggestions") if isinstance(raw.get("suggestions"), list) else []
 
-    suggestions = raw.get("suggestions")
-    if not isinstance(suggestions, list):
-        return []
+    if not suggestions:
+        raise RuntimeError("variant_suggestions failed: Gemini returned empty or invalid JSON")
 
     by_name = {c.name.lower(): c for c in characters if c.name}
     normalized: list[dict] = []
@@ -361,18 +488,28 @@ def run_image_renderer(
                     scene = _get_scene(db, scene_id)
                     style_id = render_spec.payload.get("style_id")
                     active_char_ids_str = render_spec.payload.get("active_char_ids")
+                    variant_ref_ids_payload = render_spec.payload.get("variant_ref_ids") or {}
                     active_ids: set[uuid.UUID] | None = None
                     if active_char_ids_str:
                          try:
                              active_ids = {uuid.UUID(s) for s in active_char_ids_str}
                          except ValueError:
                              pass
+
+                    variant_ref_ids = {}
+                    if isinstance(variant_ref_ids_payload, dict):
+                        for k, v in variant_ref_ids_payload.items():
+                            try:
+                                variant_ref_ids[uuid.UUID(k)] = uuid.UUID(v)
+                            except (ValueError, TypeError):
+                                continue
                     
                     reference_images = _load_character_reference_images(
                         db,
                         scene.story_id,
                         style_id=style_id,
                         filter_char_ids=active_ids,
+                        variant_ref_ids=variant_ref_ids,
                     )
 
                 image_bytes, mime_type, metadata = _render_image_from_prompt(

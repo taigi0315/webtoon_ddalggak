@@ -8,6 +8,7 @@ from app.graphs.nodes.prompts.builders import (
     _prompt_panel_plan,
     _prompt_panel_semantics,
     _prompt_scene_intent,
+    _prompt_variant_plan,
     _prompt_variant_suggestions,
     _prompt_visual_plan,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "_prompt_panel_plan",
     "_prompt_panel_semantics",
     "_prompt_scene_intent",
+    "_prompt_variant_plan",
     "_prompt_variant_suggestions",
     "_prompt_visual_plan",
 ]

@@ -32,6 +32,7 @@ def _load_character_reference_images(
     max_images: int = 6,
     style_id: str | None = None,
     filter_char_ids: set[uuid.UUID] | None = None,
+    variant_ref_ids: dict[uuid.UUID, uuid.UUID] | None = None,
 ) -> list[tuple[bytes, str]]:
     variant_refs = _active_variant_reference_images(db, story_id)
     stmt = (
@@ -55,6 +56,25 @@ def _load_character_reference_images(
     # Filter candidates if ID set is provided
     if filter_char_ids is not None:
         refs = [r for r in refs if r.character_id in filter_char_ids]
+
+    # 0. Scene-specific variant refs override
+    if variant_ref_ids:
+        ref_lookup = {
+            ref.reference_image_id: ref
+            for ref in db.execute(
+                select(CharacterReferenceImage).where(
+                    CharacterReferenceImage.reference_image_id.in_(variant_ref_ids.values())
+                )
+            ).scalars().all()
+        }
+        for cid, ref_id in variant_ref_ids.items():
+            if filter_char_ids is not None and cid not in filter_char_ids:
+                continue
+            ref = ref_lookup.get(ref_id)
+            if ref and cid not in picked:
+                picked[cid] = ref
+                if len(picked) >= max_images:
+                    break
 
     # 1. First priority: Variants matching the current scene style
     if style_id:

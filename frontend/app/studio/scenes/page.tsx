@@ -107,7 +107,7 @@ export default function ScenesPage() {
     if (!storyId || !scenesQuery.data) return;
     if (!confirm("This will regenerate images for ALL scenes in the story. Continue?")) return;
     setIsGeneratingAll(true);
-    
+
     const styleId = storyQuery.data?.default_image_style ?? "default";
 
     try {
@@ -122,7 +122,7 @@ export default function ScenesPage() {
           console.error(`Failed to start job for scene ${scene.scene_id}`, e);
         }
       });
-      
+
       await Promise.all(promises);
       alert(`Started generation for ${scenesQuery.data.length} scenes.`);
     } catch (err) {
@@ -329,7 +329,7 @@ export default function ScenesPage() {
               onClick={handleGenerateAll}
               disabled={isGeneratingAll || !storyId}
             >
-               {isGeneratingAll ? "Queuing..." : "Generate All"}
+              {isGeneratingAll ? "Queuing..." : "Generate All"}
             </button>
           </div>
         </div>
@@ -354,11 +354,10 @@ export default function ScenesPage() {
             {scenesQuery.data?.map((scene, index) => (
               <button
                 key={scene.scene_id}
-                className={`w-full text-left rounded-lg border px-3 py-2 transition ${
-                  scene.scene_id === selectedSceneId
-                    ? "border-indigo-400 bg-indigo-50"
-                    : "border-slate-200 bg-white/70 hover:border-indigo-200"
-                }`}
+                className={`w-full text-left rounded-lg border px-3 py-2 transition ${scene.scene_id === selectedSceneId
+                  ? "border-indigo-400 bg-indigo-50"
+                  : "border-slate-200 bg-white/70 hover:border-indigo-200"
+                  }`}
                 onClick={() => setSelectedSceneId(scene.scene_id)}
               >
                 <p className="text-sm font-semibold text-ink">Scene {index + 1}</p>
@@ -443,7 +442,7 @@ function SceneDetail({
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
   const [imageLoadError, setImageLoadError] = useState("");
-  
+
   // Derived state from prop
   const isGenerating = !!activeJobId;
   const isPlanning = !!planningJobId;
@@ -714,16 +713,16 @@ function SceneDetail({
             <ul className="mt-2 list-disc pl-4 text-xs text-amber-900">
               {qcIssueDetails.length > 0
                 ? qcIssueDetails.map((detail: any, idx: number) => (
-                    <li key={`${detail.code || "qc"}-${idx}`}>
-                      <span className="font-medium">{detail.message || detail.code}</span>
-                      {detail.hint ? (
-                        <span className="text-amber-800"> {detail.hint}</span>
-                      ) : null}
-                    </li>
-                  ))
+                  <li key={`${detail.code || "qc"}-${idx}`}>
+                    <span className="font-medium">{detail.message || detail.code}</span>
+                    {detail.hint ? (
+                      <span className="text-amber-800"> {detail.hint}</span>
+                    ) : null}
+                  </li>
+                ))
                 : qcIssues.map((issue: string) => (
-                    <li key={issue}>{issue}</li>
-                  ))}
+                  <li key={issue}>{issue}</li>
+                ))}
             </ul>
           )}
         </div>
@@ -749,8 +748,36 @@ function SceneDetail({
               .sort((a, b) => b.version - a.version)
               .slice(1, 5)
               .map((render) => {
-              const url = render.payload?.image_url
-                ? getImageUrl(String(render.payload.image_url))
+                const url = render.payload?.image_url
+                  ? getImageUrl(String(render.payload.image_url))
+                  : null;
+
+                if (!url) return null;
+
+                return (
+                  <button
+                    key={render.artifact_id}
+                    className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 hover:border-indigo-400"
+                    onClick={() => setSelectedArtifactId(render.artifact_id)}
+                  >
+                    <img
+                      src={url}
+                      alt={`Version ${render.version}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-0 right-0 bg-black/50 px-1 text-[10px] text-white">
+                      v{render.version}
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProceedToDialogueButton({
   scenes,
   activeJobs,
@@ -770,7 +797,7 @@ function ProceedToDialogueButton({
           try {
             const renders = await fetchSceneRenders(scene.scene_id);
             const artifacts = await fetchSceneArtifacts(scene.scene_id);
-            
+
             const latestRenderFromRenders = renders
               ? getLatestArtifact(renders, "render_result")
               : null;
@@ -778,7 +805,7 @@ function ProceedToDialogueButton({
               ? getLatestArtifact(artifacts, "render_result")
               : null;
             const latestRender = latestRenderFromRenders ?? latestRenderFromArtifacts;
-            
+
             return {
               sceneId: scene.scene_id,
               hasRender: !!latestRender,
@@ -800,14 +827,14 @@ function ProceedToDialogueButton({
     refetchInterval: 3000, // Refetch every 3 seconds to catch new renders
     staleTime: 2000
   });
-  
+
   const sceneRenderStatus = renderQueries.data ?? [];
   const allScenesHaveRenders = sceneRenderStatus.length > 0 && sceneRenderStatus.every((s) => s.hasRender);
   const anySceneGenerating = sceneRenderStatus.some((s) => s.isGenerating) || isGeneratingAll;
   const scenesWithoutRenders = sceneRenderStatus.filter((s) => !s.hasRender);
-  
+
   const isDisabled = !allScenesHaveRenders || anySceneGenerating || renderQueries.isLoading;
-  
+
   let tooltipMessage = "";
   if (renderQueries.isLoading) {
     tooltipMessage = "Checking scene render status...";
@@ -816,7 +843,7 @@ function ProceedToDialogueButton({
   } else if (!allScenesHaveRenders) {
     tooltipMessage = `${scenesWithoutRenders.length} scene(s) need image generation`;
   }
-  
+
   if (isDisabled) {
     return (
       <>
@@ -847,7 +874,7 @@ function ProceedToDialogueButton({
       </>
     );
   }
-  
+
   return (
     <Link
       href="/studio/dialogue"
@@ -857,3 +884,44 @@ function ProceedToDialogueButton({
     </Link>
   );
 }
+
+function ScenePromptPanel({
+  sceneId,
+  onPromptOverrideChange
+}: {
+  sceneId: string;
+  onPromptOverrideChange: (prompt: string | null) => void;
+}) {
+  const [value, setValue] = useState("");
+
+  // Reset local state when scene changes
+  useEffect(() => {
+    setValue("");
+    // We should also ensure the parent state is reset, but that might cause loops if not careful.
+    // Ideally the parent resets it, but here we can just ensure we sync up.
+    onPromptOverrideChange(null);
+  }, [sceneId, onPromptOverrideChange]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newVal = e.target.value;
+    setValue(newVal);
+    onPromptOverrideChange(newVal.trim() ? newVal : null);
+  };
+
+  return (
+    <div className="p-4">
+      <h3 className="font-semibold text-ink text-sm mb-2">Prompt Override</h3>
+      <p className="text-xs text-slate-500 mb-3">
+        Optional: Manually specify the image generation prompt. If left empty,
+        the system will generate a prompt based on the scene plan.
+      </p>
+      <textarea
+        className="input w-full h-32 text-sm resize-none"
+        placeholder="Enter custom prompt here..."
+        value={value}
+        onChange={handleChange}
+      />
+    </div>
+  );
+}
+

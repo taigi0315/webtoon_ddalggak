@@ -43,7 +43,8 @@ def _compile_prompt(
     Raises:
         ValueError: If prompt validation fails (forbidden anchors detected or expected style missing)
     """
-    style_desc = _style_description(style_id)
+    style_desc_raw = _style_description(style_id)
+    style_desc, _ = _strip_forbidden_style_anchors(style_desc_raw)
     layout_text = layout_template.get("layout_text", "")
     reference_char_ids = reference_char_ids or set()
     panel_semantics = _inject_character_identities(
@@ -92,7 +93,15 @@ def _compile_prompt(
     layers.append(_build_negative_prompt_layer())
     
     compiled_prompt = "\n\n".join(layers)
-    
+    compiled_prompt, removed_anchors = _strip_forbidden_style_anchors(compiled_prompt)
+    if removed_anchors:
+        import logging
+        logging.getLogger(__name__).warning(
+            "prompt_sanitized removed_anchors=%s style_id=%s",
+            ",".join(sorted(set(removed_anchors))),
+            style_id,
+        )
+
     # Validate compiled prompt
     _validate_compiled_prompt(compiled_prompt, style_id, style_desc)
     
@@ -348,6 +357,32 @@ def _build_negative_prompt_layer() -> str:
 def _style_description(style_id: str) -> str:
     from app.core.image_styles import get_style_semantic_hint
     return get_style_semantic_hint(style_id)
+
+
+def _strip_forbidden_style_anchors(text: str) -> tuple[str, list[str]]:
+    if not text:
+        return text, []
+    anchors = [
+        "korean webtoon",
+        "korean manhwa",
+        "naver webtoon",
+        "manhwa art style",
+        "webtoon art style",
+        "manhwa aesthetic",
+        "webtoon aesthetic",
+        "korean webtoon style",
+        "korean manhwa style",
+    ]
+    cleaned = text
+    removed: list[str] = []
+    for anchor in anchors:
+        pattern = rf"(?i)\b{re.escape(anchor)}\b"
+        if re.search(pattern, cleaned):
+            removed.append(anchor)
+            cleaned = re.sub(pattern, "", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip(), removed
 
 
 def _validate_compiled_prompt(prompt: str, style_id: str, style_desc: str) -> None:

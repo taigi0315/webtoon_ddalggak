@@ -422,7 +422,9 @@ function CharacterDetail({
       characterId: character.character_id,
       refTypes: ["face"],
       countPerType: 1,
-      styleId: imageStyleId ?? null
+      styleId: imageStyleId ?? null,
+      storyId,
+      autoApprove: true
     });
   };
 
@@ -441,6 +443,8 @@ function CharacterDetail({
   const hasApprovedRef = character.approved;
   const hasPrompt = Boolean(character.description || character.identity_line);
   const approvedRefs = refsQuery.data?.filter((ref) => ref.approved) ?? [];
+  const variantRefs = refsQuery.data?.filter((ref) => Boolean(ref.metadata_?.variant_type)) ?? [];
+  const baseRefs = refsQuery.data?.filter((ref) => !ref.metadata_?.variant_type) ?? [];
   const activeVariant = variantsQuery.data?.find((variant) => variant.is_active_for_story);
 
   useEffect(() => {
@@ -588,7 +592,7 @@ function CharacterDetail({
           )}
         </div>
 
-        {refsQuery.data && refsQuery.data.length > 0 && (
+        {baseRefs && baseRefs.length > 0 && (
           <div className="mt-6 border-t border-slate-100 pt-6">
             <div className="flex items-center justify-between mb-3">
                <p className="text-xs text-slate-500">
@@ -599,7 +603,7 @@ function CharacterDetail({
                </span>
             </div>
             <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
-              {refsQuery.data.map((ref) => (
+              {baseRefs.map((ref) => (
                 <div key={ref.reference_image_id} className="relative group">
                   <button
                     className={`w-full aspect-square rounded-lg overflow-hidden border-2 transition-all ${
@@ -650,6 +654,48 @@ function CharacterDetail({
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {variantRefs && variantRefs.length > 0 && (
+          <div className="mt-6 border-t border-slate-100 pt-6">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-slate-500">Variant Gallery</p>
+              <span className="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded italic">
+                Auto-generated outfit changes
+              </span>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+              {variantRefs.map((ref) => {
+                const outfit =
+                  typeof ref.metadata_?.override_attributes?.outfit === "string"
+                    ? ref.metadata_.override_attributes.outfit
+                    : null;
+                return (
+                  <div key={ref.reference_image_id} className="relative group">
+                    <button
+                      className={`w-full aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                        previewRefId === ref.reference_image_id
+                          ? "border-indigo-500 ring-2 ring-indigo-200"
+                          : "border-slate-200 hover:border-indigo-400"
+                      }`}
+                      onClick={() => setPreviewRefId(ref.reference_image_id)}
+                    >
+                      <img
+                        src={getImageUrl(ref)}
+                        alt="Character variant reference"
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                    {outfit && (
+                      <div className="absolute bottom-1 left-1 right-1 bg-slate-900/80 text-white text-[10px] text-center rounded py-0.5 px-1 line-clamp-2">
+                        {outfit}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

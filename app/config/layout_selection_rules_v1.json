@@ -5,7 +5,7 @@
     {"panel_count": 2, "min_max_weight": 0.75, "template_id": "9x16_2_70_30"},
     {"panel_count": 2, "pace": ["dialogue"], "template_id": "9x16_2_70_30"},
     {"panel_count": 2, "template_id": "9x16_2_asym"},
-    {"panel_count": 3, "scene_importance": ["cliffhanger"], "template_id": "9x16_1"},
+    {"panel_count": 1, "scene_importance": ["cliffhanger"], "template_id": "9x16_1"},
     {"panel_count": 3, "pace": ["dialogue"], "template_id": "9x16_stacked_weighted_3"},
     {"panel_count": 3, "template_id": "9x16_3_vertical"},
     {"panel_count": 4, "template_id": "9x16_4_asym"},

@@ -3,6 +3,7 @@
 # Domain: casting
 # Description: Generate character profile sheet with full body and expression insets
 # Required Variables: image_style
+# Optional Variables: image_style_guide, character_style_guide
 # Optional Variables: gender, age_range, face_traits, hair_traits, mood, custom_prompt
 
 prompt_profile_sheet: |
@@ -10,6 +11,14 @@ prompt_profile_sheet: |
 
   STYLE CONTEXT:
   - Image Style: {{ image_style }}
+  {% if image_style_guide %}
+  - Image Style Guide:
+  {{ image_style_guide }}
+  {% endif %}
+  {% if character_style_guide %}
+  - Character Style Guide:
+  {{ character_style_guide }}
+  {% endif %}
 
   CHARACTER TRAITS:
   {% if gender %}- Gender: {{ gender }}{% endif %}

@@ -32,6 +32,7 @@ from app.db.models import (
     CharacterVariant,
     CharacterVariantSuggestion,
     Project,
+    Scene,
     Story,
     StoryCharacter,
 )
@@ -248,6 +249,7 @@ def generate_character_variant_suggestion_refs(
     story = db.get(Story, story_id)
     if story is None:
         raise HTTPException(status_code=404, detail="story not found")
+    style_id = story.default_image_style
 
     suggestions = list(
         db.execute(
@@ -348,6 +350,7 @@ def generate_character_variant_suggestion_refs(
                 variant_type=suggestion.variant_type,
                 override_attributes=suggestion.override_attributes,
                 base_reference=base_ref,
+                style_id=style_id,
             )
         except Exception as exc:  # noqa: BLE001
             results.append(
@@ -513,6 +516,8 @@ def generate_character_refs(character_id: uuid.UUID, payload: CharacterGenerateR
         )
 
     style_id = payload.style_id if payload.style_id and has_image_style(payload.style_id) else None
+    story_id = payload.story_id
+    auto_approve = bool(payload.auto_approve)
 
     generated_refs: list[CharacterReferenceImage] = []
     for ref_type in payload.ref_types:
@@ -523,6 +528,110 @@ def generate_character_refs(character_id: uuid.UUID, payload: CharacterGenerateR
                 ref_type=ref_type,
                 style_id=style_id,
             )
+            if auto_approve:
+                # Auto-approve and set primary for base refs
+                ref.approved = True
+                if ref_type == "face":
+                    stmt = select(CharacterReferenceImage).where(
+                        CharacterReferenceImage.character_id == character_id,
+                        CharacterReferenceImage.ref_type == ref_type,
+                    )
+                    for other in db.execute(stmt).scalars().all():
+                        other.is_primary = other.reference_image_id == ref.reference_image_id
+                        db.add(other)
+                db.add(ref)
+                db.commit()
+                db.refresh(ref)
+            generated_refs.append(ref)
+
+    # Auto-generate outfit variants if story_id is provided
+    if story_id:
+        story = db.get(Story, story_id)
+        if story is None:
+            raise HTTPException(status_code=404, detail="story not found")
+
+        scenes = (
+            db.execute(select(Scene).where(Scene.story_id == story_id).order_by(Scene.created_at.asc()))
+            .scalars()
+            .all()
+        )
+        plans = nodes.generate_character_variant_plan_for_story(db, story_id)
+        for plan in plans:
+            if plan.get("character_id") != character_id:
+                continue
+            override_attributes = dict(plan.get("override_attributes") or {})
+            override_attributes["scene_ids"] = override_attributes.get("scene_ids") or []
+            override_attributes["scene_range"] = override_attributes.get("scene_range")
+            override_attributes["trigger"] = override_attributes.get("trigger")
+
+            existing = (
+                db.execute(
+                    select(CharacterVariant)
+                    .where(
+                        CharacterVariant.story_id == story_id,
+                        CharacterVariant.character_id == character_id,
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            duplicate = False
+            for v in existing:
+                if (v.override_attributes or {}) == override_attributes:
+                    duplicate = True
+                    if v.reference_image_id:
+                        ref = db.get(CharacterReferenceImage, v.reference_image_id)
+                        if ref is not None:
+                            generated_refs.append(ref)
+                    break
+            if duplicate:
+                continue
+
+            base_ref = (
+                db.execute(
+                    select(CharacterReferenceImage)
+                    .where(
+                        CharacterReferenceImage.character_id == character_id,
+                        CharacterReferenceImage.ref_type == "face",
+                        CharacterReferenceImage.approved.is_(True),
+                    )
+                    .order_by(
+                        CharacterReferenceImage.is_primary.desc(),
+                        CharacterReferenceImage.created_at.desc(),
+                    )
+                    .limit(1)
+                )
+                .scalars()
+                .one_or_none()
+            )
+            if base_ref is None:
+                continue
+
+            ref = nodes.generate_character_variant_reference_image(
+                db=db,
+                character_id=character_id,
+                variant_type=plan.get("variant_type") or "outfit_change",
+                override_attributes=override_attributes,
+                base_reference=base_ref,
+                style_id=style_id,
+            )
+            if auto_approve:
+                ref.approved = True
+                db.add(ref)
+                db.commit()
+                db.refresh(ref)
+
+            variant = CharacterVariant(
+                character_id=character_id,
+                story_id=story_id,
+                variant_type=plan.get("variant_type") or "outfit_change",
+                override_attributes=override_attributes,
+                reference_image_id=ref.reference_image_id,
+                is_active_for_story=False,
+            )
+            db.add(variant)
+            db.commit()
+            db.refresh(variant)
             generated_refs.append(ref)
 
     return CharacterGenerateRefsResponse(

@@ -20,8 +20,16 @@ prompt_panel_semantics: |
 
   **CINEMATOGRAPHER ROLE: LAYOUT & COMPOSITION ONLY**
   
-  Fill in DETAILED visual LAYOUT and COMPOSITION for each panel. Each description must be 35-60 words.
+  Fill in DETAILED visual LAYOUT and COMPOSITION for each panel. Each description must be 25-45 words.
   Focus EXCLUSIVELY on spatial arrangement, camera work, and physical positioning.
+
+  **NO FEELINGS / NO ABSTRACT MEANING:**
+  - Do NOT describe feelings, moods, or themes. Only describe what is visible.
+  - If a scene is abstract, translate it into DIRECT, PHYSICAL imagery.
+  - Every panel must be drawable without interpretation.
+  Example:
+  - BAD: "A close-up that symbolizes love"
+  - GOOD: "Close-up of two hands clasping, fingers interlaced, tight crop on knuckles, camera: closeup"
   
   **FORBIDDEN ELEMENTS (handled by Art Director):**
   - DO NOT specify lighting quality (soft/harsh/dramatic)
@@ -35,7 +43,7 @@ prompt_panel_semantics: |
   - Spatial composition and arrangement
   - Environment structure, architecture, props
   - Physical actions and movements
-  - Emotional readability through body language and micro-actions
+  - Visible actions and concrete gestures (no emotions)
   
   {% if intent_block %}
   {{ intent_block }}
@@ -51,7 +59,7 @@ prompt_panel_semantics: |
 
   **VISUAL PROMPT FORMULA (LAYOUT FOCUS):**
   [shot_type], vertical 9:16 webtoon panel, [composition with character % of frame],
-  [environment with 2-4 specific details: architecture, props, spatial arrangement],
+  [environment with 1-3 specific details: architecture, props, spatial arrangement],
   [character placement: position in frame, posture, action, expression, body language],
   [camera angle and perspective]
 
@@ -65,7 +73,7 @@ prompt_panel_semantics: |
   - reveal: Subject entering or being unveiled, dramatic framing
   - impact_silence: Minimal elements, 70%+ negative space, frozen moment, stark composition
 
-  **ENVIRONMENT DETAILS MUST INCLUDE (2-4 per panel):**
+  **ENVIRONMENT DETAILS MUST INCLUDE (1-3 per panel):**
   1. Architecture/space (walls, windows, ceiling, floor material)
   2. Furniture/major objects (tables, chairs, counters)
   3. Small props (cups, phones, books, bags)

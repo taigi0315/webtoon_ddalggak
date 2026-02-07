@@ -168,31 +168,49 @@ def _panel_count_for_importance(
     importance = (scene_importance or "").lower()
     word_count = len(re.findall(r"\w+", scene_text or ""))
 
-    # Maximum 5 panels per scene image
+    # Default range 1-3. Allow 4-5 only for special fast/montage cases.
     MAX_PANELS = 5
+    DEFAULT_MAX = 3
+
+    def _needs_many_panels(text: str) -> bool:
+        text_lower = (text or "").lower()
+        if len(re.findall(r"[.!?]+", text_lower)) >= 7:
+            return True
+        if re.search(
+            r"\b(montage|sequence|series of|step by step|one after another|rapid|quickly|rapidly|in rapid succession|cut to|meanwhile)\b",
+            text_lower,
+        ):
+            return True
+        if re.search(r"\b(runs?|chases?|fights?|strikes?|dodges?|leaps?|rushes?)\b", text_lower):
+            return True
+        return False
 
     if importance in {"climax", "cliffhanger"}:
         # Impact moments: single powerful panel
         return 1
     if importance == "release":
         # Resolution scenes: allow longer decompression beats.
-        if word_count >= 220:
-            return 5
-        if word_count >= 120:
-            return 4
-        return 2
+        if _needs_many_panels(scene_text):
+            if word_count >= 220:
+                return 5
+            if word_count >= 120:
+                return 4
+        return min(2, DEFAULT_MAX)
     if importance == "setup":
-        # Setup scenes: use more panels for spatial/emotional context.
-        return MAX_PANELS
+        # Setup scenes: 2-3 panels unless montage-speed text demands more.
+        if _needs_many_panels(scene_text):
+            return min(MAX_PANELS, 4)
+        return 2 if word_count < 120 else DEFAULT_MAX
     if importance == "build":
         # Build scenes: scale with content length for pacing flexibility.
-        if word_count >= 220:
-            return 5
-        if word_count >= 120:
-            return 4
-        return max(2, min(int(fallback), MAX_PANELS))
+        if _needs_many_panels(scene_text):
+            if word_count >= 220:
+                return 5
+            if word_count >= 120:
+                return 4
+        return max(1, min(int(fallback), DEFAULT_MAX))
 
-    return max(1, min(int(fallback), MAX_PANELS))
+    return max(1, min(int(fallback), DEFAULT_MAX))
 
 
 def _derive_panel_plan_features(panel_plan: dict, character_names: list[str] | None = None) -> dict:

@@ -214,6 +214,7 @@ def compute_character_profiles_llm(
 def normalize_character_profiles_llm(
     profiles: list[dict],
     source_text: str = "",
+    style_id: str | None = None,
     gemini: GeminiClient | None = None,
 ) -> list[dict]:
     """LLM-enhanced character normalization with appearance details.
@@ -232,7 +233,7 @@ def normalize_character_profiles_llm(
         logger.error("character_normalizer fail-fast: Gemini client missing")
         raise RuntimeError("character_normalizer requires Gemini client (fallback disabled)")
 
-    prompt = _prompt_character_normalization(profiles, source_text)
+    prompt = _prompt_character_normalization(profiles, source_text, style_id=style_id)
     logger.info("character_normalizer llm request started (input_characters=%s)", len(profiles))
     result = _maybe_json_from_gemini(gemini, prompt)
 

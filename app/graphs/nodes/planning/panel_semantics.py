@@ -121,18 +121,22 @@ def run_panel_semantic_filler(
                 logger.error("panel_semantics fail-fast: Gemini client missing (scene_id=%s)", scene_id)
                 raise RuntimeError("panel_semantics requires Gemini client (fallback disabled)")
 
-            llm = _maybe_json_from_gemini(
-                gemini,
-                _prompt_panel_semantics(
-                    scene.source_text,
-                    panel_plan.payload,
-                    layout.payload,
-                    characters,
-                    scene_intent=scene_intent,
-                ),
+            prompt = _prompt_panel_semantics(
+                scene.source_text,
+                panel_plan.payload,
+                layout.payload,
+                characters,
+                scene_intent=scene_intent,
             )
+            llm = _maybe_json_from_gemini(gemini, prompt)
             if not isinstance(llm, dict) or not isinstance(llm.get("panels"), list):
-                logger.error("panel_semantics generation failed: invalid Gemini JSON (scene_id=%s)", scene_id)
+                logger.error(
+                    "panel_semantics generation failed: invalid Gemini JSON (scene_id=%s request_id=%s model=%s prompt_len=%s)",
+                    scene_id,
+                    gemini.last_request_id,
+                    gemini.last_model,
+                    len(prompt),
+                )
                 raise RuntimeError("panel_semantics failed: Gemini returned invalid JSON")
 
             payload = {

@@ -114,6 +114,11 @@ def generate_character_profile_sheet(
         The character is NOT saved to the database - just the image.
     """
     # Build prompt from traits
+    from app.config.loaders import load_character_style_text, load_style_guide_text
+
+    image_style_guide = load_style_guide_text(image_style_id)
+    character_style_guide = load_character_style_text(image_style_id)
+
     prompt = render_prompt(
         "prompt_profile_sheet",
         gender=traits.get("gender"),
@@ -123,6 +128,8 @@ def generate_character_profile_sheet(
         mood=traits.get("mood"),
         custom_prompt=traits.get("custom_prompt"),
         image_style=image_style_id,
+        image_style_guide=image_style_guide,
+        character_style_guide=character_style_guide,
     )
 
     project_info = f"project {project_id}" if project_id else "global"

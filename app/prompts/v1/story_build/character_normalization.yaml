@@ -2,6 +2,7 @@
 # Version: 2.0 (Style-Neutral)
 # Description: Enrich character profiles with detailed morphological descriptions (style-agnostic)
 # Required Variables: characters_json, story_context
+# Optional Variables: image_style_guide, character_style_guide
 # Output Schema: { characters: [{ name, role, description, gender, age_range, appearance, outfit, identity_line }] }
 
 prompt_character_normalization: |
@@ -32,6 +33,16 @@ prompt_character_normalization: |
 
   Story context:
   {{ story_context }}
+
+  {% if image_style_guide %}
+  IMAGE STYLE GUIDE (use for proportions/visual conventions ONLY, do NOT copy style keywords):
+  {{ image_style_guide }}
+  {% endif %}
+
+  {% if character_style_guide %}
+  CHARACTER STYLE GUIDE (use for gender dimorphism, facial construction, proportions; do NOT copy style keywords):
+  {{ character_style_guide }}
+  {% endif %}
 
   **AGE-BASED PHYSICAL STANDARDS (Style-Agnostic):**
 

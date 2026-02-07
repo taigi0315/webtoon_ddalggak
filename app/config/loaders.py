@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -91,6 +93,31 @@ class ImageStylesV1(BaseModel):
 
 # Global config version counter (incremented on cache clear)
 _config_version = 0
+_WEBTOON_STYLE_ROOT = Path(__file__).resolve().parent.parent / "assets" / "example_webtoon"
+_STYLE_GUIDE_FILENAME = "STYLE_GUIDE.md"
+_CHARACTER_STYLE_FILENAME = "CHARACTER_STYLE.md"
+
+
+def _strip_forbidden_style_anchors(text: str) -> str:
+    if not text:
+        return text
+    anchors = [
+        "korean webtoon",
+        "korean manhwa",
+        "naver webtoon",
+        "manhwa art style",
+        "webtoon art style",
+        "manhwa aesthetic",
+        "webtoon aesthetic",
+        "korean webtoon style",
+        "korean manhwa style",
+    ]
+    cleaned = text
+    for anchor in anchors:
+        cleaned = re.sub(rf"(?i)\\b{re.escape(anchor)}\\b", "", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
 
 
 def clear_config_cache():
@@ -104,6 +131,8 @@ def clear_config_cache():
     load_continuity_rules_v1.cache_clear()
     load_qc_rules_v1.cache_clear()
     load_image_styles_v1.cache_clear()
+    load_style_guide_text.cache_clear()
+    load_character_style_text.cache_clear()
 
 
 def get_config_version() -> int:
@@ -130,6 +159,30 @@ def get_layout_template(template_id: str) -> LayoutTemplate:
 def has_image_style(style_id: str) -> bool:
     lib = load_image_styles_v1()
     return any(s.id == style_id for s in lib.styles)
+
+
+def _style_dir_label(dir_name: str) -> str:
+    return dir_name.replace("-", " ").replace("_", " ").title()
+
+
+def _read_text_file(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return ""
+
+
+def _extract_summary(text: str, max_chars: int = 200) -> str:
+    if not text:
+        return ""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    # Prefer the first non-header line
+    for line in lines:
+        if not line.startswith("#"):
+            return (line[: max_chars - 1] + "…") if len(line) > max_chars else line
+    # Fallback to first header or truncated raw
+    raw = lines[0] if lines else text
+    return (raw[: max_chars - 1] + "…") if len(raw) > max_chars else raw
 
 
 def _panel_plan_count(panel_plan) -> int:
@@ -272,7 +325,51 @@ def load_qc_rules_v1() -> QcRulesV1:
 @lru_cache(maxsize=1)
 def load_image_styles_v1() -> ImageStylesV1:
     """Load image styles."""
+    styles: list[StyleItem] = []
+    if _WEBTOON_STYLE_ROOT.exists():
+        for style_dir in sorted(p for p in _WEBTOON_STYLE_ROOT.iterdir() if p.is_dir()):
+            guide_path = style_dir / _STYLE_GUIDE_FILENAME
+            if not guide_path.exists():
+                continue
+            guide_text = _read_text_file(guide_path)
+            styles.append(
+                StyleItem(
+                    id=style_dir.name,
+                    label=_style_dir_label(style_dir.name),
+                    description=_extract_summary(guide_text),
+                    image_url=None,
+                )
+            )
+        if styles:
+            return ImageStylesV1(version="webtoon_styles_v1", styles=styles)
+
     path = _CONFIG_DIR / "image_styles.json"
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return ImageStylesV1.model_validate(data)
+
+
+@lru_cache(maxsize=128)
+def load_style_guide_text(style_id: str) -> Optional[str]:
+    if not style_id:
+        return None
+    if not _WEBTOON_STYLE_ROOT.exists():
+        return None
+    path = _WEBTOON_STYLE_ROOT / style_id / _STYLE_GUIDE_FILENAME
+    text = _read_text_file(path)
+    if not text:
+        return None
+    return _strip_forbidden_style_anchors(text)
+
+
+@lru_cache(maxsize=128)
+def load_character_style_text(style_id: str) -> Optional[str]:
+    if not style_id:
+        return None
+    if not _WEBTOON_STYLE_ROOT.exists():
+        return None
+    path = _WEBTOON_STYLE_ROOT / style_id / _CHARACTER_STYLE_FILENAME
+    text = _read_text_file(path)
+    if not text:
+        return None
+    return _strip_forbidden_style_anchors(text)

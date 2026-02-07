@@ -503,13 +503,17 @@ export async function generateCharacterRefs(params: {
   refTypes?: string[];
   countPerType?: number;
   styleId?: string | null;
+  storyId?: string | null;
+  autoApprove?: boolean;
 }) {
   const payload = await fetchJson(`/v1/characters/${params.characterId}/generate-refs`, {
     method: "POST",
     body: JSON.stringify({
       ref_types: params.refTypes ?? ["face"],
       count_per_type: params.countPerType ?? 2,
-      style_id: params.styleId ?? null
+      style_id: params.styleId ?? null,
+      story_id: params.storyId ?? null,
+      auto_approve: params.autoApprove ?? true
     })
   });
   return characterGenerateRefsResponseSchema.parse(payload);

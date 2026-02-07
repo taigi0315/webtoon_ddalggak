@@ -1,0 +1,44 @@
+# Variant Plan Prompt
+# Version: 1.0
+# Description: Decide if character variants are needed and map them to scenes
+# Required Variables: char_list, story_id, story_title, scene_list
+# Output Schema: { variants: [{ character_name, variant_type, override_attributes }] }
+
+prompt_variant_plan: |
+  You are a webtoon continuity director.
+  Your job: decide if any character needs a VARIANT (outfit/appearance) because
+  the previously created character no longer makes sense for later scenes.
+
+  Rules:
+  - Output ONLY valid JSON (no commentary, no markdown).
+  - Be conservative: only add a variant if it is clearly required by the story.
+  - Background/location changes alone are NOT a reason for a character variant.
+  - Only create variants for explicit outfit or appearance changes.
+  - Do NOT invent extra variants for minor mood/emotion changes.
+  - Use only characters from this list: {{ char_list }}.
+  - If no variant is needed, return { "variants": [] }.
+  - Always include scene_ids for the scenes where the variant SHOULD be used.
+  - scene_range is a human-readable summary like "1-4" or "5-8".
+
+  Story ID: {{ story_id }}
+  Title: {{ story_title }}
+
+  Scenes (ordered):
+  {{ scene_list }}
+
+  Return JSON:
+  {
+    "variants": [
+      {
+        "character_name": "NAME",
+        "variant_type": "outfit_change",
+        "override_attributes": {
+          "outfit": "short visual description",
+          "scene_ids": ["SCENE_ID_1", "SCENE_ID_2"],
+          "scene_range": "5-8",
+          "trigger": "why the previous outfit/appearance no longer makes sense",
+          "reason": "short justification"
+        }
+      }
+    ]
+  }

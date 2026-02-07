@@ -51,6 +51,22 @@ def _prompt_variant_suggestions(
     )
 
 
+def _prompt_variant_plan(
+    story_id: uuid.UUID,
+    story_title: str,
+    scene_list: str,
+    character_names: list[str],
+) -> str:
+    char_list = ", ".join(character_names) if character_names else "Unknown"
+    return render_prompt(
+        "prompt_variant_plan",
+        story_id=story_id,
+        story_title=story_title,
+        scene_list=scene_list,
+        char_list=char_list,
+    )
+
+
 def _prompt_scene_intent(scene_text: str, character_names: list[str] | None = None) -> str:
     """Production-grade scene intent extraction prompt."""
     char_list = ", ".join(character_names) if character_names else "unknown"
@@ -250,9 +266,21 @@ def _prompt_character_extraction(
     )
 
 
-def _prompt_character_normalization(characters: list[dict], source_text: str) -> str:
+def _prompt_character_normalization(
+    characters: list[dict],
+    source_text: str,
+    style_id: str | None = None,
+) -> str:
     """Prompt for LLM-based character enrichment with Korean manhwa aesthetics."""
     char_list = json.dumps(characters, indent=2)
+
+    image_style_guide = None
+    character_style_guide = None
+    if style_id:
+        from app.config.loaders import load_character_style_text, load_style_guide_text
+
+        image_style_guide = load_style_guide_text(style_id)
+        character_style_guide = load_character_style_text(style_id)
 
     return render_prompt(
         "prompt_character_normalization",
@@ -260,6 +288,8 @@ def _prompt_character_normalization(characters: list[dict], source_text: str) ->
         global_constraints=GLOBAL_CONSTRAINTS,
         characters_json=char_list,
         story_context=source_text[:1500],
+        image_style_guide=image_style_guide,
+        character_style_guide=character_style_guide,
     )
 
 

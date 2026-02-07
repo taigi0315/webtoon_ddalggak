@@ -82,7 +82,7 @@ def _persist_progress(state: StoryBuildState, progress: dict) -> None:
 def _node_validate_inputs(state: StoryBuildState) -> dict[str, Any]:
     max_scenes = max(1, min(int(state.get("max_scenes") or 6), 30))
     max_characters = max(1, min(int(state.get("max_characters") or 6), 20))
-    panel_count = max(1, min(int(state.get("panel_count") or 3), 12))
+    panel_count = max(1, min(int(state.get("panel_count") or 3), 3))
 
     story_style = state.get("story_style")
     image_style = state.get("image_style")
@@ -291,6 +291,7 @@ def _node_llm_character_normalizer(state: StoryBuildState, gemini: GeminiClient 
             profiles = nodes.normalize_character_profiles_llm(
                 state.get("characters", []),
                 source_text=state.get("story_text", ""),
+                style_id=state.get("image_style"),
                 gemini=gemini,
             )
         except Exception:
